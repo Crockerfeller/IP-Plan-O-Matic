@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IP Plan-O-Matic — Free Visual Subnet Calculator, IPv4/IPv6 Planner &amp; VLSM Tool</title>
-<meta name="description" content="Free browser-based subnet calculator and IP address planner. Divide and join IPv4 subnets visually, auto-plan with VLSM by host count, track names, VLANs and status, check overlaps, summarize routes, plan IPv6 prefixes, and export Cisco, Junos, MikroTik or Terraform config. Handles AWS, Azure and Google Cloud reserved addresses.">
+<meta name="description" content="Free browser-based subnet calculator and IP address planner. Divide and join IPv4 subnets visually on a color-coded map, plan several base networks at once, auto-plan with VLSM by host count, track names, VLANs and status, check overlaps, summarize routes, plan IPv6 prefixes, and export Cisco, Junos, MikroTik or Terraform config. Handles AWS, Azure, Google Cloud and Oracle Cloud reserved addresses. Works offline.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="author" content="Huddacaster">
 <link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/">
@@ -19,7 +19,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="IP Plan-O-Matic">
 <meta property="og:title" content="IP Plan-O-Matic — Free Visual Subnet Planner &amp; VLSM Calculator">
-<meta property="og:description" content="Plan IPv4 and IPv6 networks visually: divide and join subnets, VLSM auto-planning, VLAN and status tracking, cloud-aware reserved IPs, and config export. Free, runs in your browser, plans share by URL.">
+<meta property="og:description" content="Plan IPv4 and IPv6 networks visually: divide and join subnets on an address map, VLSM auto-planning, VLAN and status tracking, cloud-aware reserved IPs, and config export. Free, runs in your browser and offline, plans share by URL.">
 <meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/">
 <meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -30,7 +30,7 @@
 <meta name="twitter:site" content="@wangooroo">
 <meta name="twitter:creator" content="@wangooroo">
 <meta name="twitter:title" content="IP Plan-O-Matic — Free Visual Subnet Planner">
-<meta name="twitter:description" content="Visual IPv4/IPv6 subnet planner with VLSM, divide/join, cloud reserved IPs, config export and shareable links.">
+<meta name="twitter:description" content="Visual IPv4/IPv6 subnet planner with an address map, VLSM, divide/join, cloud reserved IPs, config export, saved plans and shareable links. Works offline.">
 <meta name="twitter:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
 
 <script type="application/ld+json">
@@ -52,12 +52,16 @@
   "featureList": [
     "Visual IPv4 subnet divide and join",
     "VLSM auto-planning by host count",
-    "AWS, Azure and Google Cloud reserved address rules",
+    "Several base networks in one plan",
+    "Color-coded address map",
+    "AWS, Azure, Google Cloud and Oracle Cloud reserved address rules",
     "Name, VLAN, status and notes per subnet",
+    "Undo and redo",
     "Overlap checker and route summarization",
-    "IPv6 prefix planning with nibble splits and ULA generator",
+    "IPv6 prefix planning with nibble splits, auto-planning by count and ULA generator",
     "Export to Cisco IOS, Juniper Junos, MikroTik, Terraform, CSV and JSON",
-    "Plans saved in a shareable URL"
+    "Plans saved in a shareable URL and in the browser",
+    "Installable and works offline"
   ]
 }
 </script>
@@ -71,9 +75,11 @@
     { "@type": "Question", "name": "Why does AWS reserve 5 IP addresses in every subnet?",
       "acceptedAnswer": { "@type": "Answer", "text": "AWS reserves the first four addresses (network ID, VPC router, DNS, and one for future use) and the last address of every subnet, so a /24 in a VPC has 251 usable addresses. Azure also reserves five, Google Cloud four, and Oracle Cloud (OCI) three: the network ID, the gateway and the broadcast address. IP Plan-O-Matic applies these rules when you pick the platform." } },
     { "@type": "Question", "name": "What is VLSM?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Variable Length Subnet Masking means giving each subnet a size that fits its needs instead of making them all equal. List each network and its host count and the Auto-plan tab picks the smallest prefix for each and packs them, largest first, into your address block without overlaps." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "Variable Length Subnet Masking means giving each subnet a size that fits its needs instead of making them all equal. List each network and its host count and the Auto-plan tab picks the smallest prefix for each and places them, largest first, into your address block without overlaps. It can replace the plan or fill only the free space around subnets you already have." } },
     { "@type": "Question", "name": "Is my network plan sent to a server?",
-      "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs in your browser. The plan is stored in the page address (after the #), which browsers do not send to the server, so a bookmark or a copied link saves and shares the whole plan." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Everything runs in your browser. The plan is stored in the page address (after the #), which browsers do not send to the server, so a bookmark or a copied link saves and shares the whole plan. Saved plans and the autosaved working plan are kept in your browser's own storage." } },
+    { "@type": "Question", "name": "Does IP Plan-O-Matic work offline?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. After your first visit the app is cached, so it opens and works without a connection. You can also install it from the browser menu (Install app, or Add to Home Screen on a phone)." } },
     { "@type": "Question", "name": "What size IPv6 prefix should a LAN use?",
       "acceptedAnswer": { "@type": "Answer", "text": "A /64 is the standard size for a single LAN or VLAN, and SLAAC requires it. Sites typically receive a /48 or /56, which you split on nibble (4-bit) boundaries to keep prefixes readable and reverse DNS clean. Point-to-point links often use /127." } }
   ]
@@ -470,6 +476,9 @@
     .actions { margin-left: 0; width: 100%; }
     .actions button { flex: 1 1 calc(50% - 4px); }
     th, td { padding: 8px 10px; }
+    .top-btns { flex-direction: column; gap: 6px; }
+    #plansBtn { width: 38px; padding: 0; justify-content: center; }
+    #plansBtn .btn-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   }
   /* Phone: logo and theme button share one row, so scale the logo (same proportions) to fit */
   @media (max-width: 420px) {
@@ -544,7 +553,7 @@
     <div class="top-btns no-print">
       <button type="button" id="plansBtn" title="Save this plan in your browser, or open one you saved" aria-haspopup="dialog">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-        Plans
+        <span class="btn-txt">Plans</span>
       </button>
       <button class="icon" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -582,7 +591,7 @@
   <main>
   <div class="intro">
     <h1>Free visual subnet calculator &amp; IP address planner</h1>
-    <p>Split an IPv4 block into subnets with a click, auto-size them with VLSM, label each with a name, VLAN and status, and export ready-to-edit router or Terraform config. Cloud-aware for AWS, Azure and Google Cloud. Runs entirely in your browser, and your plan lives in the link.</p>
+    <p>Split an IPv4 block into subnets with a click, see it on a color-coded map, auto-size subnets with VLSM, label each with a name, VLAN and status, and export ready-to-edit router or Terraform config. Cloud-aware for AWS, Azure, Google Cloud and Oracle Cloud. Runs entirely in your browser, even offline, and your plan lives in the link.</p>
   </div>
   <noscript><div class="card pad nojs"><b>IP Plan-O-Matic needs JavaScript</b> to calculate and draw subnets. Please enable it, or read about what the tool does below.</div></noscript>
 
@@ -682,7 +691,8 @@
         </table>
       </div>
       <div class="help">
-        <p>Click <b>Divide</b> to split a subnet in half. Click a colored bar on the right to join every subnet it covers back into one. Type straight into Name, VLAN and Notes; set Status to track what is in use.</p>
+        <p>Click <b>Divide</b> to split a subnet in half. Click a colored bar on the right to join every subnet it covers back into one. Type straight into Name, VLAN and Notes; set Status to track what is in use. Made a mistake? <b>Undo</b> (Ctrl+Z / ⌘Z) steps back through every change.</p>
+        <p>Use <b>Add</b> to carve out a specific subnet like <kbd>10.0.5.0/24 Servers</kbd>. A network outside every base network becomes another base network, so one plan can cover HQ, branches and cloud VPCs, each with its own platform.</p>
         <p>Tip: paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field. The page address updates as you work (names and VLANs included), so a bookmark or copied link saves the whole plan.</p>
       </div>
     </div>
@@ -865,12 +875,14 @@
     <h2 id="about-h">About IP Plan-O-Matic</h2>
     <p>IP Plan-O-Matic is a free <b>subnet calculator</b> and <b>IP address management (IPAM) planner</b> for network engineers, sysadmins, cloud architects, homelabbers and CCNA students. Instead of calculating one subnet at a time, you lay out a whole address plan: start from a block such as <span class="mono">10.0.0.0/16</span>, divide it into halves as many times as you need, and join neighbors back together by clicking the colored bars.</p>
     <ul>
-      <li><b>IPv4 subnet planner:</b> network, broadcast, usable range, gateway, netmask, wildcard mask, binary and host count for every subnet.</li>
-      <li><b>VLSM calculator:</b> list networks with host counts (and optional VLANs and growth headroom) and get a packed, overlap-free plan.</li>
+      <li><b>IPv4 subnet planner:</b> network, broadcast, usable range, gateway, netmask, wildcard mask, binary and host count for every subnet, on a color-coded address map, with undo and redo.</li>
+      <li><b>Several base networks:</b> keep HQ, branch and cloud ranges in one plan, each with its own platform rules; overlaps between them are refused.</li>
+      <li><b>VLSM calculator:</b> list networks with host counts (and optional VLANs and growth headroom) and get a packed, overlap-free plan, or fill only the free space around subnets you already have.</li>
       <li><b>Cloud rules:</b> AWS VPC, Azure VNet, Google Cloud VPC and Oracle Cloud (OCI) VCN reserved addresses and minimum subnet sizes.</li>
       <li><b>Overlap checker and route summarization:</b> check new plans against existing networks, VPN peers or VPCs, and collapse lists of routes into the fewest CIDR blocks or a single supernet.</li>
       <li><b>Address info:</b> RFC 1918 private, CGNAT, link-local, documentation, multicast and other special ranges, plus the reverse DNS (in-addr.arpa) zone.</li>
-      <li><b>IPv6 prefix planner:</b> split a /48 or /56 by bit or nibble, name each prefix, and generate a random ULA.</li>
+      <li><b>IPv6 prefix planner:</b> split a /48 or /56 by bit or nibble, give each prefix a name, VLAN, status and notes, auto-plan by count (like twelve /56s for sites), and generate a random ULA.</li>
+      <li><b>Saved plans and offline use:</b> save named plans in your browser, export them as a backup, and install the app to use it without a connection.</li>
       <li><b>Export:</b> Cisco IOS / IOS-XE, Juniper Junos, MikroTik RouterOS, Terraform for AWS, Azure, Google Cloud and Oracle Cloud, CSV and JSON, with optional DHCP pools.</li>
     </ul>
 
@@ -885,11 +897,15 @@
     </details>
     <details>
       <summary>What is VLSM, and how do I use the auto-planner?</summary>
-      <p>Variable Length Subnet Masking gives each subnet a size that fits its needs instead of making them all equal. On the Auto-plan tab, list each network as <span class="mono">Name, hosts</span> (optionally <span class="mono">, VLAN</span>). The tool picks the smallest prefix for each, packs them largest first into your base network, and can apply the result to the planner.</p>
+      <p>Variable Length Subnet Masking gives each subnet a size that fits its needs instead of making them all equal. On the Auto-plan tab, list each network as <span class="mono">Name, hosts</span> (optionally <span class="mono">, VLAN</span>). The tool picks the smallest prefix for each and places them largest first, each in the smallest free space that fits. <b>Replace the plan</b> starts from an empty base network; <b>Fill free space</b> keeps the subnets you already named or marked in use. Then apply the result to the planner.</p>
     </details>
     <details>
       <summary>Is my network plan sent to a server?</summary>
-      <p>No. All calculation happens in your browser. The plan is stored in the page address after the <span class="mono">#</span>, which browsers never send to the web server, so a bookmark or a copied link saves and shares the whole plan, names and VLANs included.</p>
+      <p>No. All calculation happens in your browser. The plan is stored in the page address after the <span class="mono">#</span>, which browsers never send to the web server, so a bookmark or a copied link saves and shares the whole plan, names and VLANs included. Saved plans and the autosaved working plan stay in your browser’s own storage.</p>
+    </details>
+    <details>
+      <summary>Does it work offline?</summary>
+      <p>Yes. After your first visit the app is cached, so it opens and works without a connection. You can also install it from your browser’s menu (<b>Install app</b>, or <b>Add to Home Screen</b> on a phone).</p>
     </details>
     <details>
       <summary>What size IPv6 prefix should a LAN use?</summary>
