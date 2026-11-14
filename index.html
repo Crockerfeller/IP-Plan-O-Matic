@@ -68,7 +68,7 @@
     { "@type": "Question", "name": "How many usable hosts are in a subnet?",
       "acceptedAnswer": { "@type": "Answer", "text": "A subnet with prefix length /n has 2^(32−n) addresses. On a standard network two are reserved (the network ID and the broadcast address), so a /24 has 256 addresses and 254 usable hosts. A /31 point-to-point link uses both addresses (RFC 3021), and a /32 is a single host." } },
     { "@type": "Question", "name": "Why does AWS reserve 5 IP addresses in every subnet?",
-      "acceptedAnswer": { "@type": "Answer", "text": "AWS reserves the first four addresses (network ID, VPC router, DNS, and one for future use) and the last address of every subnet, so a /24 in a VPC has 251 usable addresses. Azure also reserves five; Google Cloud reserves four. IP Plan-O-Matic applies these rules when you pick the platform." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "AWS reserves the first four addresses (network ID, VPC router, DNS, and one for future use) and the last address of every subnet, so a /24 in a VPC has 251 usable addresses. Azure also reserves five, Google Cloud four, and Oracle Cloud (OCI) three: the network ID, the gateway and the broadcast address. IP Plan-O-Matic applies these rules when you pick the platform." } },
     { "@type": "Question", "name": "What is VLSM?",
       "acceptedAnswer": { "@type": "Answer", "text": "Variable Length Subnet Masking means giving each subnet a size that fits its needs instead of making them all equal. List each network and its host count and the Auto-plan tab picks the smallest prefix for each and packs them, largest first, into your address block without overlaps." } },
     { "@type": "Question", "name": "Is my network plan sent to a server?",
@@ -523,6 +523,7 @@
             <option value="aws">AWS VPC</option>
             <option value="azure">Azure VNet</option>
             <option value="gcp">Google Cloud VPC</option>
+            <option value="oci">Oracle Cloud (OCI) VCN</option>
           </select>
         </div>
         <div class="field" id="gwField">
@@ -644,6 +645,7 @@
             <option value="tf-aws">Terraform: AWS</option>
             <option value="tf-azure">Terraform: Azure</option>
             <option value="tf-gcp">Terraform: Google Cloud</option>
+            <option value="tf-oci">Terraform: Oracle Cloud (OCI)</option>
             <option value="csv">CSV (all columns)</option>
             <option value="json">JSON (full plan, re-importable)</option>
           </select>
@@ -718,11 +720,11 @@
     <ul>
       <li><b>IPv4 subnet planner:</b> network, broadcast, usable range, gateway, netmask, wildcard mask, binary and host count for every subnet.</li>
       <li><b>VLSM calculator:</b> list networks with host counts (and optional VLANs and growth headroom) and get a packed, overlap-free plan.</li>
-      <li><b>Cloud rules:</b> AWS VPC, Azure VNet and Google Cloud VPC reserved addresses and minimum subnet sizes.</li>
+      <li><b>Cloud rules:</b> AWS VPC, Azure VNet, Google Cloud VPC and Oracle Cloud (OCI) VCN reserved addresses and minimum subnet sizes.</li>
       <li><b>Overlap checker and route summarization:</b> check new plans against existing networks, VPN peers or VPCs, and collapse lists of routes into the fewest CIDR blocks or a single supernet.</li>
       <li><b>Address info:</b> RFC 1918 private, CGNAT, link-local, documentation, multicast and other special ranges, plus the reverse DNS (in-addr.arpa) zone.</li>
       <li><b>IPv6 prefix planner:</b> split a /48 or /56 by bit or nibble, name each prefix, and generate a random ULA.</li>
-      <li><b>Export:</b> Cisco IOS / IOS-XE, Juniper Junos, MikroTik RouterOS, Terraform for AWS, Azure and Google Cloud, CSV and JSON, with optional DHCP pools.</li>
+      <li><b>Export:</b> Cisco IOS / IOS-XE, Juniper Junos, MikroTik RouterOS, Terraform for AWS, Azure, Google Cloud and Oracle Cloud, CSV and JSON, with optional DHCP pools.</li>
     </ul>
 
     <h3>Frequently asked questions</h3>
@@ -732,7 +734,7 @@
     </details>
     <details>
       <summary>Why does AWS reserve 5 IP addresses in every subnet?</summary>
-      <p>AWS reserves the first four addresses (network ID, VPC router, DNS, and one for future use) and the last address of every subnet, so a /24 in a VPC has 251 usable addresses. Azure also reserves five; Google Cloud reserves four. Pick the platform on the Plan IPv4 tab and the host counts, gateway and exports follow those rules.</p>
+      <p>AWS reserves the first four addresses (network ID, VPC router, DNS, and one for future use) and the last address of every subnet, so a /24 in a VPC has 251 usable addresses. Azure also reserves five, Google Cloud four, and Oracle Cloud (OCI) three: the network ID, the gateway and the broadcast address. Pick the platform on the Plan IPv4 tab and the host counts, gateway and exports follow those rules.</p>
     </details>
     <details>
       <summary>What is VLSM, and how do I use the auto-planner?</summary>
@@ -894,6 +896,7 @@
     aws:   { label: 'AWS VPC', min: 28, max: 16 },
     azure: { label: 'Azure VNet', min: 29 },
     gcp:   { label: 'Google Cloud VPC', min: 29 },
+    oci:   { label: 'OCI VCN', min: 30, max: 16 },
   };
   const settings = { cloud: 'std', gw: 'first' };
   const divLimit = () => CLOUDS[settings.cloud].min;
@@ -913,8 +916,11 @@
     }
     const lbl = CLOUDS[c].label;
     if (mask > CLOUDS[c].min) r.warn = `${lbl} subnets can’t be smaller than /${CLOUDS[c].min}`;
-    if (sz < 8) return r;
-    if (c === 'gcp') {
+    if (sz < (c === 'oci' ? 4 : 8)) return r;
+    if (c === 'oci') {
+      Object.assign(r, { uF: addr + 2, uL: last - 1, hosts: sz - 3, gw: addr + 1 });
+      r.reserved = [[addr, 'the network ID'], [addr + 1, 'the default gateway (reserved by OCI)'], [last, 'the broadcast address (reserved by OCI)']];
+    } else if (c === 'gcp') {
       Object.assign(r, { uF: addr + 2, uL: last - 2, hosts: sz - 4, gw: addr + 1 });
       r.reserved = [[addr, 'the network ID'], [addr + 1, 'the default gateway (reserved by Google Cloud)'], [last - 1, 'reserved by Google Cloud'], [last, 'the broadcast address (reserved)']];
     } else {
@@ -1356,7 +1362,7 @@
       `<span><i style="background:var(--border)"></i>Free ${fmt(by.free)} (${p1(by.free)}%)</span>`;
 
     const w = [classTags(state.network, state.mask)];
-    if (settings.cloud === 'aws' && state.mask < 16) w.push('<span class="tag danger">AWS VPC CIDR blocks must be between /16 and /28</span>');
+    if (CLOUDS[settings.cloud].max && state.mask < CLOUDS[settings.cloud].max) w.push(`<span class="tag danger">${CLOUDS[settings.cloud].label} CIDR blocks must be between /${CLOUDS[settings.cloud].max} and /${CLOUDS[settings.cloud].min}</span>`);
     if (settings.cloud !== 'std' && state.mask > CLOUDS[settings.cloud].min) w.push(`<span class="tag danger">Base is smaller than the ${CLOUDS[settings.cloud].label} minimum of /${CLOUDS[settings.cloud].min}</span>`);
     if (tooSmall) w.push(`<span class="tag danger">${tooSmall} subnet${tooSmall > 1 ? 's are' : ' is'} below the ${CLOUDS[settings.cloud].label} minimum of /${CLOUDS[settings.cloud].min}</span>`);
     for (const [v, list] of Object.entries(vlans)) if (list.length > 1) w.push(`<span class="tag warn" title="${esc(list.join(', '))}">VLAN ${esc(v)} is on ${list.length} subnets</span>`);
@@ -1941,10 +1947,11 @@
       let s;
       if (style === 'tf') { s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); if (!/^[a-z_]/.test(s)) s = 'n_' + s; }
       else if (style === 'gcp') { s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 55); if (!/^[a-z]/.test(s)) s = 'n-' + s; }
+      else if (style === 'dns') { s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 13); if (!/^[a-z]/.test(s)) s = 'n' + s.slice(0, 12); }
       else if (style === 'upper') s = raw.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       else s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
       s = s || 'net';
-      const sep = style === 'tf' || style === 'upper' ? '_' : '-';
+      const sep = style === 'tf' || style === 'upper' ? '_' : style === 'dns' ? '' : '-';
       let u = s, i = 2;
       while (used.has(u)) u = s + sep + i++;
       used.add(u);
@@ -2035,7 +2042,7 @@
     return out.join('\n');
   };
   const genTf = (list, kind) => {
-    const want = { 'tf-aws': 'aws', 'tf-azure': 'azure', 'tf-gcp': 'gcp' }[kind];
+    const want = { 'tf-aws': 'aws', 'tf-azure': 'azure', 'tf-gcp': 'gcp', 'tf-oci': 'oci' }[kind];
     const out = ['# Generated by IP Plan-O-Matic. Review before applying.'];
     if (settings.cloud !== want) out.push(`# Tip: set Platform to ${CLOUDS[want].label} on the Plan tab so host counts and minimum sizes match.`);
     out.push('');
@@ -2054,6 +2061,15 @@
       out.push('resource "azurerm_virtual_network" "main" {', '  name                = "vnet-main"', `  address_space       = ["${base}"]`, '  location            = var.location', '  resource_group_name = var.resource_group_name', '}', '');
       for (const x of list) {
         out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "snet-${an(x)}"`, '  resource_group_name  = var.resource_group_name', '  virtual_network_name = azurerm_virtual_network.main.name', `  address_prefixes     = ["${x.key}"]`, '}', '');
+      }
+    } else if (kind === 'tf-oci') {
+      const nm = makeNamer('tf'), dn = makeNamer('dns');
+      out.push('variable "compartment_id" {', '  type = string', '}', '');
+      out.push('resource "oci_core_vcn" "main" {', '  compartment_id = var.compartment_id', `  cidr_blocks    = ["${base}"]`, '  display_name   = "vcn-main"', '  dns_label      = "main"', '}', '');
+      for (const x of list) {
+        out.push(`resource "oci_core_subnet" "${nm(x)}" {`, '  compartment_id = var.compartment_id', '  vcn_id         = oci_core_vcn.main.id', `  cidr_block     = "${x.key}"`, `  display_name   = "${hq(x.meta.n || x.key)}"`, `  dns_label      = "${dn(x)}"`);
+        if (x.meta.v) out.push(`  freeform_tags  = { "VLAN" = "${x.meta.v}" }`);
+        out.push('}', '');
       }
     } else {
       const nm = makeNamer('tf'), gn = makeNamer('gcp');
@@ -2085,7 +2101,7 @@
     ipv6: { prefix: v6Key(v6.net, v6.mask), tree: v6TreeStr(v6.root), names: v6.meta },
   }, null, 2);
 
-  const EXT = { cisco: 'txt', junos: 'txt', mikrotik: 'rsc', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', csv: 'csv', json: 'json' };
+  const EXT = { cisco: 'txt', junos: 'txt', mikrotik: 'rsc', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', csv: 'csv', json: 'json' };
   const renderExport = () => {
     const f = $('exFmt').value;
     const whole = f === 'json' || f === 'csv';
