@@ -424,6 +424,9 @@
 
   .v6-pfx { display: flex; align-items: center; gap: 6px; }
   .v6-btns { display: flex; gap: 6px; }
+  .v6plan > summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+  .v6plan[open] > summary { margin-bottom: 8px; }
+  .v6plan textarea { width: 100%; }
 
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
@@ -768,15 +771,34 @@
       </form>
       <div class="msg" id="v6Msg" role="status"></div>
     </div>
+    <details class="card pad v6plan" id="v6PlanCard">
+      <summary>Auto-plan prefixes by count</summary>
+      <p class="sub">One line per group: <span class="mono">Name, /length, count</span>. For example <span class="mono">Sites, /56, 12</span> or <span class="mono">Branch LANs, /64, 40</span>. Count defaults to 1. Prefixes are placed largest first in the smallest free space that fits, split on nibble boundaries where possible.</p>
+      <textarea id="v6PlanIn" spellcheck="false" placeholder="Sites, /56, 12&#10;Infrastructure, /64, 4&#10;Point-to-point links, /127, 8"></textarea>
+      <div class="row" style="margin-top:12px">
+        <div class="field">
+          <label for="v6PlanMode">Mode</label>
+          <select id="v6PlanMode" title="Replace starts from the whole prefix. Fill keeps named, VLAN-tagged, in-use and reserved prefixes.">
+            <option value="replace">Replace the plan</option>
+            <option value="fill">Fill free space (keep existing)</option>
+          </select>
+        </div>
+        <button type="button" class="primary" id="v6PlanRun">Plan it</button>
+        <button type="button" id="v6PlanExample">Load example</button>
+        <button type="button" id="v6PlanApply" hidden>Apply to IPv6 plan</button>
+      </div>
+      <div class="result" id="v6PlanOut"></div>
+    </details>
     <div class="card">
       <div class="summary" id="v6Summary" style="padding-bottom:12px; border-bottom:1px solid var(--border)"></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Prefix</th><th>Name</th><th>First – last address</th><th class="num">Size</th><th>Split</th><th>Join</th></tr></thead>
+          <thead><tr><th>Prefix</th><th>Name</th><th>VLAN</th><th>Status</th><th>Notes</th><th>First – last address</th><th class="num">Size</th><th>Split</th><th>Join</th></tr></thead>
           <tbody id="v6Body"></tbody>
         </table>
       </div>
       <div class="help">
+        <p>Type a name, VLAN and notes on any prefix, and set its status. They are saved in the link and included in CSV and JSON exports.</p>
         <p><b>÷2</b> halves a prefix. <b>÷16</b> splits on the next nibble (4 bits), which keeps prefixes readable and makes reverse DNS delegation clean, so it’s the usual choice. A <b>/64</b> is the standard size for one LAN or VLAN (SLAAC needs it); point-to-point links often use /127.</p>
       </div>
     </div>
@@ -1181,6 +1203,13 @@
   const MAX6 = 4096;
   const v6 = { net: parse6('2001:db8::'), mask: 48, root: { c: null }, meta: {} };
   const v6Key = (a, m) => `${fmt6(a)}/${m}`;
+  // v6.meta: { 'prefix/len': { n: name, v: vlan, o: note, s: 'used' | 'reserved' } }
+  const v6Get = (k) => v6.meta[k] || {};
+  const v6Set = (k, f, val) => {
+    const m = { ...v6Get(k) };
+    if (val === '' || val == null) delete m[f]; else m[f] = val;
+    if (Object.keys(m).length) v6.meta[k] = m; else delete v6.meta[k];
+  };
   const v6TreeStr = (n) => (!n.c ? '0' : (n.c.length === 16 ? 'n' : '1') + n.c.map(v6TreeStr).join(''));
   const v6TreeParse = (s, mask) => {
     let i = 0;
@@ -1311,7 +1340,11 @@
     };
     walk(v6.root, v6.net, v6.mask);
     const meta = {};
-    for (const k in v6.meta) if (keys.has(k) && v6.meta[k]) meta[k] = v6.meta[k];
+    for (const k in v6.meta) {
+      const m = v6.meta[k];
+      if (!keys.has(k) || !m || !Object.keys(m).length) continue;
+      meta[k] = Object.keys(m).length === 1 && m.n ? m.n : m;
+    }
     const p = v6Key(v6.net, v6.mask);
     if (p === V6_DEFAULT && !v6.root.c && !Object.keys(meta).length) return null;
     const o = { p, t: v6TreeStr(v6.root) };
@@ -1323,7 +1356,18 @@
     if (!p) return;
     v6.net = p.net; v6.mask = p.mask;
     try { v6.root = o.t ? v6TreeParse(String(o.t), p.mask) : { c: null }; } catch (e) { v6.root = { c: null }; }
-    v6.meta = (o.m && typeof o.m === 'object') ? { ...o.m } : {};
+    v6.meta = {};
+    if (o.m && typeof o.m === 'object') for (const [k, v] of Object.entries(o.m)) {
+      // Older links store just a name string per prefix.
+      const m = typeof v === 'string' ? { n: v } : (v && typeof v === 'object' ? v : {});
+      const clean = {};
+      if (m.n) clean.n = String(m.n);
+      if (m.v != null && validVlan(m.v)) clean.v = String(+m.v);
+      if (m.o) clean.o = String(m.o);
+      const st = normStatus(m.s);
+      if (st) clean.s = st;
+      if (Object.keys(clean).length) v6.meta[k] = clean;
+    }
   };
   const extras = () => {
     const keys = nodeKeys();
@@ -2574,7 +2618,11 @@
         firstUsable: i.uF === null ? null : ntoa(i.uF), lastUsable: i.uL === null ? null : ntoa(i.uL), hosts: i.hosts,
       };
     }),
-    ipv6: { prefix: v6Key(v6.net, v6.mask), tree: v6TreeStr(v6.root), names: v6.meta },
+    ipv6: {
+      prefix: v6Key(v6.net, v6.mask), tree: v6TreeStr(v6.root),
+      names: Object.fromEntries(Object.entries(v6.meta).filter(([, m]) => m.n).map(([k, m]) => [k, m.n])),
+      meta: v6.meta,
+    },
   }, null, 2);
 
   const EXT = { cisco: 'txt', junos: 'txt', mikrotik: 'rsc', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', csv: 'csv', json: 'json' };
@@ -2679,7 +2727,7 @@
     }
     if (v6data) {
       const t = v6data.tree ? String(v6data.tree) : '0';
-      v6Load({ p: v6data.prefix, t, m: v6data.names });
+      v6Load({ p: v6data.prefix, t, m: v6data.meta || v6data.names });
     }
     syncControls();
     update();
@@ -2735,13 +2783,42 @@
       if (lf.m === 64) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = 'LAN'; b.title = 'A /64 is the standard size for one LAN or VLAN'; pfx.append(b); }
       td(pfx);
 
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.className = 'cell-input'; inp.placeholder = 'Name'; inp.spellcheck = false;
-      inp.value = v6.meta[key] || '';
-      inp.setAttribute('aria-label', 'Name for ' + key);
-      inp.addEventListener('focus', () => { delete inp.dataset.cp; });
-      inp.addEventListener('input', () => { firstEdit(inp); if (inp.value.trim()) v6.meta[key] = inp.value; else delete v6.meta[key]; writeHashSoon(); });
-      td(inp);
+      const meta = v6Get(key);
+      if (meta.s) tr.classList.add('st-' + meta.s);
+      const textIn = (field, cls, placeholder, label) => {
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.className = 'cell-input ' + cls; inp.placeholder = placeholder; inp.spellcheck = false;
+        inp.value = meta[field] || '';
+        inp.setAttribute('aria-label', `${label} for ${key}`);
+        inp.addEventListener('focus', () => { delete inp.dataset.cp; });
+        return inp;
+      };
+      const nameIn = textIn('n', '', 'Name', 'Name');
+      nameIn.addEventListener('input', () => { firstEdit(nameIn); v6Set(key, 'n', nameIn.value.trim() ? nameIn.value : ''); writeHashSoon(); });
+      td(nameIn);
+      const vlanIn = textIn('v', 'vlan', '—', 'VLAN ID');
+      vlanIn.inputMode = 'numeric';
+      vlanIn.addEventListener('input', () => {
+        firstEdit(vlanIn);
+        const v = vlanIn.value.trim();
+        const ok = v === '' || validVlan(v);
+        vlanIn.setAttribute('aria-invalid', String(!ok));
+        vlanIn.title = ok ? '' : 'VLAN IDs run from 1 to 4094';
+        if (ok) { v6Set(key, 'v', v ? String(+v) : ''); writeHashSoon(); }
+      });
+      td(vlanIn);
+      const sel = document.createElement('select');
+      sel.className = 'status ' + (meta.s || 'free');
+      sel.setAttribute('aria-label', `Status of ${key}`);
+      for (const [v, l] of [['free', 'Free'], ['used', 'In use'], ['reserved', 'Reserved']]) {
+        const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o);
+      }
+      sel.value = meta.s || 'free';
+      sel.addEventListener('change', () => { checkpoint(); v6Set(key, 's', sel.value === 'free' ? '' : sel.value); renderV6(); writeHash(); });
+      td(sel);
+      const noteIn = textIn('o', 'note', 'Notes', 'Notes');
+      noteIn.addEventListener('input', () => { firstEdit(noteIn); v6Set(key, 'o', noteIn.value.trim() ? noteIn.value : ''); writeHashSoon(); });
+      td(noteIn);
 
       td(`${esc(fmt6(lf.a))} – ${esc(fmt6(lf.a + size6(lf.m) - 1n))}`, 'mono');
       td(lf.m <= 64 ? `${pow2Str(64 - lf.m)} × /64` : `${pow2Str(128 - lf.m)} addresses`, 'num mono');
@@ -2818,12 +2895,132 @@
   });
   $('v6Reset').addEventListener('click', () => { if (!v6.root.c) return; checkpoint(); v6.root = { c: null }; renderV6(); writeHash(); toast('IPv6 plan reset', UNDO); });
   $('v6Csv').addEventListener('click', async () => {
-    const lines = [['Prefix', 'Name', 'First address', 'Last address', 'Size'].map(csvQ).join(',')];
+    const lines = [['Prefix', 'Name', 'VLAN', 'Status', 'Notes', 'First address', 'Last address', 'Size'].map(csvQ).join(',')];
     for (const lf of v6Walk()) {
-      const k = v6Key(lf.a, lf.m);
-      lines.push([k, v6.meta[k] || '', fmt6(lf.a), fmt6(lf.a + size6(lf.m) - 1n), lf.m <= 64 ? `${pow2Text(64 - lf.m)} x /64` : `${pow2Text(128 - lf.m)} addresses`].map(csvQ).join(','));
+      const k = v6Key(lf.a, lf.m), m = v6Get(k);
+      lines.push([k, m.n || '', m.v || '', m.s || 'free', m.o || '', fmt6(lf.a), fmt6(lf.a + size6(lf.m) - 1n), lf.m <= 64 ? `${pow2Text(64 - lf.m)} x /64` : `${pow2Text(128 - lf.m)} addresses`].map(csvQ).join(','));
     }
     toast((await copyText(lines.join('\n'))) ? `Copied ${lines.length - 1} rows as CSV` : 'Couldn’t copy CSV');
+  });
+
+  // ---------- IPv6 auto-plan by count ----------
+  let v6Plan = null;
+  const v6Clone = (n) => (n.c ? { c: n.c.map(v6Clone) } : { c: null });
+  // Split a free leaf down to addr/len (16-way on nibble boundaries when 4+ bits remain, else halves).
+  // Siblings created along the way are pushed to spill as new free leaves.
+  const carve6From = (node, a, m, addr, len, spill) => {
+    while (m < len) {
+      const bits = m % 4 === 0 && len - m >= 4 ? 4 : 1;
+      node.c = Array.from({ length: 1 << bits }, () => ({ c: null }));
+      const idx = Number((addr - a) >> BigInt(128 - m - bits));
+      node.c.forEach((ch, i) => { if (i !== idx) spill.push({ node: ch, a: a + BigInt(i) * size6(m + bits), m: m + bits }); });
+      a += BigInt(idx) * size6(m + bits);
+      node = node.c[idx];
+      m += bits;
+    }
+  };
+  const v6PlanDefaults = () => {
+    if (!$('v6PlanMode').dataset.touched) $('v6PlanMode').value = Object.keys(v6.meta).length ? 'fill' : 'replace';
+  };
+  $('v6PlanMode').addEventListener('change', () => { $('v6PlanMode').dataset.touched = '1'; });
+  $('v6PlanExample').addEventListener('click', () => {
+    $('v6PlanIn').value = 'Sites, /56, 12\nData centers, /52, 2\nInfrastructure, /64, 4';
+    if (v6.mask > 48) toast('The example needs a /48 or larger prefix');
+  });
+  $('v6PlanRun').addEventListener('click', () => {
+    const out = $('v6PlanOut');
+    $('v6PlanApply').hidden = true;
+    v6Plan = null;
+    const errors = [], reqs = [];
+    $('v6PlanIn').value.split('\n').forEach((raw, i) => {
+      const l = raw.replace(/#.*$/, '').trim();
+      if (!l) return;
+      const parts = l.split(/\s*[,;\t]\s*/);
+      const named = parts.length > 1 && !/^\/?\d{1,3}$/.test(parts[0]);
+      const name = named ? parts[0] : '';
+      const rest = named ? parts.slice(1) : parts;
+      const lm = /^\/?(\d{1,3})$/.exec(rest[0] || '');
+      const len = lm ? Number(lm[1]) : NaN;
+      const count = rest[1] ? Number(rest[1]) : 1;
+      if (!lm || len > 128) { errors.push(`Line ${i + 1}: “${l}” needs a prefix length, like “Sites, /56, 12”.`); return; }
+      if (len < v6.mask) { errors.push(`Line ${i + 1}: a /${len} is bigger than ${v6Key(v6.net, v6.mask)}.`); return; }
+      if (!Number.isInteger(count) || count < 1 || count > MAX6) { errors.push(`Line ${i + 1}: the count must be a whole number from 1 to ${MAX6}.`); return; }
+      for (let k = 1; k <= count && reqs.length <= MAX6; k++) reqs.push({ name: (name || `/${len}`) + (count > 1 ? ` ${k}` : ''), len, idx: reqs.length });
+    });
+    if (!reqs.length) { out.innerHTML = `<div class="msg show error">${esc(errors[0] || 'Add at least one line, like “Sites, /56, 12”.')}</div>`; return; }
+    if (reqs.length > MAX6) { out.innerHTML = `<div class="msg show error">That asks for more than ${MAX6} prefixes.</div>`; return; }
+    const mode = $('v6PlanMode').value;
+    const root = mode === 'fill' ? v6Clone(v6.root) : { c: null };
+    let free = [];
+    const walk = (n, a, m) => {
+      if (n.c) { const bits = n.c.length === 16 ? 4 : 1; n.c.forEach((ch, i) => walk(ch, a + BigInt(i) * size6(m + bits), m + bits)); }
+      else if (mode !== 'fill' || !Object.keys(v6Get(v6Key(a, m))).length) free.push({ node: n, a, m });
+    };
+    walk(root, v6.net, v6.mask);
+    const sorted = [...reqs].sort((x, y) => x.len - y.len || x.idx - y.idx);
+    for (const r of sorted) {
+      let bi = -1;
+      free.forEach((f, i) => {
+        if (f.m > r.len) return;
+        const b = free[bi];
+        if (bi < 0 || f.m > b.m || (f.m === b.m && f.a < b.a)) bi = i;
+      });
+      if (bi < 0) { r.a = null; continue; }
+      const f = free[bi];
+      free.splice(bi, 1);
+      r.a = f.a;
+      carve6From(f.node, f.a, f.m, f.a, r.len, free);
+    }
+    const placed = sorted.filter((r) => r.a !== null), failed = sorted.filter((r) => r.a === null);
+    const rowsAfter = leafCount(root);
+    if (rowsAfter > MAX6) {
+      out.innerHTML = `<div class="msg show error">This plan would need ${fmt(rowsAfter)} rows, over the limit of ${MAX6}. Use fewer or larger prefixes.</div>`;
+      return;
+    }
+    let html = '';
+    if (errors.length) html += `<div class="msg show error">${errors.map(esc).join('<br>')}</div>`;
+    if (failed.length) {
+      const g = {};
+      for (const r of failed) g[r.len] = (g[r.len] || 0) + 1;
+      html += `<div class="msg show error">Doesn’t fit: ${Object.entries(g).map(([len, n]) => `${n} × /${len}`).join(', ')}. Use a larger prefix${mode === 'fill' ? ', free up space or switch to Replace the plan' : ''}.</div>`;
+    }
+    if (placed.length) {
+      html += `<div class="stat-line">Places <b>${placed.length}</b> prefix${placed.length > 1 ? 'es' : ''} in ${esc(v6Key(v6.net, v6.mask))}${mode === 'fill' ? ', keeping existing ones' : ''}. The plan will have ${fmt(rowsAfter)} rows.</div>`;
+      html += '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Prefix</th><th class="num">Size</th></tr></thead><tbody>';
+      for (const r of placed.slice(0, 500)) {
+        html += `<tr><td>${esc(r.name)}</td><td class="mono"><b>${esc(v6Key(r.a, r.len))}</b></td><td class="num mono">${r.len <= 64 ? `${pow2Str(64 - r.len)} × /64` : `${pow2Str(128 - r.len)} addresses`}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+      if (placed.length > 500) html += `<div class="stat-line">…and ${fmt(placed.length - 500)} more.</div>`;
+      v6Plan = { root, placed, mode, before: stateHash() };
+    }
+    out.innerHTML = html;
+    $('v6PlanApply').hidden = !v6Plan;
+  });
+  $('v6PlanApply').addEventListener('click', () => {
+    const plan = v6Plan;
+    if (!plan) return;
+    if (stateHash() !== plan.before) {
+      $('v6PlanOut').insertAdjacentHTML('afterbegin', '<div class="msg show error">The IPv6 plan changed since this was calculated. Click Plan it again.</div>');
+      $('v6PlanApply').hidden = true;
+      v6Plan = null;
+      return;
+    }
+    if (plan.mode === 'replace' && (v6.root.c || Object.keys(v6.meta).length) && !confirm(`Replace the current IPv6 plan for ${v6Key(v6.net, v6.mask)}?`)) return;
+    checkpoint();
+    v6.root = plan.root;
+    if (plan.mode === 'replace') v6.meta = {};
+    for (const r of plan.placed) {
+      const k = v6Key(r.a, r.len);
+      v6Set(k, 'n', r.name);
+      v6Set(k, 's', 'used');
+    }
+    v6Plan = null;
+    $('v6PlanApply').hidden = true;
+    $('v6PlanOut').innerHTML = '';
+    renderV6();
+    writeHash();
+    toast(`Applied ${plan.placed.length} IPv6 prefixes`, UNDO);
   });
 
   // =====================================================================
@@ -2841,6 +3038,7 @@
     if (t === 'export') renderExport();
     if (t === 'vlsm') updateVlsmBase();
     if (t === 'tools') runInfo();
+    if (t === 'v6') v6PlanDefaults();
   };
   for (const x of TABS) $('tb-' + x).addEventListener('click', () => showTab(x));
   document.querySelector('nav.tabs').addEventListener('keydown', (e) => {
