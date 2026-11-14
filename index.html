@@ -1,0 +1,2202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IP Plan-O-Matic · Subnet Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --text: #161a22;
+    --muted: #5d6573;
+    --border: #e2e5eb;
+    --accent: #2f6fed;
+    --accent-text: #ffffff;
+    --accent-weak: #e9effd;
+    --row-hover: #f3f6fa;
+    --hl: #fff3cf;
+    --hl-border: #e8b931;
+    --danger: #c62f2f;
+    --danger-weak: #fdecec;
+    --ok: #1d8a4e;
+    --ok-weak: #e3f4ea;
+    --warn: #9a6400;
+    --warn-weak: #fdf2d8;
+    --bar-s: 72%;
+    --bar-l: 88%;
+    --bar-l-hover: 80%;
+    --bar-text: #1b2230;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 4px 16px rgba(16, 24, 40, .06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1015;
+      --panel: #161920;
+      --text: #e6e8ee;
+      --muted: #98a1b0;
+      --border: #272b35;
+      --accent: #6c9cff;
+      --accent-text: #0e1015;
+      --accent-weak: #1b2640;
+      --row-hover: #1b1f28;
+      --hl: #3a3118;
+      --hl-border: #c99a1e;
+      --danger: #ff7b7b;
+      --danger-weak: #3a1c1c;
+      --ok: #4fd18b;
+      --ok-weak: #153124;
+      --warn: #f0b84a;
+      --warn-weak: #392d13;
+      --bar-s: 40%;
+      --bar-l: 28%;
+      --bar-l-hover: 36%;
+      --bar-text: #e6e8ee;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1015;
+    --panel: #161920;
+    --text: #e6e8ee;
+    --muted: #98a1b0;
+    --border: #272b35;
+    --accent: #6c9cff;
+    --accent-text: #0e1015;
+    --accent-weak: #1b2640;
+    --row-hover: #1b1f28;
+    --hl: #3a3118;
+    --hl-border: #c99a1e;
+    --danger: #ff7b7b;
+    --danger-weak: #3a1c1c;
+    --ok: #4fd18b;
+    --ok-weak: #153124;
+    --warn: #f0b84a;
+    --warn-weak: #392d13;
+    --bar-s: 40%;
+    --bar-l: 28%;
+    --bar-l-hover: 36%;
+    --bar-text: #e6e8ee;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 16px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 16px 64px; }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0 20px; margin-bottom: 8px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  /* Brand logo. Its colors follow the page theme: system preference unless the toggle forces light/dark. */
+  .brand{--ink:#0F1B2D;--mid:#4A5A70;--accent:#0B7A6E;
+    display:flex;align-items:center;gap:18px;text-decoration:none}
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]) .brand{--ink:#F4F7FB;--mid:#9FB0C6;--accent:#3DD9C4}
+  }
+  :root[data-theme="dark"] .brand{--ink:#F4F7FB;--mid:#9FB0C6;--accent:#3DD9C4}
+  .brand svg{width:58px;height:58px;flex-shrink:0;display:block}
+  .brand-text{height:58px;display:flex;flex-direction:column;justify-content:space-between}
+  .brand-title{font:600 30px/0.74 'Space Grotesk',system-ui,sans-serif;letter-spacing:-0.025em;color:var(--ink)}
+  .brand-by{display:flex;align-items:baseline;gap:6px;line-height:0.8;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mid)}
+  .brand-by b{font:600 17px 'Space Grotesk',system-ui,sans-serif;color:var(--accent)}
+  .brand-tag{font:400 11px/0.8 'JetBrains Mono',monospace;color:var(--mid);white-space:nowrap}
+
+  nav.tabs { display: flex; gap: 2px; overflow-x: auto; margin-bottom: 16px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+  nav.tabs button {
+    border: none; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent;
+    color: var(--muted); height: 40px; padding: 0 14px; white-space: nowrap; flex: none;
+  }
+  nav.tabs button:hover { background: var(--row-hover); color: var(--text); }
+  nav.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 16px; }
+  .pad { padding: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 2px; letter-spacing: -.005em; }
+  .card .sub { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; align-items: start; }
+  .grid2 > .card + .card { margin-top: 0; }
+
+  .controls { padding: 16px; display: grid; gap: 14px; margin-bottom: 16px; }
+  .controls > *, .usage-wrap > * { min-width: 0; }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label, .lbl { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .cidr { display: flex; align-items: center; gap: 6px; }
+  .cidr .slash { font-size: 20px; color: var(--muted); }
+  input[type="text"], input[type="number"], select, textarea {
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input[type="text"], input[type="number"], textarea { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; }
+  select { padding: 0 8px; cursor: pointer; }
+  textarea { height: auto; min-height: 150px; width: 100%; padding: 10px 12px; resize: vertical; line-height: 1.5; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+  input[aria-invalid="true"] { border-color: var(--danger) !important; }
+  #network { width: 200px; }
+  #mask { width: 76px; }
+  #findIp { width: 170px; }
+  #v6Net { width: 300px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; height: 38px; color: var(--text); font-size: 14px; cursor: pointer; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    height: 38px;
+    padding: 0 14px;
+    font-weight: 500;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  button:hover { background: var(--row-hover); }
+  button:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.primary:hover { filter: brightness(1.07); background: var(--accent); }
+  button.icon { width: 38px; padding: 0; display: inline-grid; place-items: center; }
+  button.small { height: 28px; padding: 0 10px; font-size: 13px; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+  .msg { font-size: 13px; padding: 8px 12px; border-radius: 8px; display: none; }
+  .msg.show { display: block; }
+  .msg.error { background: var(--danger-weak); color: var(--danger); }
+  .msg.info { background: var(--accent-weak); color: var(--text); }
+  .msg.ok { background: var(--ok-weak); color: var(--text); }
+  .find-out { font-size: 13px; color: var(--text); background: var(--accent-weak); padding: 8px 12px; border-radius: 8px; }
+  .find-out:empty { display: none; }
+  .find-out.miss { background: var(--warn-weak); }
+  .find-out b { color: var(--text); }
+
+  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .chips .lbl { margin-right: 4px; }
+  .chip {
+    height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px;
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+  }
+  .chip[aria-pressed="true"] { background: var(--accent-weak); border-color: var(--accent); color: var(--text); }
+  .chip:disabled[aria-pressed="true"] { opacity: .65; cursor: default; }
+
+  .summary { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 16px 0; color: var(--muted); font-size: 13px; }
+  .summary b { color: var(--text); font-weight: 600; }
+  .usage-wrap { padding: 10px 16px 12px; border-bottom: 1px solid var(--border); display: grid; gap: 8px; }
+  .usage { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--border); }
+  .usage span { display: block; height: 100%; }
+  .usage .u-used { background: var(--ok); }
+  .usage .u-res { background: var(--hl-border); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+  .warnings { display: flex; flex-wrap: wrap; gap: 6px; }
+  .warnings .tag { white-space: normal; }
+  .warnings:empty { display: none; }
+
+  .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 20px; padding: 0 8px; border-radius: 999px; background: var(--accent-weak); color: var(--text); white-space: nowrap; }
+  .tag.ok { background: var(--ok-weak); color: var(--ok); }
+  .tag.warn { background: var(--warn-weak); color: var(--warn); }
+  .tag.danger { background: var(--danger-weak); color: var(--danger); }
+  .tag.muted { background: var(--row-hover); color: var(--muted); }
+
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; }
+  th, td { padding: 8px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  th {
+    font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+    background: var(--panel); position: sticky; top: 0; z-index: 1;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td.data { background: var(--row-hover); }
+  tbody tr.found td.data { background: var(--accent-weak); }
+  tbody tr.hl td.data { background: var(--hl); }
+  tbody tr.clash td.data:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+  tbody tr.st-reserved td.data { color: var(--muted); }
+  td.num, th.num { text-align: right; }
+
+  .subnet-cell { display: flex; align-items: center; gap: 6px; }
+  .subnet-cell .addr { font-weight: 600; }
+  .badge { font-size: 11px; font-weight: 600; line-height: 18px; padding: 0 6px; border-radius: 4px; background: var(--row-hover); color: var(--muted); cursor: help; }
+  .badge.danger { background: var(--danger-weak); color: var(--danger); }
+  .badge.clash { background: var(--danger-weak); color: var(--danger); }
+  .copy {
+    height: 24px; width: 24px; padding: 0; border: none; background: transparent; color: var(--muted);
+    border-radius: 6px; display: inline-grid; place-items: center; opacity: 0; transition: opacity .15s;
+  }
+  tr:hover .copy, .copy:focus-visible { opacity: 1; }
+  .copy:hover { background: var(--accent-weak); color: var(--text); }
+  .copy.done { color: var(--ok); opacity: 1; }
+  @media (hover: none) { .copy { opacity: .6; } }
+
+  .cell-input {
+    height: 28px !important; padding: 0 8px !important; font-size: 13px !important; border-radius: 6px !important;
+    background: transparent !important; border-color: transparent !important; width: 150px;
+    font-family: inherit !important;
+  }
+  .cell-input:hover { border-color: var(--border) !important; }
+  .cell-input:focus { background: var(--bg) !important; border-color: var(--accent) !important; }
+  .cell-input::placeholder { color: var(--muted); opacity: .5; }
+  .cell-input.vlan { width: 70px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important; }
+  .cell-input.note { width: 220px; }
+  select.status { height: 26px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 0 6px; border-color: transparent; background: var(--row-hover); color: var(--muted); }
+  select.status.used { background: var(--ok-weak); color: var(--ok); }
+  select.status.reserved { background: var(--warn-weak); color: var(--warn); }
+
+  .bin { font-size: 12px; letter-spacing: .02em; }
+  .bin .nb { color: var(--accent); font-weight: 600; }
+  .bin .hb { color: var(--muted); }
+
+  th.join-h { text-align: center; }
+  td.bar {
+    padding: 0;
+    min-width: 46px;
+    text-align: center;
+    vertical-align: middle;
+    border-bottom: none;
+    border-left: 2px solid var(--panel);
+    border-top: 2px solid var(--panel);
+    background: hsl(var(--h) var(--bar-s) var(--bar-l));
+    color: var(--bar-text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    user-select: none;
+  }
+  td.bar.leaf { opacity: .55; }
+  td.bar.joinable { cursor: pointer; }
+  td.bar.joinable:hover, td.bar.joinable:focus-visible {
+    background: hsl(var(--h) var(--bar-s) var(--bar-l-hover));
+    outline: 2px solid var(--hl-border); outline-offset: -2px;
+  }
+  td.bar .hint { display: block; font-size: 10px; font-weight: 500; opacity: 0; text-transform: uppercase; letter-spacing: .05em; height: 0; overflow: visible; }
+  td.bar.joinable:hover .hint, td.bar.joinable:focus-visible .hint { opacity: .8; }
+
+  .help { color: var(--muted); font-size: 13px; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .help p { margin: 0 0 6px; }
+  .help p:last-child { margin: 0; }
+  kbd { font-family: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+
+  .result { margin-top: 12px; display: grid; gap: 10px; font-size: 13px; }
+  .result:empty { display: none; }
+  .result table { font-size: 13px; }
+  .result th { position: static; }
+  .result .table-wrap { border: 1px solid var(--border); border-radius: 8px; }
+  .result ul { margin: 0; padding-left: 18px; }
+  .result li { margin: 2px 0; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .stat-line { color: var(--muted); }
+  .stat-line b { color: var(--text); }
+  .codebox { display: flex; flex-wrap: wrap; gap: 6px; }
+  .codebox code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; padding: 2px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
+  textarea.out { min-height: 420px; white-space: pre; overflow: auto; font-size: 13px; }
+
+  .v6-pfx { display: flex; align-items: center; gap: 6px; }
+  .v6-btns { display: flex; gap: 6px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 640px) {
+    .wrap { padding-top: 20px; }
+    .field.grow { flex: 1 1 100%; }
+    .cidr { width: 100%; }
+    .cidr input#network { flex: 1; width: auto; }
+    #findIp, #v6Net { width: 100%; }
+    .field.findf { flex: 1 1 100%; }
+    .actions { margin-left: 0; width: 100%; }
+    .actions button { flex: 1 1 calc(50% - 4px); }
+    th, td { padding: 8px 10px; }
+  }
+  /* Phone: logo and theme button share one row, so scale the logo (same proportions) to fit */
+  @media (max-width: 420px) {
+    .brand { zoom: .76; }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    .no-print, nav.tabs, .copy, th.col-divide, td.col-divide, th.join-h, td.bar, .chips, .help { display: none !important; }
+    .card { box-shadow: none; border: none; }
+    .wrap { padding: 0; max-width: none; }
+    .table-wrap { overflow: visible; }
+    th { position: static; }
+    .cell-input, select.status { border: none !important; background: none !important; padding: 0 !important; -webkit-appearance: none; appearance: none; color: #000 !important; }
+    .cell-input::placeholder { color: transparent; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="sr-only">IP Plan-O-Matic</h1>
+    <div class="brand" role="img" aria-label="IP Plan-O-Matic by Huddacaster, a subsidiary of Crockerfeller Industries, copyright 2026">
+      <svg viewBox="3 3 42 42" aria-hidden="true">
+        <rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/>
+        <rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--accent)"/>
+        <rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/>
+        <rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--accent)"/>
+        <rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/>
+      </svg>
+      <div class="brand-text">
+        <div class="brand-title">IP Plan-O-Matic</div>
+        <div class="brand-by"><span>by</span><b>Huddacaster</b></div>
+        <div class="brand-tag">a subsidiary of Crockerfeller Industries © 2026</div>
+      </div>
+    </div>
+    <button class="icon no-print" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tb-plan" data-tab="plan">Plan IPv4</button>
+    <button type="button" role="tab" id="tb-vlsm" data-tab="vlsm">Auto-plan (VLSM)</button>
+    <button type="button" role="tab" id="tb-tools" data-tab="tools">Check &amp; summarize</button>
+    <button type="button" role="tab" id="tb-export" data-tab="export">Export &amp; import</button>
+    <button type="button" role="tab" id="tb-v6" data-tab="v6">IPv6</button>
+  </nav>
+
+  <!-- ================= PLAN ================= -->
+  <section id="tab-plan" role="tabpanel" aria-labelledby="tb-plan">
+    <div class="card controls no-print">
+      <form class="row" id="netForm" autocomplete="off">
+        <div class="field grow">
+          <label for="network">Base network</label>
+          <div class="cidr">
+            <input type="text" id="network" value="192.168.0.0" spellcheck="false" inputmode="decimal" placeholder="10.0.0.0">
+            <span class="slash">/</span>
+            <input type="number" id="mask" value="24" min="0" max="32">
+          </div>
+        </div>
+        <button type="submit" class="primary">Update</button>
+        <div class="field">
+          <label for="platform">Platform</label>
+          <select id="platform" title="Changes which addresses are reserved in each subnet">
+            <option value="std">Standard (on-prem)</option>
+            <option value="aws">AWS VPC</option>
+            <option value="azure">Azure VNet</option>
+            <option value="gcp">Google Cloud VPC</option>
+          </select>
+        </div>
+        <div class="field" id="gwField">
+          <label for="gwPos">Gateway</label>
+          <select id="gwPos">
+            <option value="first">First usable</option>
+            <option value="last">Last usable</option>
+          </select>
+        </div>
+        <div class="field findf">
+          <label for="findIp">Find IP</label>
+          <input type="text" id="findIp" spellcheck="false" inputmode="decimal" placeholder="e.g. 192.168.0.77">
+        </div>
+        <div class="actions">
+          <button type="button" id="resetBtn" title="Join everything back into the base network">Reset</button>
+          <button type="button" id="linkBtn" title="Copy a link that restores this whole plan">Copy link</button>
+          <button type="button" id="csvBtn" title="Copy the columns shown below as CSV">Copy CSV</button>
+          <button type="button" id="printBtn" title="Print or save as PDF">Print</button>
+        </div>
+      </form>
+      <div class="find-out" id="findOut" aria-live="polite"></div>
+      <div class="msg" id="msg" role="status"></div>
+      <div class="chips" id="chips"><span class="lbl">Columns</span></div>
+    </div>
+
+    <div class="card">
+      <div class="summary" id="summary"></div>
+      <div class="usage-wrap">
+        <div class="usage" id="usageBar" aria-hidden="true"></div>
+        <div class="legend" id="usageLegend"></div>
+        <div class="warnings" id="warnings"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr id="headRow"></tr></thead>
+          <tbody id="body"></tbody>
+        </table>
+      </div>
+      <div class="help">
+        <p>Click <b>Divide</b> to split a subnet in half. Click a colored bar on the right to join every subnet it covers back into one. Type straight into Name, VLAN and Notes; set Status to track what is in use.</p>
+        <p>Tip: paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field. The page address updates as you work (names and VLANs included), so a bookmark or copied link saves the whole plan.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= VLSM ================= -->
+  <section id="tab-vlsm" role="tabpanel" aria-labelledby="tb-vlsm" hidden>
+    <div class="card pad">
+      <h2>Auto-plan by host count</h2>
+      <p class="sub">List what you need, one per line as <span class="mono">Name, hosts</span> or <span class="mono">Name, hosts, VLAN</span>. Subnets are sized to fit, packed largest first into <b id="vlsmBase" class="mono"></b>, and use the <b id="vlsmPlat"></b> platform rules. Change either on the Plan IPv4 tab.</p>
+      <textarea id="vlsmIn" spellcheck="false" placeholder="Servers, 200, 10&#10;Staff Wi-Fi, 120, 20&#10;Guest Wi-Fi, 60, 30&#10;VoIP, 50, 40&#10;Management, 10, 99&#10;Uplink to ISP, 2"></textarea>
+      <div class="row" style="margin-top:12px">
+        <div class="field">
+          <label for="vlsmHead">Growth headroom %</label>
+          <input type="number" id="vlsmHead" value="0" min="0" max="1000" style="width:110px">
+        </div>
+        <div class="field" id="vlsmSmallF">
+          <label for="vlsmSmall">Smallest subnet</label>
+          <select id="vlsmSmall">
+            <option value="30">/30 (2 hosts, classic)</option>
+            <option value="31">/31 for point-to-point links</option>
+            <option value="32">/32 allowed for single hosts</option>
+          </select>
+        </div>
+        <button type="button" class="primary" id="vlsmRun">Plan it</button>
+        <button type="button" id="vlsmExample">Load example</button>
+        <button type="button" id="vlsmApply" hidden>Apply to planner</button>
+      </div>
+      <div class="result" id="vlsmOut"></div>
+    </div>
+  </section>
+
+  <!-- ================= TOOLS ================= -->
+  <section id="tab-tools" role="tabpanel" aria-labelledby="tb-tools" hidden>
+    <div class="grid2">
+      <div class="card pad">
+        <h2>Overlap checker</h2>
+        <p class="sub">Paste networks that already exist (one per line, optional label after it). Each is checked against your plan and against the others. Clashing rows get a red edge on the Plan tab.</p>
+        <textarea id="ovIn" spellcheck="false" placeholder="10.0.0.0/16 HQ&#10;192.168.0.0/24 Branch office VPN&#10;172.31.0.0/16 AWS default VPC"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="primary" id="ovRun">Check overlaps</button>
+          <button type="button" id="ovClear">Clear</button>
+        </div>
+        <div class="result" id="ovOut"></div>
+      </div>
+
+      <div class="card pad">
+        <h2>Summarize routes</h2>
+        <p class="sub">Paste networks (lines, commas or spaces). Get the smallest exact set of routes, plus the single supernet that covers them all.</p>
+        <textarea id="sumIn" spellcheck="false" placeholder="10.1.0.0/24&#10;10.1.1.0/24&#10;10.1.2.0/24&#10;10.1.3.0/24"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="primary" id="sumRun">Summarize</button>
+          <button type="button" id="sumFromPlan" title="Use the subnets marked In use on the Plan tab">Use “in use” subnets</button>
+        </div>
+        <div class="result" id="sumOut"></div>
+      </div>
+
+      <div class="card pad">
+        <h2>Address info</h2>
+        <p class="sub">Enter an IP or network (<span class="mono">10.0.0.5/22</span>, <span class="mono">10.0.0.5 255.255.252.0</span>, or just an IP) to see masks, binary, special-range warnings and the reverse DNS zone.</p>
+        <input type="text" id="infoIn" spellcheck="false" placeholder="100.64.12.9/20" style="width:100%">
+        <div class="result" id="infoOut"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= EXPORT ================= -->
+  <section id="tab-export" role="tabpanel" aria-labelledby="tb-export" hidden>
+    <div class="card pad">
+      <h2>Export</h2>
+      <p class="sub">Generate config from the current IPv4 plan. Placeholders like <span class="mono">&lt;INTERFACE&gt;</span> need filling in. Always review before applying to a device.</p>
+      <div class="row">
+        <div class="field">
+          <label for="exFmt">Format</label>
+          <select id="exFmt">
+            <option value="cisco">Cisco IOS / IOS-XE</option>
+            <option value="junos">Juniper Junos</option>
+            <option value="mikrotik">MikroTik RouterOS</option>
+            <option value="tf-aws">Terraform: AWS</option>
+            <option value="tf-azure">Terraform: Azure</option>
+            <option value="tf-gcp">Terraform: Google Cloud</option>
+            <option value="csv">CSV (all columns)</option>
+            <option value="json">JSON (full plan, re-importable)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="exInc">Include</label>
+          <select id="exInc">
+            <option value="planned">Planned subnets (named, VLAN or in use)</option>
+            <option value="used">Only “in use”</option>
+            <option value="all">Every subnet</option>
+          </select>
+        </div>
+        <label class="check" id="exDhcpL"><input type="checkbox" id="exDhcp" checked> DHCP pools</label>
+        <div class="actions">
+          <button type="button" id="exCopy">Copy</button>
+          <button type="button" class="primary" id="exDl">Download</button>
+        </div>
+      </div>
+      <div class="msg" id="exMsg" style="margin-top:10px"></div>
+      <textarea class="out" id="exOut" readonly spellcheck="false" style="margin-top:12px"></textarea>
+    </div>
+
+    <div class="card pad">
+      <h2>Import</h2>
+      <p class="sub">Load a JSON file exported from here, or a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes). Importing replaces the current IPv4 plan.</p>
+      <div class="row">
+        <input type="file" id="imFile" accept=".json,.csv,.txt,application/json,text/csv">
+      </div>
+      <textarea id="imText" spellcheck="false" style="margin-top:10px; min-height:110px" placeholder="…or paste JSON / CSV here&#10;Subnet,Name,VLAN,Status&#10;10.20.0.0/24,Servers,10,used&#10;10.20.1.0/25,Staff,20,used"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button type="button" class="primary" id="imRun">Import pasted text</button>
+      </div>
+      <div class="msg" id="imMsg" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ================= IPv6 ================= -->
+  <section id="tab-v6" role="tabpanel" aria-labelledby="tb-v6" hidden>
+    <div class="card controls">
+      <form class="row" id="v6Form" autocomplete="off">
+        <div class="field grow">
+          <label for="v6Net">IPv6 prefix</label>
+          <input type="text" id="v6Net" value="2001:db8::/48" spellcheck="false">
+        </div>
+        <button type="submit" class="primary">Update</button>
+        <div class="actions">
+          <button type="button" id="v6Ula" title="Generate a random unique local /48 (RFC 4193)">Random ULA /48</button>
+          <button type="button" id="v6Reset">Reset</button>
+          <button type="button" id="v6Csv">Copy CSV</button>
+        </div>
+      </form>
+      <div class="msg" id="v6Msg" role="status"></div>
+    </div>
+    <div class="card">
+      <div class="summary" id="v6Summary" style="padding-bottom:12px; border-bottom:1px solid var(--border)"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Prefix</th><th>Name</th><th>First – last address</th><th class="num">Size</th><th>Split</th><th>Join</th></tr></thead>
+          <tbody id="v6Body"></tbody>
+        </table>
+      </div>
+      <div class="help">
+        <p><b>÷2</b> halves a prefix. <b>÷16</b> splits on the next nibble (4 bits), which keeps prefixes readable and makes reverse DNS delegation clean, so it’s the usual choice. A <b>/64</b> is the standard size for one LAN or VLAN (SLAAC needs it); point-to-point links often use /127.</p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // =====================================================================
+  // IPv4 math (unsigned 32-bit as JS numbers)
+  // =====================================================================
+  const aton = (s) => {
+    const m = /^\s*(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s*$/.exec(s || '');
+    if (!m) return null;
+    const p = m.slice(1).map(Number);
+    if (p.some((x) => x > 255)) return null;
+    return p[0] * 16777216 + p[1] * 65536 + p[2] * 256 + p[3];
+  };
+  const ntoa = (n) => [Math.floor(n / 16777216) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.');
+  const size = (mask) => 2 ** (32 - mask);
+  const netAddr = (ip, mask) => (mask === 0 ? 0 : (ip & (~0 << (32 - mask))) >>> 0);
+  const netmask = (mask) => netAddr(0xffffffff, mask);
+  const wildcard = (mask) => 0xffffffff - netmask(mask);
+  const lastAddr = (addr, mask) => addr + size(mask) - 1;
+  const fmt = (n) => n.toLocaleString('en-US');
+  const cidrStr = (a, m) => `${ntoa(a)}/${m}`;
+  const inBlock = (ip, a, m) => ip >= a && ip <= lastAddr(a, m);
+  const overlaps = (a1, m1, a2, m2) => a1 <= lastAddr(a2, m2) && a2 <= lastAddr(a1, m1);
+  const relation = (a1, m1, a2, m2) => {
+    if (a1 === a2 && m1 === m2) return 'identical to';
+    if (m1 < m2 && inBlock(a2, a1, m1)) return 'contains';
+    if (m1 > m2 && inBlock(a1, a2, m2)) return 'is inside';
+    return null;
+  };
+  const maskFromNetmask = (nm) => {
+    if (nm === null) return null;
+    for (let m = 0; m <= 32; m++) if (netmask(m) === nm) return m;
+    return null;
+  };
+  const IP_RE = '\\d{1,3}(?:\\.\\d{1,3}){3}';
+  const parseCidr = (s) => {
+    const t = String(s || '').trim();
+    let m, ip, mask;
+    if ((m = new RegExp(`^(${IP_RE})\\s*/\\s*(\\d{1,2})$`).exec(t))) { ip = aton(m[1]); mask = Number(m[2]); }
+    else if ((m = new RegExp(`^(${IP_RE})\\s+(${IP_RE})$`).exec(t))) { ip = aton(m[1]); mask = maskFromNetmask(aton(m[2])); }
+    else if ((m = new RegExp(`^(${IP_RE})$`).exec(t))) { ip = aton(m[1]); mask = 32; }
+    else return null;
+    if (ip === null || mask === null || !(mask >= 0 && mask <= 32)) return null;
+    const addr = netAddr(ip, mask);
+    return { addr, mask, ip, aligned: addr === ip, cidr: cidrStr(addr, mask) };
+  };
+  // Pull "CIDR [label]" out of one line.
+  const parseLine = (line) => {
+    const t = line.replace(/#.*$/, '').trim();
+    if (!t) return null;
+    const m = new RegExp(`^(${IP_RE}(?:\\s*/\\s*\\d{1,2}|\\s+255\\.${'\\d{1,3}(?:\\.\\d{1,3}){2}'})?)(?:[\\s,;\\t]+(.*))?$`).exec(t);
+    const c = m && parseCidr(m[1]);
+    if (!c) return { error: true, raw: t };
+    return { ...c, label: (m[2] || '').trim(), raw: t };
+  };
+  const rangeToCidrs = (start, end) => {
+    const out = [];
+    while (start <= end) {
+      let tz = 0;
+      if (start === 0) tz = 32; else while (tz < 32 && start % 2 ** (tz + 1) === 0) tz++;
+      const fit = Math.floor(Math.log2(end - start + 1));
+      const bits = Math.min(tz, fit);
+      out.push({ addr: start, mask: 32 - bits });
+      start += 2 ** bits;
+    }
+    return out;
+  };
+  const supernet = (list) => {
+    const lo = Math.min(...list.map((e) => e.addr));
+    const hi = Math.max(...list.map((e) => lastAddr(e.addr, e.mask)));
+    for (let m = 32; m >= 0; m--) {
+      const a = netAddr(lo, m);
+      if (lastAddr(a, m) >= hi) return { addr: a, mask: m };
+    }
+    return { addr: 0, mask: 0 };
+  };
+  const binHtml = (addr, mask) => {
+    let s = '';
+    for (let i = 31; i >= 0; i--) {
+      const bit = Math.floor(addr / 2 ** i) % 2;
+      const pos = 31 - i;
+      s += `<span class="${pos < mask ? 'nb' : 'hb'}">${bit}</span>`;
+      if (i % 8 === 0 && i) s += '.';
+    }
+    return s;
+  };
+  const binText = (addr) => [24, 16, 8, 0].map((sh) => ((Math.floor(addr / 2 ** sh)) & 255).toString(2).padStart(8, '0')).join('.');
+
+  const SPECIAL4 = [
+    ['0.0.0.0/8', '“This network” (RFC 791)', 'warn'],
+    ['10.0.0.0/8', 'Private (RFC 1918)', 'ok'],
+    ['100.64.0.0/10', 'Carrier-grade NAT shared space (RFC 6598)', 'warn'],
+    ['127.0.0.0/8', 'Loopback', 'warn'],
+    ['169.254.0.0/16', 'Link-local / APIPA (RFC 3927)', 'warn'],
+    ['172.16.0.0/12', 'Private (RFC 1918)', 'ok'],
+    ['192.0.0.0/24', 'IETF protocol assignments (RFC 6890)', 'warn'],
+    ['192.0.2.0/24', 'Documentation TEST-NET-1 (RFC 5737)', 'warn'],
+    ['192.88.99.0/24', 'Deprecated 6to4 relay anycast (RFC 7526)', 'warn'],
+    ['192.168.0.0/16', 'Private (RFC 1918)', 'ok'],
+    ['198.18.0.0/15', 'Benchmark testing (RFC 2544)', 'warn'],
+    ['198.51.100.0/24', 'Documentation TEST-NET-2 (RFC 5737)', 'warn'],
+    ['203.0.113.0/24', 'Documentation TEST-NET-3 (RFC 5737)', 'warn'],
+    ['224.0.0.0/4', 'Multicast (RFC 5771)', 'danger'],
+    ['240.0.0.0/4', 'Reserved for future use', 'danger'],
+    ['255.255.255.255/32', 'Limited broadcast', 'danger'],
+  ].map(([c, label, kind]) => ({ ...parseCidr(c), label, kind }));
+  const classify4 = (addr, mask) => {
+    const hits = [];
+    for (const r of SPECIAL4) {
+      if (!overlaps(addr, mask, r.addr, r.mask)) continue;
+      const rel = (addr >= r.addr && lastAddr(addr, mask) <= lastAddr(r.addr, r.mask)) ? 'inside' : (r.addr >= addr && lastAddr(r.addr, r.mask) <= lastAddr(addr, mask)) ? 'contains' : 'overlaps';
+      hits.push({ ...r, rel });
+    }
+    return hits;
+  };
+  const classTags = (addr, mask) => {
+    const hits = classify4(addr, mask);
+    if (!hits.length) return '<span class="tag">Public address space</span>';
+    return hits.map((h) => `<span class="tag ${h.kind}" title="${esc(h.cidr)}">${h.rel === 'inside' ? '' : (h.rel === 'contains' ? 'Contains ' : 'Partly ')}${esc(h.label)}${h.rel === 'inside' ? '' : ' ' + esc(h.cidr)}</span>`).join(' ');
+  };
+
+  // =====================================================================
+  // Platform rules
+  // =====================================================================
+  const CLOUDS = {
+    std:   { label: 'Standard', min: 32 },
+    aws:   { label: 'AWS VPC', min: 28, max: 16 },
+    azure: { label: 'Azure VNet', min: 29 },
+    gcp:   { label: 'Google Cloud VPC', min: 29 },
+  };
+  const settings = { cloud: 'std', gw: 'first' };
+  const divLimit = () => CLOUDS[settings.cloud].min;
+
+  // Everything about one subnet under the current platform rules.
+  const hostInfo = (addr, mask) => {
+    const sz = size(mask), last = addr + sz - 1, c = settings.cloud;
+    const r = { addr, mask, last, reserved: [], uF: null, uL: null, hosts: 0, gw: null, note: '', warn: '' };
+    if (c === 'std') {
+      if (mask === 32) Object.assign(r, { uF: addr, uL: addr, hosts: 1, note: 'Single host (loopback or host route)' });
+      else if (mask === 31) Object.assign(r, { uF: addr, uL: last, hosts: 2, note: 'Point-to-point link (RFC 3021): both addresses usable, no broadcast' });
+      else {
+        Object.assign(r, { uF: addr + 1, uL: last - 1, hosts: sz - 2, gw: settings.gw === 'last' ? last - 1 : addr + 1 });
+        r.reserved = [[addr, 'the network ID'], [last, 'the broadcast address']];
+      }
+      return r;
+    }
+    const lbl = CLOUDS[c].label;
+    if (mask > CLOUDS[c].min) r.warn = `${lbl} subnets can’t be smaller than /${CLOUDS[c].min}`;
+    if (sz < 8) return r;
+    if (c === 'gcp') {
+      Object.assign(r, { uF: addr + 2, uL: last - 2, hosts: sz - 4, gw: addr + 1 });
+      r.reserved = [[addr, 'the network ID'], [addr + 1, 'the default gateway (reserved by Google Cloud)'], [last - 1, 'reserved by Google Cloud'], [last, 'the broadcast address (reserved)']];
+    } else {
+      Object.assign(r, { uF: addr + 4, uL: last - 1, hosts: sz - 5, gw: addr + 1 });
+      r.reserved = c === 'aws'
+        ? [[addr, 'the network ID'], [addr + 1, 'the VPC router (reserved by AWS)'], [addr + 2, 'reserved by AWS (DNS)'], [addr + 3, 'reserved by AWS for future use'], [last, 'the broadcast address (reserved by AWS)']]
+        : [[addr, 'the network ID'], [addr + 1, 'the default gateway (reserved by Azure)'], [addr + 2, 'reserved by Azure (DNS)'], [addr + 3, 'reserved by Azure (DNS)'], [last, 'the broadcast address (reserved by Azure)']];
+    }
+    return r;
+  };
+
+  // =====================================================================
+  // State
+  // =====================================================================
+  // A node is { c: null } (leaf) or { c: [left, right] } (split into halves).
+  const state = { network: aton('192.168.0.0'), mask: 24, root: { c: null }, meta: {} };
+  // meta: { 'a.b.c.d/m': { n: name, v: vlan, o: note, s: 'used' | 'reserved' } }
+  const getMeta = (key) => state.meta[key] || {};
+  const setMeta = (key, field, val) => {
+    const m = { ...getMeta(key) };
+    if (val === '' || val == null) delete m[field]; else m[field] = val;
+    if (Object.keys(m).length) state.meta[key] = m; else delete state.meta[key];
+  };
+  let existing = [];  // networks pasted into the overlap checker
+  let foundIp = null; // address from the Find IP box
+
+  const COLS = [
+    { key: 'subnet',   label: 'Subnet', locked: true },
+    { key: 'divide',   label: 'Divide', locked: true },
+    { key: 'name',     label: 'Name' },
+    { key: 'vlan',     label: 'VLAN' },
+    { key: 'netmask',  label: 'Netmask' },
+    { key: 'wildcard', label: 'Wildcard' },
+    { key: 'range',    label: 'Address range' },
+    { key: 'usable',   label: 'Usable IPs' },
+    { key: 'gateway',  label: 'Gateway' },
+    { key: 'hosts',    label: 'Hosts', num: true },
+    { key: 'status',   label: 'Status' },
+    { key: 'note',     label: 'Notes' },
+    { key: 'binary',   label: 'Binary' },
+    { key: 'join',     label: 'Join' },
+  ];
+  const visible = {
+    subnet: true, name: true, vlan: true, netmask: false, wildcard: false, range: false, usable: true,
+    gateway: true, hosts: true, status: true, note: false, binary: false, divide: true, join: true,
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem('subnetPlanner.cols') || 'null');
+    if (saved) for (const k in visible) if (typeof saved[k] === 'boolean') visible[k] = saved[k];
+  } catch (e) { /* storage unavailable */ }
+  for (const col of COLS) if (col.locked) visible[col.key] = true;
+
+  // =====================================================================
+  // Tree helpers (shared by IPv4 binary trees and IPv6 2/16-way trees)
+  // =====================================================================
+  const height = (n) => (n.c ? 1 + Math.max(...n.c.map(height)) : 0);
+  const leafCount = (n) => (n.c ? n.c.reduce((s, ch) => s + leafCount(ch), 0) : 1);
+
+  // Pre-order bits (1 = split, 0 = leaf), packed 4 bits per hex char ("len.hex").
+  const treeToBits = (n) => (n.c ? '1' + treeToBits(n.c[0]) + treeToBits(n.c[1]) : '0');
+  const packBits = (bits) => {
+    let out = '', cur = 0, b = 0;
+    for (let i = 0; i < bits.length; i++) {
+      if (bits[i] === '1') cur |= 1 << b;
+      if (++b > 3) { out += cur.toString(16); cur = 0; b = 0; }
+    }
+    if (b > 0) out += cur.toString(16);
+    return bits.length + '.' + out;
+  };
+  const unpackBits = (str) => {
+    const m = /^(\d+)\.([0-9a-f]*)$/i.exec(str || '');
+    if (!m) return null;
+    const len = Number(m[1]);
+    if (Math.ceil(len / 4) > m[2].length) return null;
+    let out = '';
+    for (let i = 0; i < len; i++) {
+      const ch = parseInt(m[2][Math.floor(i / 4)], 16);
+      out += ch & (1 << (i % 4)) ? '1' : '0';
+    }
+    return out;
+  };
+  const bitsToTree = (bits, maxDepth) => {
+    let i = 0;
+    const build = (depth) => {
+      if (i >= bits.length) throw new Error('short');
+      const bit = bits[i++];
+      if (bit === '0') return { c: null };
+      if (depth >= maxDepth) throw new Error('too deep');
+      return { c: [build(depth + 1), build(depth + 1)] };
+    };
+    const t = build(0);
+    if (i !== bits.length) throw new Error('trailing');
+    return t;
+  };
+  // Split the tree down so that addr/mask becomes a leaf.
+  const carve = (root, baseA, baseM, addr, mask) => {
+    let node = root, a = baseA, m = baseM;
+    while (m < mask) {
+      if (!node.c) node.c = [{ c: null }, { c: null }];
+      const half = size(m + 1);
+      if (addr >= a + half) { node = node.c[1]; a += half; } else node = node.c[0];
+      m++;
+    }
+    node.c = null;
+  };
+  const nodeKeys = () => {
+    const s = new Set();
+    const walk = (n, a, m) => {
+      s.add(cidrStr(a, m));
+      if (n.c) { walk(n.c[0], a, m + 1); walk(n.c[1], a + size(m + 1), m + 1); }
+    };
+    walk(state.root, state.network, state.mask);
+    return s;
+  };
+
+  // =====================================================================
+  // IPv6 math (BigInt)
+  // =====================================================================
+  const ALL6 = (1n << 128n) - 1n;
+  const size6 = (m) => 1n << BigInt(128 - m);
+  const net6 = (n, m) => n & (ALL6 ^ (size6(m) - 1n));
+  const parse6 = (s) => {
+    s = String(s || '').trim().toLowerCase();
+    if (!/^[0-9a-f:]+$/.test(s)) return null;
+    const dbl = s.split('::');
+    if (dbl.length > 2) return null;
+    const groupsOf = (p) => (p === '' ? [] : p.split(':'));
+    const head = groupsOf(dbl[0]), tail = dbl.length === 2 ? groupsOf(dbl[1]) : [];
+    if (dbl.length === 1 && head.length !== 8) return null;
+    if (dbl.length === 2 && head.length + tail.length > 7) return null;
+    const groups = dbl.length === 2 ? [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail] : head;
+    let n = 0n;
+    for (const g of groups) {
+      if (!/^[0-9a-f]{1,4}$/.test(g)) return null;
+      n = (n << 16n) | BigInt(parseInt(g, 16));
+    }
+    return n;
+  };
+  const fmt6 = (n) => {
+    const g = [];
+    for (let i = 7; i >= 0; i--) g.push(Number((n >> BigInt(i * 16)) & 0xffffn));
+    let bs = -1, bl = 0;
+    for (let i = 0; i < 8;) {
+      if (g[i] === 0) { let j = i; while (j < 8 && g[j] === 0) j++; if (j - i > bl) { bs = i; bl = j - i; } i = j; } else i++;
+    }
+    const hx = g.map((x) => x.toString(16));
+    if (bl < 2) return hx.join(':');
+    return hx.slice(0, bs).join(':') + '::' + hx.slice(bs + bl).join(':');
+  };
+  const parse6Cidr = (s) => {
+    const m = /^\s*([0-9a-fA-F:]+)\s*(?:\/\s*(\d{1,3}))?\s*$/.exec(s || '');
+    if (!m) return null;
+    const n = parse6(m[1]);
+    const len = m[2] === undefined ? 64 : Number(m[2]);
+    if (n === null || len > 128) return null;
+    return { n, mask: len, net: net6(n, len) };
+  };
+  const SPECIAL6 = [
+    ['::1/128', 'Loopback', 'warn'], ['::/128', 'Unspecified', 'warn'],
+    ['64:ff9b::/96', 'NAT64 well-known prefix (RFC 6052)', 'warn'], ['100::/64', 'Discard-only (RFC 6666)', 'warn'],
+    ['2001::/32', 'Teredo', 'warn'], ['2001:db8::/32', 'Documentation (RFC 3849)', 'warn'], ['2002::/16', '6to4 (deprecated)', 'warn'],
+    ['fc00::/7', 'Unique local, ULA (RFC 4193)', 'ok'], ['fe80::/10', 'Link-local', 'warn'], ['ff00::/8', 'Multicast', 'danger'],
+    ['2000::/3', 'Global unicast', ''],
+  ].map(([c, label, kind]) => { const p = parse6Cidr(c); return { n: p.net, mask: p.mask, label, kind, cidr: c }; });
+  const classTags6 = (n, m) => {
+    const end = n + size6(m) - 1n;
+    const hits = SPECIAL6.filter((r) => n <= r.n + size6(r.mask) - 1n && r.n <= end);
+    const inside = hits.filter((r) => n >= r.n && end <= r.n + size6(r.mask) - 1n);
+    const pick = inside.length ? [inside.sort((a, b) => b.mask - a.mask)[0]] : hits;
+    if (!pick.length) return '<span class="tag warn">Not in a commonly assigned range</span>';
+    return pick.map((h) => `<span class="tag ${h.kind}">${esc(h.label)}</span>`).join(' ');
+  };
+  const pow2Str = (k) => (k <= 40 ? fmt(2 ** k) : `2<sup>${k}</sup>`);
+  const pow2Text = (k) => (k <= 40 ? String(2 ** k) : `2^${k}`);
+
+  const V6_DEFAULT = '2001:db8::/48';
+  const MAX6 = 4096;
+  const v6 = { net: parse6('2001:db8::'), mask: 48, root: { c: null }, meta: {} };
+  const v6Key = (a, m) => `${fmt6(a)}/${m}`;
+  const v6TreeStr = (n) => (!n.c ? '0' : (n.c.length === 16 ? 'n' : '1') + n.c.map(v6TreeStr).join(''));
+  const v6TreeParse = (s, mask) => {
+    let i = 0;
+    const b = (m) => {
+      const ch = s[i++];
+      if (ch === '0') return { c: null };
+      const k = ch === 'n' ? 16 : ch === '1' ? 2 : 0;
+      if (!k) throw new Error('bad');
+      const bits = k === 16 ? 4 : 1;
+      if (m + bits > 128) throw new Error('deep');
+      const c = [];
+      for (let j = 0; j < k; j++) c.push(b(m + bits));
+      return { c };
+    };
+    const t = b(mask);
+    if (i !== s.length || leafCount(t) > MAX6) throw new Error('bad');
+    return t;
+  };
+  const v6Walk = () => {
+    const leaves = [];
+    const walk = (node, a, m, depth, parent, idx) => {
+      if (node.c) {
+        const bits = node.c.length === 16 ? 4 : 1;
+        const me = { node, a, m, count: node.c.length };
+        node.c.forEach((ch, i) => walk(ch, a + BigInt(i) * size6(m + bits), m + bits, depth + 1, me, i));
+      } else leaves.push({ node, a, m, depth, parent, idx });
+    };
+    walk(v6.root, v6.net, v6.mask, 0, null, 0);
+    return leaves;
+  };
+
+  // =====================================================================
+  // DOM helpers
+  // =====================================================================
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const netInput = $('network'), maskInput = $('mask');
+
+  const showMsg = (id, text, kind = 'info') => { const m = $(id); m.textContent = text; m.className = 'msg show ' + kind; };
+  const clearMsg = (id) => { const m = $(id); m.className = 'msg'; m.textContent = ''; };
+
+  let toastTimer;
+  const toast = (text) => {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  };
+  const copyText = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e2) { /* ignore */ }
+      ta.remove();
+      return ok;
+    }
+  };
+  const download = (name, text, type) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  };
+  const csvQ = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+  const parseCsv = (t) => {
+    const rows = []; let row = [], f = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (q) {
+        if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c;
+      } else if (c === '"') q = true;
+      else if (c === ',') { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && t[i + 1] === '\n') i++;
+        row.push(f); rows.push(row); row = []; f = '';
+      } else f += c;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows.filter((r) => r.some((x) => x.trim() !== ''));
+  };
+  const validVlan = (v) => /^\d+$/.test(String(v).trim()) && +v >= 1 && +v <= 4094;
+  const normStatus = (s) => {
+    const t = String(s || '').trim().toLowerCase();
+    if (t === 'used' || t === 'in use' || t === 'inuse' || t === 'active') return 'used';
+    if (t === 'reserved') return 'reserved';
+    return '';
+  };
+
+  // =====================================================================
+  // URL state:  #net/mask/tree[/base64url(JSON extras)]
+  // =====================================================================
+  const b64e = (str) => {
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const b64d = (s) => {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
+  };
+  const v6Serialize = () => {
+    const keys = new Set();
+    const walk = (n, a, m) => {
+      keys.add(v6Key(a, m));
+      if (n.c) { const bits = n.c.length === 16 ? 4 : 1; n.c.forEach((ch, i) => walk(ch, a + BigInt(i) * size6(m + bits), m + bits)); }
+    };
+    walk(v6.root, v6.net, v6.mask);
+    const meta = {};
+    for (const k in v6.meta) if (keys.has(k) && v6.meta[k]) meta[k] = v6.meta[k];
+    const p = v6Key(v6.net, v6.mask);
+    if (p === V6_DEFAULT && !v6.root.c && !Object.keys(meta).length) return null;
+    const o = { p, t: v6TreeStr(v6.root) };
+    if (Object.keys(meta).length) o.m = meta;
+    return o;
+  };
+  const v6Load = (o) => {
+    const p = parse6Cidr(o && o.p);
+    if (!p) return;
+    v6.net = p.net; v6.mask = p.mask;
+    try { v6.root = o.t ? v6TreeParse(String(o.t), p.mask) : { c: null }; } catch (e) { v6.root = { c: null }; }
+    v6.meta = (o.m && typeof o.m === 'object') ? { ...o.m } : {};
+  };
+  const extras = () => {
+    const keys = nodeKeys();
+    const m = {};
+    for (const k in state.meta) if (keys.has(k)) m[k] = state.meta[k];
+    const o = {};
+    if (settings.cloud !== 'std') o.c = settings.cloud;
+    if (settings.gw !== 'first') o.g = settings.gw;
+    if (Object.keys(m).length) o.m = m;
+    const v = v6Serialize();
+    if (v) o.v6 = v;
+    return Object.keys(o).length ? b64e(JSON.stringify(o)) : '';
+  };
+  const stateHash = () => {
+    const x = extras();
+    return `${ntoa(state.network)}/${state.mask}/${packBits(treeToBits(state.root))}${x ? '/' + x : ''}`;
+  };
+  let lastHash = '';
+  const writeHash = () => {
+    const h = stateHash();
+    lastHash = h;
+    try { history.replaceState(null, '', '#' + h); }
+    catch (e) { location.hash = h; }
+  };
+  let hashTimer;
+  const writeHashSoon = () => { clearTimeout(hashTimer); hashTimer = setTimeout(writeHash, 300); };
+
+  const loadFromLocation = () => {
+    let net, mask, division, blob;
+    const hash = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (hash) {
+      [net, mask, division, blob] = hash.split('/');
+    } else {
+      const q = new URLSearchParams(location.search);
+      net = q.get('network'); mask = q.get('mask'); division = q.get('division');
+    }
+    const n = aton(net || '');
+    const m = Number(mask);
+    if (n === null || !Number.isInteger(m) || m < 0 || m > 32) return false;
+    let root = { c: null };
+    if (division) {
+      const bits = unpackBits(division);
+      try { if (bits) root = bitsToTree(bits, 32 - m); } catch (e) { root = { c: null }; }
+    }
+    let x = {};
+    if (blob) { try { x = JSON.parse(b64d(blob)) || {}; } catch (e) { x = {}; } }
+    settings.cloud = CLOUDS[x.c] ? x.c : 'std';
+    settings.gw = x.g === 'last' ? 'last' : 'first';
+    state.meta = (x.m && typeof x.m === 'object') ? { ...x.m } : {};
+    if (x.v6) v6Load(x.v6);
+    state.network = netAddr(n, m);
+    state.mask = m;
+    state.root = root;
+    lastHash = hash;
+    return true;
+  };
+
+  // =====================================================================
+  // PLAN tab rendering
+  // =====================================================================
+  const copyIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const copyBtn = (text) => {
+    const btn = document.createElement('button');
+    btn.className = 'copy';
+    btn.type = 'button';
+    btn.title = 'Copy ' + text;
+    btn.setAttribute('aria-label', 'Copy ' + text);
+    btn.innerHTML = copyIcon;
+    btn.addEventListener('click', async () => {
+      if (await copyText(text)) {
+        btn.innerHTML = checkIcon; btn.classList.add('done');
+        setTimeout(() => { btn.innerHTML = copyIcon; btn.classList.remove('done'); }, 1200);
+      }
+    });
+    return btn;
+  };
+
+  const hueFor = (mask) => (mask * 47 + 200) % 360;
+  let rows = []; // flat list of leaves for the current render
+
+  const collectLeaves = () => {
+    const out = [];
+    const walk = (node, addr, mask, depth, opening) => {
+      if (node.c) {
+        const entry = { node, addr, mask, depth };
+        walk(node.c[0], addr, mask + 1, depth + 1, opening.concat([entry]));
+        walk(node.c[1], addr + size(mask + 1), mask + 1, depth + 1, []);
+      } else {
+        out.push({ node, addr, mask, depth, opening, key: cidrStr(addr, mask) });
+      }
+    };
+    walk(state.root, state.network, state.mask, 0, []);
+    return out;
+  };
+
+  const renderSummary = () => {
+    const base = cidrStr(state.network, state.mask);
+    let usableTotal = 0;
+    const by = { used: 0, reserved: 0, free: 0 };
+    const vlans = {};
+    let tooSmall = 0, clashes = 0;
+    for (const r of rows) {
+      const info = hostInfo(r.addr, r.mask);
+      const m = getMeta(r.key);
+      usableTotal += info.hosts;
+      by[m.s || 'free'] += size(r.mask);
+      if (m.v) (vlans[m.v] = vlans[m.v] || []).push(r.key);
+      if (info.warn) tooSmall++;
+      if (existing.some((e) => overlaps(e.addr, e.mask, r.addr, r.mask))) clashes++;
+    }
+    const total = size(state.mask);
+    $('summary').innerHTML =
+      `<span>Base network <b class="mono">${base}</b></span>` +
+      `<span>Netmask <b class="mono">${ntoa(netmask(state.mask))}</b></span>` +
+      `<span>Subnets <b>${fmt(rows.length)}</b></span>` +
+      `<span>Total addresses <b>${fmt(total)}</b></span>` +
+      `<span>Usable hosts <b>${fmt(usableTotal)}</b></span>` +
+      `<span>Platform <b>${CLOUDS[settings.cloud].label}</b></span>`;
+    const pct = (x) => (x / total) * 100;
+    $('usageBar').innerHTML = `<span class="u-used" style="width:${pct(by.used)}%"></span><span class="u-res" style="width:${pct(by.reserved)}%"></span>`;
+    const p1 = (x) => (pct(x) < 0.1 && x > 0 ? '<0.1' : pct(x).toFixed(pct(x) < 10 ? 1 : 0));
+    $('usageLegend').innerHTML =
+      `<span><i style="background:var(--ok)"></i>In use ${fmt(by.used)} addresses (${p1(by.used)}%)</span>` +
+      `<span><i style="background:var(--hl-border)"></i>Reserved ${fmt(by.reserved)} (${p1(by.reserved)}%)</span>` +
+      `<span><i style="background:var(--border)"></i>Free ${fmt(by.free)} (${p1(by.free)}%)</span>`;
+
+    const w = [classTags(state.network, state.mask)];
+    if (settings.cloud === 'aws' && state.mask < 16) w.push('<span class="tag danger">AWS VPC CIDR blocks must be between /16 and /28</span>');
+    if (settings.cloud !== 'std' && state.mask > CLOUDS[settings.cloud].min) w.push(`<span class="tag danger">Base is smaller than the ${CLOUDS[settings.cloud].label} minimum of /${CLOUDS[settings.cloud].min}</span>`);
+    if (tooSmall) w.push(`<span class="tag danger">${tooSmall} subnet${tooSmall > 1 ? 's are' : ' is'} below the ${CLOUDS[settings.cloud].label} minimum of /${CLOUDS[settings.cloud].min}</span>`);
+    for (const [v, list] of Object.entries(vlans)) if (list.length > 1) w.push(`<span class="tag warn" title="${esc(list.join(', '))}">VLAN ${esc(v)} is on ${list.length} subnets</span>`);
+    if (clashes) w.push(`<span class="tag danger">${clashes} subnet${clashes > 1 ? 's overlap' : ' overlaps'} existing networks (see Check &amp; summarize)</span>`);
+    $('warnings').innerHTML = w.join('');
+  };
+
+  const render = () => {
+    const H = height(state.root);
+    rows = collectLeaves();
+    const limit = divLimit();
+
+    const head = $('headRow');
+    head.innerHTML = '';
+    for (const col of COLS) {
+      if (!visible[col.key]) continue;
+      const th = document.createElement('th');
+      th.textContent = col.label;
+      th.className = 'col-' + col.key + (col.num ? ' num' : '');
+      if (col.key === 'join') { th.classList.add('join-h'); th.colSpan = H + 1; }
+      head.appendChild(th);
+    }
+
+    const body = $('body');
+    body.innerHTML = '';
+    let foundRow = null;
+    rows.forEach((leaf, idx) => {
+      const key = leaf.key;
+      const meta = getMeta(key);
+      const info = hostInfo(leaf.addr, leaf.mask);
+      const tr = document.createElement('tr');
+      if (meta.s) tr.classList.add('st-' + meta.s);
+      if (foundIp !== null && inBlock(foundIp, leaf.addr, leaf.mask)) { tr.classList.add('found'); foundRow = tr; }
+      const clashes = existing.filter((e) => overlaps(e.addr, e.mask, leaf.addr, leaf.mask));
+      if (clashes.length) tr.classList.add('clash');
+
+      const cell = (cls, content) => {
+        const td = document.createElement('td');
+        td.className = 'data ' + cls;
+        if (content == null) { /* empty */ }
+        else if (typeof content === 'string') td.textContent = content; else td.appendChild(content);
+        tr.appendChild(td);
+        return td;
+      };
+      const textInput = (cls, field, placeholder, label) => {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'cell-input ' + cls;
+        inp.value = meta[field] || '';
+        inp.placeholder = placeholder;
+        inp.setAttribute('aria-label', `${label} for ${key}`);
+        inp.spellcheck = false;
+        return inp;
+      };
+
+      if (visible.subnet) {
+        const wrap = document.createElement('div');
+        wrap.className = 'subnet-cell';
+        const a = document.createElement('span');
+        a.className = 'addr mono';
+        a.textContent = key;
+        wrap.append(a, copyBtn(key));
+        if (info.warn) {
+          const b = document.createElement('span'); b.className = 'badge danger'; b.textContent = 'too small'; b.title = info.warn; wrap.append(b);
+        } else if (info.note) {
+          const b = document.createElement('span'); b.className = 'badge'; b.textContent = leaf.mask === 31 ? 'P2P' : 'host'; b.title = info.note; wrap.append(b);
+        }
+        if (clashes.length) {
+          const b = document.createElement('span'); b.className = 'badge clash'; b.textContent = 'overlap';
+          b.title = 'Overlaps existing: ' + clashes.map((e) => e.cidr + (e.label ? ` (${e.label})` : '')).join(', ');
+          wrap.append(b);
+        }
+        cell('', wrap);
+      }
+      if (visible.divide) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'small';
+        btn.textContent = 'Divide';
+        if (leaf.mask >= limit) {
+          btn.disabled = true;
+          btn.title = settings.cloud === 'std' ? '/32 is a single address' : `${CLOUDS[settings.cloud].label} subnets can’t be smaller than /${limit}`;
+        } else {
+          btn.title = `Split into two /${leaf.mask + 1}s`;
+          btn.addEventListener('click', () => { leaf.node.c = [{ c: null }, { c: null }]; update(); });
+        }
+        cell('col-divide', btn);
+      }
+      if (visible.name) {
+        const inp = textInput('', 'n', 'Name', 'Name');
+        inp.addEventListener('input', () => { setMeta(key, 'n', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
+        cell('', inp);
+      }
+      if (visible.vlan) {
+        const inp = textInput('vlan', 'v', '—', 'VLAN ID');
+        inp.inputMode = 'numeric';
+        inp.addEventListener('input', () => {
+          const v = inp.value.trim();
+          const ok = v === '' || validVlan(v);
+          inp.setAttribute('aria-invalid', String(!ok));
+          inp.title = ok ? '' : 'VLAN IDs run from 1 to 4094';
+          if (ok) { setMeta(key, 'v', v ? String(+v) : ''); writeHashSoon(); }
+        });
+        inp.addEventListener('change', renderSummary);
+        cell('', inp);
+      }
+      if (visible.netmask) cell('mono', ntoa(netmask(leaf.mask)));
+      if (visible.wildcard) cell('mono', ntoa(wildcard(leaf.mask)));
+      if (visible.range) cell('mono', `${ntoa(leaf.addr)} – ${ntoa(info.last)}`);
+      if (visible.usable) cell('mono', info.uF === null ? '—' : (info.uF === info.uL ? ntoa(info.uF) : `${ntoa(info.uF)} – ${ntoa(info.uL)}`));
+      if (visible.gateway) cell('mono', info.gw === null ? '—' : ntoa(info.gw));
+      if (visible.hosts) cell('mono num', fmt(info.hosts));
+      if (visible.status) {
+        const sel = document.createElement('select');
+        sel.className = 'status ' + (meta.s || 'free');
+        sel.setAttribute('aria-label', `Status of ${key}`);
+        for (const [v, l] of [['free', 'Free'], ['used', 'In use'], ['reserved', 'Reserved']]) {
+          const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o);
+        }
+        sel.value = meta.s || 'free';
+        sel.addEventListener('change', () => { setMeta(key, 's', sel.value === 'free' ? '' : sel.value); update(); });
+        cell('', sel);
+      }
+      if (visible.note) {
+        const inp = textInput('note', 'o', 'Notes', 'Notes');
+        inp.addEventListener('input', () => { setMeta(key, 'o', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
+        cell('', inp);
+      }
+      if (visible.binary) cell('mono bin', null).innerHTML = binHtml(leaf.addr, leaf.mask);
+      if (visible.join) {
+        const own = document.createElement('td');
+        own.className = 'bar leaf';
+        own.style.setProperty('--h', hueFor(leaf.mask));
+        own.colSpan = H - leaf.depth + 1;
+        own.textContent = '/' + leaf.mask;
+        tr.appendChild(own);
+
+        for (let i = leaf.opening.length - 1; i >= 0; i--) {
+          const anc = leaf.opening[i];
+          const span = leafCount(anc.node);
+          const td = document.createElement('td');
+          td.className = 'bar joinable';
+          td.style.setProperty('--h', hueFor(anc.mask));
+          td.rowSpan = span;
+          td.tabIndex = 0;
+          td.setAttribute('role', 'button');
+          td.title = `Join ${span} subnets into ${cidrStr(anc.addr, anc.mask)}`;
+          td.setAttribute('aria-label', td.title);
+          td.innerHTML = `/${anc.mask}<span class="hint">join</span>`;
+          const first = idx, lastIdx = idx + span - 1;
+          const hl = (on) => {
+            for (let r = first; r <= lastIdx; r++) body.rows[r] && body.rows[r].classList.toggle('hl', on);
+          };
+          td.addEventListener('mouseenter', () => hl(true));
+          td.addEventListener('mouseleave', () => hl(false));
+          td.addEventListener('focus', () => hl(true));
+          td.addEventListener('blur', () => hl(false));
+          const doJoin = () => { anc.node.c = null; update(); };
+          td.addEventListener('click', doJoin);
+          td.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doJoin(); }
+          });
+          tr.appendChild(td);
+        }
+      }
+      body.appendChild(tr);
+    });
+    renderSummary();
+    return foundRow;
+  };
+
+  const update = () => { render(); writeHash(); };
+
+  const syncControls = () => {
+    netInput.value = ntoa(state.network);
+    maskInput.value = state.mask;
+    $('platform').value = settings.cloud;
+    $('gwPos').value = settings.gw;
+    // Cloud platforms fix the gateway at .1, so the choice only applies to Standard.
+    $('gwField').hidden = settings.cloud !== 'std';
+    $('gwPos').title = 'Which address in each subnet is the router/gateway';
+    $('v6Net').value = v6Key(v6.net, v6.mask);
+  };
+
+  // ---------- Column chips ----------
+  const chips = $('chips');
+  for (const col of COLS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = col.label;
+    b.setAttribute('aria-pressed', String(!!visible[col.key]));
+    if (col.locked) {
+      b.disabled = true;
+      b.title = `${col.label} is always shown`;
+      chips.appendChild(b);
+      continue;
+    }
+    b.addEventListener('click', () => {
+      visible[col.key] = !visible[col.key];
+      b.setAttribute('aria-pressed', String(visible[col.key]));
+      try { localStorage.setItem('subnetPlanner.cols', JSON.stringify(visible)); } catch (e) { /* ignore */ }
+      render();
+    });
+    chips.appendChild(b);
+  }
+
+  // ---------- Plan form ----------
+  netInput.addEventListener('input', () => {
+    const m = /^\s*([\d.]+)\s*\/\s*(\d{1,2})\s*$/.exec(netInput.value);
+    if (m) { netInput.value = m[1]; maskInput.value = m[2]; }
+    netInput.removeAttribute('aria-invalid');
+    maskInput.removeAttribute('aria-invalid');
+  });
+  maskInput.addEventListener('input', () => maskInput.removeAttribute('aria-invalid'));
+
+  $('netForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearMsg('msg');
+    const n = aton(netInput.value);
+    const m = Number(maskInput.value);
+    if (n === null) {
+      netInput.setAttribute('aria-invalid', 'true');
+      showMsg('msg', 'That isn’t a valid IPv4 address. Use four numbers from 0 to 255, like 10.0.0.0.', 'error');
+      return;
+    }
+    if (!Number.isInteger(m) || m < 0 || m > 32) {
+      maskInput.setAttribute('aria-invalid', 'true');
+      showMsg('msg', 'Mask bits must be a whole number from 0 to 32.', 'error');
+      return;
+    }
+    const aligned = netAddr(n, m);
+    if (aligned !== n) {
+      netInput.value = ntoa(aligned);
+      showMsg('msg', `${ntoa(n)} isn’t on a /${m} boundary, so it was adjusted to ${ntoa(aligned)}.`, 'info');
+    }
+    if (m !== state.mask || aligned !== state.network) {
+      const hasWork = state.root.c || Object.keys(state.meta).length;
+      if (m !== state.mask && hasWork && !confirm(`Changing the base network from /${state.mask} to /${m} will reset your splits, names and VLANs. Continue?`)) {
+        maskInput.value = state.mask;
+        return;
+      }
+      if (m !== state.mask) { state.root = { c: null }; state.meta = {}; state.mask = m; }
+      else {
+        // Same size, new address: carry names and VLANs across to the matching subnets.
+        const shift = aligned - state.network, moved = {};
+        for (const [k, v] of Object.entries(state.meta)) {
+          const c = parseCidr(k);
+          if (c) moved[cidrStr(c.addr + shift, c.mask)] = v;
+        }
+        state.meta = moved;
+      }
+    }
+    state.network = aligned;
+    update();
+  });
+
+  $('platform').addEventListener('change', () => {
+    settings.cloud = $('platform').value;
+    syncControls();
+    update();
+    const lim = divLimit();
+    if (settings.cloud !== 'std') toast(`${CLOUDS[settings.cloud].label}: gateway is always .1, ${settings.cloud === 'gcp' ? 4 : 5} addresses reserved per subnet, smallest /${lim}`);
+  });
+  $('gwPos').addEventListener('change', () => {
+    settings.gw = $('gwPos').value;
+    if (!visible.gateway) {
+      visible.gateway = true;
+      const chip = [...document.querySelectorAll('#chips .chip')].find((c) => c.textContent === 'Gateway');
+      if (chip) chip.setAttribute('aria-pressed', 'true');
+      try { localStorage.setItem('subnetPlanner.cols', JSON.stringify(visible)); } catch (e) { /* ignore */ }
+    }
+    update();
+    const eg = rows[0] && hostInfo(rows[0].addr, rows[0].mask).gw;
+    toast(`Gateway is now the ${settings.gw} usable address${eg != null ? ` (e.g. ${ntoa(eg)} in ${rows[0].key})` : ''}`);
+    if (foundIp !== null) runFind(false);
+  });
+
+  const runFind = (scroll) => {
+    const v = $('findIp').value.trim();
+    const out = $('findOut');
+    $('findIp').removeAttribute('aria-invalid');
+    out.classList.remove('miss');
+    if (!v) { foundIp = null; out.textContent = ''; render(); return; }
+    const ip = aton(v);
+    if (ip === null) { foundIp = null; out.textContent = ''; render(); if (/^\d+\.\d+\.\d+\.\d+/.test(v)) $('findIp').setAttribute('aria-invalid', 'true'); return; }
+    foundIp = ip;
+    const row = render();
+    const leaf = rows.find((r) => inBlock(ip, r.addr, r.mask));
+    if (!leaf) { out.classList.add('miss'); out.innerHTML = `<b class="mono">${ntoa(ip)}</b> is outside this plan (${cidrStr(state.network, state.mask)}).`; return; }
+    const info = hostInfo(leaf.addr, leaf.mask);
+    const res = info.reserved.find(([a]) => a === ip);
+    let role;
+    if (res) role = res[1];
+    else if (ip === info.gw) role = 'the gateway';
+    else if (info.uF !== null && ip >= info.uF && ip <= info.uL) role = `usable host #${fmt(ip - info.uF + 1)} of ${fmt(info.hosts)}`;
+    else role = 'not usable on this platform';
+    const name = getMeta(leaf.key).n;
+    out.innerHTML = `<b class="mono">${ntoa(ip)}</b> is in <b class="mono">${leaf.key}</b>${name ? ` (${esc(name)})` : ''}: ${esc(role)}.`;
+    if (scroll && row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  $('findIp').addEventListener('input', () => runFind(true));
+  $('findIp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runFind(true); } });
+
+  $('resetBtn').addEventListener('click', () => {
+    if (!state.root.c) return;
+    if (Object.keys(state.meta).length && !confirm('Join everything back into the base network? Names and VLANs on the joined subnets will be dropped from the link.')) return;
+    state.root = { c: null };
+    update();
+    toast('Joined back into one network');
+  });
+  $('linkBtn').addEventListener('click', async () => {
+    writeHash();
+    toast((await copyText(location.href)) ? 'Link copied' : 'Couldn’t copy. Use the address bar.');
+  });
+  $('printBtn').addEventListener('click', () => window.print());
+
+  // CSV columns, keyed to the table columns they come from.
+  const CSV_COLS = [
+    { key: 'subnet',   head: ['Subnet'],                        val: (r) => [r.key] },
+    { key: 'name',     head: ['Name'],                          val: (r, i, m) => [m.n || ''] },
+    { key: 'vlan',     head: ['VLAN'],                          val: (r, i, m) => [m.v || ''] },
+    { key: 'netmask',  head: ['Netmask'],                       val: (r) => [ntoa(netmask(r.mask))] },
+    { key: 'wildcard', head: ['Wildcard'],                      val: (r) => [ntoa(wildcard(r.mask))] },
+    { key: 'range',    head: ['First address', 'Last address'], val: (r, i) => [ntoa(r.addr), ntoa(i.last)] },
+    { key: 'usable',   head: ['First usable', 'Last usable'],   val: (r, i) => (i.uF === null ? ['', ''] : [ntoa(i.uF), ntoa(i.uL)]) },
+    { key: 'gateway',  head: ['Gateway'],                       val: (r, i) => [i.gw === null ? '' : ntoa(i.gw)] },
+    { key: 'hosts',    head: ['Hosts'],                         val: (r, i) => [i.hosts] },
+    { key: 'status',   head: ['Status'],                        val: (r, i, m) => [m.s || 'free'] },
+    { key: 'note',     head: ['Notes'],                         val: (r, i, m) => [m.o || ''] },
+    { key: 'binary',   head: ['Binary'],                        val: (r) => [binText(r.addr)] },
+  ];
+  const buildCsv = (onlyVisible) => {
+    const cols = CSV_COLS.filter((c) => !onlyVisible || visible[c.key]);
+    const lines = [cols.flatMap((c) => c.head).map(csvQ).join(',')];
+    for (const r of rows) {
+      const i = hostInfo(r.addr, r.mask), m = getMeta(r.key);
+      lines.push(cols.flatMap((c) => c.val(r, i, m)).map(csvQ).join(','));
+    }
+    return { text: lines.join('\n'), ncols: cols.length };
+  };
+  $('csvBtn').addEventListener('click', async () => {
+    const { text, ncols } = buildCsv(true);
+    toast((await copyText(text)) ? `Copied ${rows.length} rows (${ncols} columns) as CSV` : 'Couldn’t copy CSV');
+  });
+
+  // =====================================================================
+  // VLSM tab
+  // =====================================================================
+  let vlsmPlan = null;
+  const updateVlsmBase = () => {
+    $('vlsmBase').textContent = cidrStr(state.network, state.mask);
+    $('vlsmPlat').textContent = CLOUDS[settings.cloud].label;
+    $('vlsmSmallF').hidden = settings.cloud !== 'std';
+  };
+  $('vlsmExample').addEventListener('click', () => {
+    $('vlsmIn').value = 'Servers, 200, 10\nStaff Wi-Fi, 120, 20\nGuest Wi-Fi, 60, 30\nVoIP, 50, 40\nPrinters, 20, 50\nManagement, 10, 99\nUplink to ISP, 2';
+    if (state.mask > 22) {
+      state.network = aton('10.10.0.0'); state.mask = 22; state.root = { c: null }; state.meta = {};
+      syncControls(); update(); updateVlsmBase();
+      toast('Base network set to 10.10.0.0/22 for the example');
+    }
+  });
+  $('vlsmRun').addEventListener('click', () => {
+    const out = $('vlsmOut');
+    $('vlsmApply').hidden = true;
+    vlsmPlan = null;
+    const errors = [], reqs = [];
+    $('vlsmIn').value.split('\n').forEach((raw, i) => {
+      const l = raw.replace(/#.*$/, '').trim();
+      if (!l) return;
+      let name, hosts, vlan;
+      const parts = l.split(/\s*[,;\t]\s*/);
+      if (parts.length >= 2) [name, hosts, vlan] = parts;
+      else { const m = /^(.*?)\s*(\d+)$/.exec(l); if (m) { name = m[1]; hosts = m[2]; } }
+      const h = Number(hosts);
+      if (!Number.isInteger(h) || h < 1) { errors.push(`Line ${i + 1}: “${l}” needs a host count, like “Sales, 50”.`); return; }
+      if (vlan && !validVlan(vlan)) { errors.push(`Line ${i + 1}: VLAN “${vlan}” must be 1–4094.`); vlan = ''; }
+      reqs.push({ name: (name || '').trim() || `Subnet ${reqs.length + 1}`, hosts: h, vlan: vlan ? String(+vlan) : '', idx: i });
+    });
+    if (!reqs.length) { out.innerHTML = `<div class="msg show error">${esc(errors[0] || 'Add at least one line, like “Sales, 50”.')}</div>`; return; }
+
+    const headroom = Math.max(0, Number($('vlsmHead').value) || 0);
+    const minM = settings.cloud === 'std' ? Number($('vlsmSmall').value) : CLOUDS[settings.cloud].min;
+    for (const r of reqs) {
+      r.need = Math.ceil(r.hosts * (1 + headroom / 100));
+      r.mask = null;
+      for (let m = minM; m >= state.mask; m--) if (hostInfo(0, m).hosts >= r.need) { r.mask = m; break; }
+    }
+    const tooBig = reqs.filter((r) => r.mask === null);
+    if (tooBig.length) {
+      out.innerHTML = `<div class="msg show error">${tooBig.map((r) => `${esc(r.name)} needs ${fmt(r.need)} hosts, which is more than ${cidrStr(state.network, state.mask)} can hold.`).join('<br>')}</div>`;
+      return;
+    }
+    const sorted = [...reqs].sort((a, b) => a.mask - b.mask || a.idx - b.idx);
+    const baseEnd = lastAddr(state.network, state.mask);
+    let ptr = state.network;
+    const needTotal = sorted.reduce((s, r) => s + size(r.mask), 0);
+    if (state.network + needTotal - 1 > baseEnd) {
+      out.innerHTML = `<div class="msg show error">Doesn’t fit: these subnets need ${fmt(needTotal)} addresses but ${cidrStr(state.network, state.mask)} has ${fmt(size(state.mask))}. Try a bigger base network (smaller mask number) or less headroom.</div>`;
+      return;
+    }
+    for (const r of sorted) { r.addr = ptr; ptr += size(r.mask); }
+    const free = ptr <= baseEnd ? rangeToCidrs(ptr, baseEnd) : [];
+    vlsmPlan = sorted;
+
+    let html = '';
+    if (errors.length) html += `<div class="msg show error">${errors.map(esc).join('<br>')}</div>`;
+    html += `<div class="stat-line">Uses <b>${fmt(needTotal)}</b> of ${fmt(size(state.mask))} addresses (<b>${((needTotal / size(state.mask)) * 100).toFixed(1)}%</b>)${headroom ? `, with ${headroom}% growth headroom` : ''}.</div>`;
+    html += '<div class="table-wrap"><table><thead><tr><th>Name</th><th>VLAN</th><th class="num">Needs</th><th>Subnet</th><th class="num">Usable</th><th class="num">Spare</th><th>Usable range</th></tr></thead><tbody>';
+    for (const r of sorted) {
+      const i = hostInfo(r.addr, r.mask);
+      html += `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.vlan || '—')}</td><td class="num mono">${fmt(r.hosts)}</td><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="num mono">${fmt(i.hosts)}</td><td class="num mono">${fmt(i.hosts - r.hosts)}</td><td class="mono">${i.uF === null ? '—' : `${ntoa(i.uF)} – ${ntoa(i.uL)}`}</td></tr>`;
+    }
+    html += '</tbody></table></div>';
+    html += free.length
+      ? `<div><span class="lbl">Left free</span><div class="codebox" style="margin-top:6px">${free.map((f) => `<code>${cidrStr(f.addr, f.mask)}</code>`).join('')}</div></div>`
+      : '<div class="stat-line">No space left over.</div>';
+    out.innerHTML = html;
+    $('vlsmApply').hidden = false;
+  });
+  $('vlsmApply').addEventListener('click', () => {
+    if (!vlsmPlan) return;
+    if ((state.root.c || Object.keys(state.meta).length) && !confirm('Replace the current plan on the Plan IPv4 tab with this one?')) return;
+    state.root = { c: null };
+    state.meta = {};
+    for (const r of vlsmPlan) {
+      carve(state.root, state.network, state.mask, r.addr, r.mask);
+      const k = cidrStr(r.addr, r.mask);
+      setMeta(k, 'n', r.name);
+      setMeta(k, 'v', r.vlan);
+      setMeta(k, 's', 'used');
+      setMeta(k, 'o', `Needs ${r.hosts} hosts`);
+    }
+    update();
+    showTab('plan');
+    toast(`Applied ${vlsmPlan.length} subnets`);
+  });
+
+  // =====================================================================
+  // Tools tab
+  // =====================================================================
+  $('ovRun').addEventListener('click', () => {
+    const out = $('ovOut');
+    const lines = $('ovIn').value.split('\n').map(parseLine).filter(Boolean);
+    const bad = lines.filter((l) => l.error);
+    const list = lines.filter((l) => !l.error);
+    existing = list;
+    update();
+    if (!list.length) { out.innerHTML = `<div class="msg show error">No networks found. Use one per line, like “10.0.0.0/16 HQ”.</div>`; return; }
+
+    let html = '';
+    if (bad.length) html += `<div class="msg show error">Couldn’t read: ${bad.map((b) => esc(b.raw)).join(', ')}</div>`;
+    let clashCount = 0;
+    html += '<div class="table-wrap"><table><thead><tr><th>Existing network</th><th>Label</th><th>Against your plan</th></tr></thead><tbody>';
+    for (const e of list) {
+      const hits = rows.filter((r) => overlaps(e.addr, e.mask, r.addr, r.mask));
+      let res;
+      if (!hits.length) res = '<span class="tag ok">No overlap</span>';
+      else {
+        clashCount++;
+        const shown = hits.slice(0, 6).map((r) => {
+          const rel = relation(e.addr, e.mask, r.addr, r.mask);
+          const n = getMeta(r.key).n;
+          return `${rel ? esc(rel) + ' ' : ''}<b class="mono">${r.key}</b>${n ? ` (${esc(n)})` : ''}`;
+        });
+        res = `<span class="tag danger">Overlaps ${hits.length}</span> ${shown.join(', ')}${hits.length > 6 ? `, +${hits.length - 6} more` : ''}`;
+      }
+      const fix = e.aligned ? '' : ` <span class="tag muted" title="Host bits were set in ${esc(e.raw)}">from ${esc(ntoa(e.ip))}</span>`;
+      html += `<tr><td class="mono"><b>${e.cidr}</b>${fix}</td><td>${esc(e.label || '—')}</td><td style="white-space:normal">${res}</td></tr>`;
+    }
+    html += '</tbody></table></div>';
+    const pairs = [];
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j];
+      if (overlaps(a.addr, a.mask, b.addr, b.mask)) {
+        pairs.push(`<b class="mono">${a.cidr}</b>${a.label ? ` (${esc(a.label)})` : ''} ${esc(relation(a.addr, a.mask, b.addr, b.mask) || 'overlaps')} <b class="mono">${b.cidr}</b>${b.label ? ` (${esc(b.label)})` : ''}`);
+      }
+    }
+    html += pairs.length
+      ? `<div><span class="lbl">Overlaps among the existing networks</span><ul>${pairs.map((p) => `<li>${p}</li>`).join('')}</ul></div>`
+      : '<div class="stat-line">No overlaps among the existing networks.</div>';
+    html = `<div class="msg show ${clashCount ? 'error' : 'ok'}">${clashCount ? `${clashCount} of ${list.length} existing networks clash with ${cidrStr(state.network, state.mask)}.` : `None of the ${list.length} networks clash with ${cidrStr(state.network, state.mask)}.`}</div>` + html;
+    out.innerHTML = html;
+  });
+  $('ovClear').addEventListener('click', () => { existing = []; $('ovIn').value = ''; $('ovOut').innerHTML = ''; update(); });
+
+  const runSummarize = () => {
+    const out = $('sumOut');
+    const tokens = $('sumIn').value.replace(/#.*$/gm, '').split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean)
+      .flatMap((t) => (parseCidr(t) ? [t] : t.split(/\s+/)));
+    const list = [], bad = [];
+    for (const t of tokens) { const c = parseCidr(t); if (c) list.push(c); else bad.push(t); }
+    if (!list.length) { out.innerHTML = '<div class="msg show error">No networks found.</div>'; return; }
+    const iv = list.map((c) => [c.addr, lastAddr(c.addr, c.mask)]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const merged = [];
+    for (const [s, e] of iv) {
+      const top = merged[merged.length - 1];
+      if (top && s <= top[1] + 1) top[1] = Math.max(top[1], e); else merged.push([s, e]);
+    }
+    const exact = merged.flatMap(([s, e]) => rangeToCidrs(s, e));
+    const covered = merged.reduce((t, [s, e]) => t + (e - s + 1), 0);
+    const sup = supernet(list);
+    const extra = size(sup.mask) - covered;
+    let html = '';
+    if (bad.length) html += `<div class="msg show error">Skipped: ${bad.map(esc).join(', ')}</div>`;
+    html += `<div class="stat-line"><b>${list.length}</b> networks → <b>${exact.length}</b> route${exact.length > 1 ? 's' : ''} covering exactly the same ${fmt(covered)} addresses.</div>`;
+    html += `<div><span class="lbl">Exact summary</span><div class="codebox" style="margin-top:6px">${exact.map((c) => `<code>${cidrStr(c.addr, c.mask)}</code>`).join('')}</div>
+      <div style="margin-top:8px"><button type="button" class="small" id="sumCopy">Copy routes</button></div></div>`;
+    html += `<div><span class="lbl">Single supernet</span><div class="codebox" style="margin-top:6px"><code>${cidrStr(sup.addr, sup.mask)}</code></div>
+      <div class="stat-line" style="margin-top:6px">${extra === 0 ? 'Covers exactly your networks, nothing extra.' : `Also covers <b>${fmt(extra)}</b> address${extra > 1 ? 'es' : ''} not in your list. Only advertise it if you own that space.`}</div></div>`;
+    out.innerHTML = html;
+    $('sumCopy').addEventListener('click', async () => {
+      toast((await copyText(exact.map((c) => cidrStr(c.addr, c.mask)).join('\n'))) ? 'Routes copied' : 'Couldn’t copy');
+    });
+  };
+  $('sumRun').addEventListener('click', runSummarize);
+  $('sumFromPlan').addEventListener('click', () => {
+    const used = rows.filter((r) => getMeta(r.key).s === 'used').map((r) => r.key);
+    if (!used.length) { $('sumOut').innerHTML = '<div class="msg show info">No subnets are marked “In use” on the Plan tab yet.</div>'; return; }
+    $('sumIn').value = used.join('\n');
+    runSummarize();
+  });
+
+  const reverseZone = (addr, mask) => {
+    const o = ntoa(addr).split('.');
+    if (mask < 8) return `Spans ${fmt(2 ** (8 - mask))} /8 reverse zones`;
+    const k = Math.floor(mask / 8);
+    const zone = o.slice(0, k).reverse().join('.') + '.in-addr.arpa';
+    if (mask % 8 === 0) return zone;
+    if (mask > 24) return `Part of ${zone}. Needs classless delegation (RFC 2317), e.g. ${o[3]}-${lastAddr(addr, mask) & 255}.${zone}`;
+    const n = 2 ** (8 - (mask % 8));
+    const first = [o[k], ...o.slice(0, k).reverse()].join('.') + '.in-addr.arpa';
+    return `Spans ${n} zones at /${(k + 1) * 8}, starting ${first}`;
+  };
+  const runInfo = () => {
+    const out = $('infoOut');
+    const v = $('infoIn').value.trim();
+    if (!v) { out.innerHTML = ''; return; }
+    const c = parseCidr(v);
+    if (!c) { out.innerHTML = '<div class="msg show error">Enter an IP like 10.1.2.3, or a network like 10.1.2.0/24 or 10.1.2.0 255.255.255.0.</div>'; return; }
+    const i = hostInfo(c.addr, c.mask);
+    const first = Math.floor(c.ip / 16777216);
+    const klass = first < 128 ? 'A' : first < 192 ? 'B' : first < 224 ? 'C' : first < 240 ? 'D (multicast)' : 'E (reserved)';
+    const inPlan = rows.find((r) => inBlock(c.ip, r.addr, r.mask));
+    const kv = [
+      ['Address', `<span class="mono">${ntoa(c.ip)}</span>`],
+      ['Network', `<span class="mono"><b>${c.cidr}</b></span>`],
+      ['Netmask', `<span class="mono">${ntoa(netmask(c.mask))}</span>`],
+      ['Wildcard', `<span class="mono">${ntoa(wildcard(c.mask))}</span>`],
+      ['Range', `<span class="mono">${ntoa(c.addr)} – ${ntoa(i.last)}</span> (${fmt(size(c.mask))} addresses)`],
+      ['Usable', i.uF === null ? '—' : `<span class="mono">${ntoa(i.uF)} – ${ntoa(i.uL)}</span> (${fmt(i.hosts)} hosts, ${CLOUDS[settings.cloud].label} rules)`],
+      ['Binary', `<span class="mono bin">${binHtml(c.ip, c.mask)}</span>`],
+      ['Hex', `<span class="mono">0x${c.ip.toString(16).toUpperCase().padStart(8, '0')}</span>`],
+      ['Type', classTags(c.addr, c.mask)],
+      ['Old class', `Class ${klass} (classful addressing is historical)`],
+      ['Reverse DNS', `<span class="mono">${esc(reverseZone(c.addr, c.mask))}</span>`],
+      ['In your plan', inPlan ? `<span class="mono">${inPlan.key}</span>${getMeta(inPlan.key).n ? ` (${esc(getMeta(inPlan.key).n)})` : ''}` : `No (plan is ${cidrStr(state.network, state.mask)})`],
+    ];
+    out.innerHTML = `<dl class="kv">${kv.map(([k, v2]) => `<dt>${k}</dt><dd>${v2}</dd>`).join('')}</dl>`;
+  };
+  $('infoIn').addEventListener('input', runInfo);
+
+  // =====================================================================
+  // Export / import
+  // =====================================================================
+  const exportList = () => {
+    const inc = $('exInc').value;
+    const all = rows.map((r) => ({ ...r, meta: getMeta(r.key), info: hostInfo(r.addr, r.mask) }));
+    let list = inc === 'all' ? all
+      : inc === 'used' ? all.filter((x) => x.meta.s === 'used')
+      : all.filter((x) => x.meta.n || x.meta.v || x.meta.s === 'used');
+    let note = '';
+    if (!list.length && inc === 'planned') { list = all; note = 'No subnets are named, have a VLAN or are marked in use yet, so every subnet is included.'; }
+    else if (!list.length) note = 'No subnets are marked “In use” yet.';
+    return { list, note };
+  };
+  const makeNamer = (style) => {
+    const used = new Set();
+    return (x) => {
+      const raw = x.meta.n || (x.meta.v ? `vlan${x.meta.v}` : `net-${ntoa(x.addr).replace(/\./g, '-')}-${x.mask}`);
+      let s;
+      if (style === 'tf') { s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); if (!/^[a-z_]/.test(s)) s = 'n_' + s; }
+      else if (style === 'gcp') { s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 55); if (!/^[a-z]/.test(s)) s = 'n-' + s; }
+      else if (style === 'upper') s = raw.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      else s = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      s = s || 'net';
+      const sep = style === 'tf' || style === 'upper' ? '_' : '-';
+      let u = s, i = 2;
+      while (used.has(u)) u = s + sep + i++;
+      used.add(u);
+      return u;
+    };
+  };
+  const hq = (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const poolRange = (info) => {
+    if (info.uF === null || info.hosts < 3) return null;
+    let lo = info.uF, hi = info.uL;
+    if (info.gw === lo) lo++; else if (info.gw === hi) hi--;
+    return lo <= hi ? [lo, hi] : null;
+  };
+  const routerIp = (info) => (info.gw ?? info.uF);
+
+  const genCisco = (list, dhcp) => {
+    const pool = makeNamer('upper');
+    const out = ['! Generated by IP Plan-O-Matic. Review before applying.', '! Replace <INTERFACE> and <DNS_SERVER> placeholders.', '!'];
+    let lo = 0;
+    for (const x of list) {
+      const { info, meta } = x;
+      out.push(`! ===== ${x.key}${meta.n ? '  ' + meta.n : ''}`);
+      if (info.uF === null) { out.push('! skipped: no usable addresses on this platform', '!'); continue; }
+      const r = routerIp(info), nm = ntoa(netmask(x.mask));
+      let ifname;
+      if (x.mask === 32) ifname = `Loopback${lo++}`;
+      else if (meta.v) { out.push(`vlan ${meta.v}`, ` name ${(meta.n || 'VLAN' + meta.v).replace(/\s+/g, '_').slice(0, 32)}`, '!'); ifname = `Vlan${meta.v}`; }
+      else ifname = '<INTERFACE>';
+      out.push(`interface ${ifname}`, ` description ${meta.n || x.key}`, ` ip address ${ntoa(r)} ${nm}`, ' no shutdown', '!');
+      if (dhcp && poolRange(info)) {
+        out.push(`ip dhcp excluded-address ${ntoa(r)}`, `ip dhcp pool ${pool(x)}`, ` network ${ntoa(x.addr)} ${nm}`, ` default-router ${ntoa(r)}`, ' dns-server <DNS_SERVER>', '!');
+      }
+    }
+    return out.join('\n');
+  };
+  const genJunos = (list, dhcp) => {
+    const nm = makeNamer('upper');
+    const out = ['# Generated by IP Plan-O-Matic. Review before applying.', '# Replace <INTERFACE> placeholders. Paste in configuration mode.', ''];
+    let lo = 0;
+    for (const x of list) {
+      const { info, meta } = x;
+      out.push(`# ===== ${x.key}${meta.n ? '  ' + meta.n : ''}`);
+      if (info.uF === null) { out.push('# skipped: no usable addresses on this platform', ''); continue; }
+      const r = routerIp(info), name = nm(x), desc = hq(meta.n || x.key);
+      let ifc;
+      if (x.mask === 32) { ifc = `lo0 unit ${lo++}`; }
+      else if (meta.v) {
+        out.push(`set vlans ${name} vlan-id ${meta.v}`, `set vlans ${name} l3-interface irb.${meta.v}`);
+        ifc = `irb unit ${meta.v}`;
+      } else ifc = '<INTERFACE> unit 0';
+      out.push(`set interfaces ${ifc} description "${desc}"`, `set interfaces ${ifc} family inet address ${ntoa(r)}/${x.mask}`);
+      const pr = dhcp && poolRange(info);
+      if (pr) {
+        out.push(
+          `set access address-assignment pool ${name} family inet network ${x.key}`,
+          `set access address-assignment pool ${name} family inet range R1 low ${ntoa(pr[0])}`,
+          `set access address-assignment pool ${name} family inet range R1 high ${ntoa(pr[1])}`,
+          `set access address-assignment pool ${name} family inet dhcp-attributes router ${ntoa(r)}`,
+          `set system services dhcp-local-server group LAN interface ${ifc.replace(' unit ', '.')}`,
+        );
+      }
+      out.push('');
+    }
+    return out.join('\n');
+  };
+  const genMikrotik = (list, dhcp) => {
+    const nm = makeNamer('lower');
+    const out = ['# Generated by IP Plan-O-Matic. Review before applying.', '# Assumes a VLAN-aware bridge called "bridge". Replace <INTERFACE> placeholders.', ''];
+    for (const x of list) {
+      const { info, meta } = x;
+      out.push(`# ===== ${x.key}${meta.n ? '  ' + meta.n : ''}`);
+      if (info.uF === null) { out.push('# skipped: no usable addresses on this platform', ''); continue; }
+      const r = routerIp(info), name = nm(x), cmt = hq(meta.n || x.key);
+      let ifc;
+      if (meta.v) { ifc = `vlan${meta.v}`; out.push(`/interface vlan add interface=bridge name=${ifc} vlan-id=${meta.v} comment="${cmt}"`); }
+      else ifc = '<INTERFACE>';
+      out.push(`/ip address add address=${ntoa(r)}/${x.mask} interface=${ifc} comment="${cmt}"`);
+      const pr = dhcp && poolRange(info);
+      if (pr) {
+        out.push(
+          `/ip pool add name=pool-${name} ranges=${ntoa(pr[0])}-${ntoa(pr[1])}`,
+          `/ip dhcp-server add name=dhcp-${name} interface=${ifc} address-pool=pool-${name}`,
+          `/ip dhcp-server network add address=${x.key} gateway=${ntoa(r)} comment="${cmt}"`,
+        );
+      }
+      out.push('');
+    }
+    return out.join('\n');
+  };
+  const genTf = (list, kind) => {
+    const want = { 'tf-aws': 'aws', 'tf-azure': 'azure', 'tf-gcp': 'gcp' }[kind];
+    const out = ['# Generated by IP Plan-O-Matic. Review before applying.'];
+    if (settings.cloud !== want) out.push(`# Tip: set Platform to ${CLOUDS[want].label} on the Plan tab so host counts and minimum sizes match.`);
+    out.push('');
+    const base = cidrStr(state.network, state.mask);
+    if (kind === 'tf-aws') {
+      const nm = makeNamer('tf');
+      out.push('resource "aws_vpc" "main" {', `  cidr_block           = "${base}"`, '  enable_dns_support   = true', '  enable_dns_hostnames = true', '  tags = {', '    Name = "main"', '  }', '}', '');
+      for (const x of list) {
+        out.push(`resource "aws_subnet" "${nm(x)}" {`, '  vpc_id     = aws_vpc.main.id', `  cidr_block = "${x.key}"`, '  # availability_zone = "us-east-1a"', '  tags = {', `    Name = "${hq(x.meta.n || x.key)}"`);
+        if (x.meta.o) out.push(`    Notes = "${hq(x.meta.o)}"`);
+        out.push('  }', '}', '');
+      }
+    } else if (kind === 'tf-azure') {
+      const nm = makeNamer('tf'), an = makeNamer('lower');
+      out.push('variable "resource_group_name" {', '  type = string', '}', '', 'variable "location" {', '  type = string', '}', '');
+      out.push('resource "azurerm_virtual_network" "main" {', '  name                = "vnet-main"', `  address_space       = ["${base}"]`, '  location            = var.location', '  resource_group_name = var.resource_group_name', '}', '');
+      for (const x of list) {
+        out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "snet-${an(x)}"`, '  resource_group_name  = var.resource_group_name', '  virtual_network_name = azurerm_virtual_network.main.name', `  address_prefixes     = ["${x.key}"]`, '}', '');
+      }
+    } else {
+      const nm = makeNamer('tf'), gn = makeNamer('gcp');
+      out.push('variable "region" {', '  type = string', '}', '');
+      out.push('resource "google_compute_network" "main" {', '  name                    = "vpc-main"', '  auto_create_subnetworks = false', '}', '');
+      for (const x of list) {
+        out.push(`resource "google_compute_subnetwork" "${nm(x)}" {`, `  name          = "${gn(x)}"`, `  ip_cidr_range = "${x.key}"`, '  region        = var.region', '  network       = google_compute_network.main.id');
+        if (x.meta.o || x.meta.n) out.push(`  description   = "${hq(x.meta.o || x.meta.n)}"`);
+        out.push('}', '');
+      }
+    }
+    return out.join('\n');
+  };
+  const genJson = () => JSON.stringify({
+    format: 'subnet-planner',
+    version: 2,
+    base: cidrStr(state.network, state.mask),
+    platform: settings.cloud,
+    gateway: settings.gw,
+    tree: packBits(treeToBits(state.root)),
+    subnets: rows.map((r) => {
+      const m = getMeta(r.key), i = hostInfo(r.addr, r.mask);
+      return {
+        cidr: r.key, name: m.n || '', vlan: m.v ? Number(m.v) : null, status: m.s || 'free', note: m.o || '',
+        netmask: ntoa(netmask(r.mask)), gateway: i.gw === null ? null : ntoa(i.gw),
+        firstUsable: i.uF === null ? null : ntoa(i.uF), lastUsable: i.uL === null ? null : ntoa(i.uL), hosts: i.hosts,
+      };
+    }),
+    ipv6: { prefix: v6Key(v6.net, v6.mask), tree: v6TreeStr(v6.root), names: v6.meta },
+  }, null, 2);
+
+  const EXT = { cisco: 'txt', junos: 'txt', mikrotik: 'rsc', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', csv: 'csv', json: 'json' };
+  const renderExport = () => {
+    const f = $('exFmt').value;
+    const whole = f === 'json' || f === 'csv';
+    $('exInc').disabled = whole;
+    $('exDhcpL').hidden = !['cisco', 'junos', 'mikrotik'].includes(f);
+    clearMsg('exMsg');
+    let text;
+    if (f === 'json') text = genJson();
+    else if (f === 'csv') text = buildCsv(false).text;
+    else {
+      const { list, note } = exportList();
+      if (note) showMsg('exMsg', note, 'info');
+      const dhcp = $('exDhcp').checked;
+      text = f === 'cisco' ? genCisco(list, dhcp) : f === 'junos' ? genJunos(list, dhcp) : f === 'mikrotik' ? genMikrotik(list, dhcp) : genTf(list, f);
+    }
+    $('exOut').value = text;
+  };
+  for (const id of ['exFmt', 'exInc', 'exDhcp']) $(id).addEventListener('change', renderExport);
+  $('exCopy').addEventListener('click', async () => toast((await copyText($('exOut').value)) ? 'Copied' : 'Couldn’t copy'));
+  $('exDl').addEventListener('click', () => {
+    const f = $('exFmt').value;
+    download(`subnet-plan-${f}.${EXT[f]}`, $('exOut').value, f === 'json' ? 'application/json' : f === 'csv' ? 'text/csv' : 'text/plain');
+  });
+
+  const importText = (text) => {
+    text = String(text || '').replace(/^﻿/, '').trim();
+    if (!text) throw new Error('Nothing to import.');
+    let base = null, tree = null, set = null, v6data = null;
+    const entries = [];
+    if (text[0] === '{') {
+      let j;
+      try { j = JSON.parse(text); } catch (e) { throw new Error('That JSON couldn’t be read.'); }
+      if (j.base) base = parseCidr(j.base);
+      if (j.platform && CLOUDS[j.platform]) set = { cloud: j.platform, gw: j.gateway === 'last' ? 'last' : 'first' };
+      for (const s of j.subnets || []) {
+        const c = parseCidr(s.cidr || s.subnet || '');
+        if (c) entries.push({ ...c, n: s.name, v: s.vlan, o: s.note || s.notes, s: s.status });
+      }
+      if (j.tree) tree = j.tree;
+      if (j.ipv6) v6data = j.ipv6;
+    } else {
+      const recs = parseCsv(text);
+      const hdr = recs.shift().map((h) => h.trim().toLowerCase());
+      const col = (...names) => hdr.findIndex((h) => names.includes(h));
+      const ci = col('subnet', 'cidr', 'network', 'prefix');
+      if (ci < 0) throw new Error('The CSV needs a “Subnet” column with values like 10.0.0.0/24.');
+      const ni = col('name'), vi = col('vlan', 'vlan id', 'vlanid'), oi = col('notes', 'note', 'description'), si = col('status');
+      for (const r of recs) {
+        const c = parseCidr(r[ci] || '');
+        if (c) entries.push({ ...c, n: r[ni], v: r[vi], o: r[oi], s: r[si] });
+      }
+    }
+    if (!entries.length) throw new Error('No subnets found.');
+    if (!base) {
+      const fits = entries.every((e) => e.mask >= state.mask && inBlock(e.addr, state.network, state.mask));
+      base = fits ? { addr: state.network, mask: state.mask } : supernet(entries);
+    }
+    if (set) Object.assign(settings, set);
+    state.network = base.addr; state.mask = base.mask; state.meta = {};
+    let root = null;
+    if (tree) { try { const bits = unpackBits(tree); if (bits) root = bitsToTree(bits, 32 - base.mask); } catch (e) { root = null; } }
+    let skipped = 0;
+    const inside = entries.filter((e) => {
+      const ok = e.mask >= base.mask && inBlock(e.addr, base.addr, base.mask);
+      if (!ok) skipped++;
+      return ok;
+    });
+    if (!root) {
+      root = { c: null };
+      for (const e of [...inside].sort((a, b) => a.mask - b.mask)) carve(root, base.addr, base.mask, e.addr, e.mask);
+    }
+    state.root = root;
+    for (const e of inside) {
+      const k = e.cidr;
+      if (e.n) setMeta(k, 'n', String(e.n));
+      if (e.v != null && validVlan(e.v)) setMeta(k, 'v', String(+e.v));
+      if (e.o) setMeta(k, 'o', String(e.o));
+      const st = normStatus(e.s);
+      if (st) setMeta(k, 's', st);
+    }
+    if (v6data) {
+      const t = v6data.tree ? String(v6data.tree) : '0';
+      v6Load({ p: v6data.prefix, t, m: v6data.names });
+    }
+    syncControls();
+    update();
+    renderV6();
+    return { count: inside.length, skipped };
+  };
+  const doImport = (text) => {
+    clearMsg('imMsg');
+    if ((state.root.c || Object.keys(state.meta).length) && !confirm('Importing replaces the current IPv4 plan. Continue?')) return;
+    try {
+      const { count, skipped } = importText(text);
+      showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'} into ${cidrStr(state.network, state.mask)}${skipped ? `. Skipped ${skipped} that didn’t fit the base network` : ''}.`, 'ok');
+      renderExport();
+    } catch (e) {
+      showMsg('imMsg', e.message, 'error');
+    }
+  };
+  $('imRun').addEventListener('click', () => doImport($('imText').value));
+  $('imFile').addEventListener('change', () => {
+    const f = $('imFile').files[0];
+    if (!f) return;
+    f.text().then((t) => { doImport(t); $('imFile').value = ''; });
+  });
+
+  // =====================================================================
+  // IPv6 tab
+  // =====================================================================
+  const renderV6 = () => {
+    const leaves = v6Walk();
+    const total = leaves.length;
+    const body = $('v6Body');
+    body.innerHTML = '';
+    leaves.forEach((lf, idx) => {
+      const key = v6Key(lf.a, lf.m);
+      const tr = document.createElement('tr');
+      const td = (content, cls = '') => {
+        const c = document.createElement('td');
+        c.className = 'data ' + cls;
+        if (typeof content === 'string') c.innerHTML = content; else c.appendChild(content);
+        tr.appendChild(c);
+        return c;
+      };
+      const pfx = document.createElement('div');
+      pfx.className = 'v6-pfx';
+      pfx.style.paddingLeft = (lf.depth * 14) + 'px';
+      const s = document.createElement('span');
+      s.className = 'mono';
+      s.style.fontWeight = '600';
+      s.textContent = key;
+      pfx.append(s, copyBtn(key));
+      if (lf.m % 4 !== 0) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = 'off-nibble'; b.title = 'Not on a 4-bit boundary: harder to read and to delegate reverse DNS'; pfx.append(b); }
+      if (lf.m === 64) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = 'LAN'; b.title = 'A /64 is the standard size for one LAN or VLAN'; pfx.append(b); }
+      td(pfx);
+
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'cell-input'; inp.placeholder = 'Name'; inp.spellcheck = false;
+      inp.value = v6.meta[key] || '';
+      inp.setAttribute('aria-label', 'Name for ' + key);
+      inp.addEventListener('input', () => { if (inp.value.trim()) v6.meta[key] = inp.value; else delete v6.meta[key]; writeHashSoon(); });
+      td(inp);
+
+      td(`${esc(fmt6(lf.a))} – ${esc(fmt6(lf.a + size6(lf.m) - 1n))}`, 'mono');
+      td(lf.m <= 64 ? `${pow2Str(64 - lf.m)} × /64` : `${pow2Str(128 - lf.m)} addresses`, 'num mono');
+
+      const btns = document.createElement('div');
+      btns.className = 'v6-btns';
+      const mk = (label, k, title) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'small'; b.textContent = label; b.title = title;
+        const bits = k === 16 ? 4 : 1;
+        if (lf.m + bits > 128) { b.disabled = true; b.title = 'Too small to split'; }
+        else if (total + k - 1 > MAX6) { b.disabled = true; b.title = `Limit of ${MAX6} rows reached`; }
+        else b.addEventListener('click', () => { lf.node.c = Array.from({ length: k }, () => ({ c: null })); renderV6(); writeHash(); });
+        return b;
+      };
+      btns.append(mk('÷2', 2, `Split into two /${lf.m + 1}s`), mk('÷16', 16, `Split into sixteen /${lf.m + 4}s (next nibble)`));
+      td(btns);
+
+      if (lf.parent && lf.idx === 0) {
+        const span = leafCount(lf.parent.node);
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'small';
+        b.textContent = `Join → /${lf.parent.m}`;
+        b.title = `Join ${span} prefixes back into ${v6Key(lf.parent.a, lf.parent.m)}`;
+        const hl = (on) => { for (let r = idx; r < idx + span; r++) body.rows[r] && body.rows[r].classList.toggle('hl', on); };
+        b.addEventListener('mouseenter', () => hl(true));
+        b.addEventListener('mouseleave', () => hl(false));
+        b.addEventListener('focus', () => hl(true));
+        b.addEventListener('blur', () => hl(false));
+        b.addEventListener('click', () => { lf.parent.node.c = null; renderV6(); writeHash(); });
+        td(b);
+      } else td('');
+      body.appendChild(tr);
+    });
+    const k64 = 64 - v6.mask;
+    $('v6Summary').innerHTML =
+      `<span>Prefix <b class="mono">${esc(v6Key(v6.net, v6.mask))}</b></span>` +
+      `<span>Rows <b>${fmt(total)}</b></span>` +
+      `<span>${v6.mask <= 64 ? `/64 networks <b>${pow2Str(k64)}</b>` : `Addresses <b>${pow2Str(128 - v6.mask)}</b>`}</span>` +
+      `<span>${classTags6(v6.net, v6.mask)}</span>`;
+  };
+
+  $('v6Form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearMsg('v6Msg');
+    const p = parse6Cidr($('v6Net').value);
+    if (!p || !/\//.test($('v6Net').value)) {
+      $('v6Net').setAttribute('aria-invalid', 'true');
+      showMsg('v6Msg', 'Enter an IPv6 prefix with a length, like 2001:db8:1234::/48.', 'error');
+      return;
+    }
+    $('v6Net').removeAttribute('aria-invalid');
+    if (p.net !== p.n) showMsg('v6Msg', `Host bits were set, so the prefix was adjusted to ${v6Key(p.net, p.mask)}.`, 'info');
+    if (p.mask !== v6.mask && v6.root.c && !confirm('Changing the prefix length resets your IPv6 splits. Continue?')) return;
+    if (p.mask !== v6.mask) { v6.root = { c: null }; v6.meta = {}; }
+    else if (p.net !== v6.net) v6.meta = {};
+    v6.net = p.net; v6.mask = p.mask;
+    $('v6Net').value = v6Key(v6.net, v6.mask);
+    renderV6(); writeHash();
+  });
+  $('v6Net').addEventListener('input', () => $('v6Net').removeAttribute('aria-invalid'));
+  $('v6Ula').addEventListener('click', () => {
+    if (v6.root.c && !confirm('Replace the current IPv6 plan with a new random ULA /48?')) return;
+    const b = crypto.getRandomValues(new Uint8Array(5));
+    let g = 0n;
+    for (const x of b) g = (g << 8n) | BigInt(x);
+    v6.net = (0xfdn << 120n) | (g << 80n);
+    v6.mask = 48; v6.root = { c: null }; v6.meta = {};
+    $('v6Net').value = v6Key(v6.net, v6.mask);
+    showMsg('v6Msg', `Generated ${v6Key(v6.net, v6.mask)}: a random unique local prefix (RFC 4193). Private like 10.0.0.0/8, and very unlikely to clash with anyone else’s.`, 'ok');
+    renderV6(); writeHash();
+  });
+  $('v6Reset').addEventListener('click', () => { if (!v6.root.c) return; v6.root = { c: null }; renderV6(); writeHash(); });
+  $('v6Csv').addEventListener('click', async () => {
+    const lines = [['Prefix', 'Name', 'First address', 'Last address', 'Size'].map(csvQ).join(',')];
+    for (const lf of v6Walk()) {
+      const k = v6Key(lf.a, lf.m);
+      lines.push([k, v6.meta[k] || '', fmt6(lf.a), fmt6(lf.a + size6(lf.m) - 1n), lf.m <= 64 ? `${pow2Text(64 - lf.m)} x /64` : `${pow2Text(128 - lf.m)} addresses`].map(csvQ).join(','));
+    }
+    toast((await copyText(lines.join('\n'))) ? `Copied ${lines.length - 1} rows as CSV` : 'Couldn’t copy CSV');
+  });
+
+  // =====================================================================
+  // Tabs and theme
+  // =====================================================================
+  const TABS = ['plan', 'vlsm', 'tools', 'export', 'v6'];
+  const showTab = (t) => {
+    if (!TABS.includes(t)) t = 'plan';
+    for (const x of TABS) {
+      $('tab-' + x).hidden = x !== t;
+      $('tb-' + x).setAttribute('aria-selected', String(x === t));
+      $('tb-' + x).tabIndex = x === t ? 0 : -1;
+    }
+    try { localStorage.setItem('subnetPlanner.tab', t); } catch (e) { /* ignore */ }
+    if (t === 'export') renderExport();
+    if (t === 'vlsm') updateVlsmBase();
+    if (t === 'tools') runInfo();
+  };
+  for (const x of TABS) $('tb-' + x).addEventListener('click', () => showTab(x));
+  document.querySelector('nav.tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const cur = TABS.findIndex((x) => $('tb-' + x).getAttribute('aria-selected') === 'true');
+    const next = TABS[(cur + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+    showTab(next);
+    $('tb-' + next).focus();
+  });
+
+  const root = document.documentElement;
+  try {
+    const t = localStorage.getItem('subnetPlanner.theme');
+    if (t === 'light' || t === 'dark') root.dataset.theme = t;
+  } catch (e) { /* ignore */ }
+  $('themeBtn').addEventListener('click', () => {
+    const current = root.dataset.theme ||
+      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try { localStorage.setItem('subnetPlanner.theme', next); } catch (e) { /* ignore */ }
+  });
+
+  // =====================================================================
+  // Boot
+  // =====================================================================
+  window.addEventListener('hashchange', () => {
+    const h = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (h && h !== lastHash && loadFromLocation()) { syncControls(); render(); renderV6(); }
+  });
+  loadFromLocation();
+  syncControls();
+  update();
+  renderV6();
+  let startTab = 'plan';
+  try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
+  showTab(startTab);
+})();
+</script>
+</body>
+</html>
