@@ -315,6 +315,30 @@
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover td.data { background: var(--row-hover); }
   tbody tr.found td.data { background: var(--accent-weak); }
+  tbody tr.flash td.data { background: var(--hl); transition: background .6s; }
+  .map-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+  .map-ttl { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--text); cursor: pointer; }
+  .map-ctl { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+  .map-ctl select { font-size: 12px; padding: 2px 6px; }
+  .map { display: grid; grid-template-columns: repeat(var(--cols, 16), minmax(0, 1fr)); grid-auto-rows: 22px; gap: 2px; margin-top: 8px; }
+  .map[hidden], #mapLegend[hidden] { display: none; }
+  .map .mc {
+    min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer;
+    font-size: 11px; line-height: 20px; padding: 0 4px; border-radius: 4px; color: var(--text);
+    border: 1px solid var(--border); background: var(--row-hover);
+  }
+  .map .used { background: var(--ok-weak); border-color: var(--ok); }
+  .map .reserved { background: var(--hl); border-color: var(--hl-border); }
+  .map .vl { background: hsl(var(--h) var(--bar-s) var(--bar-l)); border-color: hsl(var(--h) var(--bar-s) 50%); color: var(--bar-text); }
+  .map .mc.clash { box-shadow: inset 0 0 0 2px var(--danger); }
+  .map .mc.found { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .map .mc:hover { filter: brightness(.96); }
+  .map .mc:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .map .mix { display: flex; gap: 1px; padding: 1px; background: var(--panel); }
+  .map .mix > i { flex: var(--w) 1 0; min-width: 1px; border-radius: 2px; border: 0; background: var(--border); }
+  .map .mix > i.used { background: var(--ok); }
+  .map .mix > i.reserved { background: var(--hl-border); }
+  .map .mix > i.vl { background: hsl(var(--h) var(--bar-s) 55%); }
   tbody tr.hl td.data { background: var(--hl); }
   tbody tr.clash td.data:first-child { box-shadow: inset 3px 0 0 var(--danger); }
   tbody tr.st-reserved td.data { color: var(--muted); }
@@ -576,6 +600,20 @@
       <div class="usage-wrap">
         <div class="usage" id="usageBar" aria-hidden="true"></div>
         <div class="legend" id="usageLegend"></div>
+        <div class="map-wrap no-print" id="mapWrap">
+          <div class="map-head">
+            <button type="button" class="map-ttl" id="mapToggle" aria-expanded="true" aria-controls="map">▾ Address map</button>
+            <span id="mapScale"></span>
+            <label class="map-ctl">Color by
+              <select id="mapColor">
+                <option value="status">Status</option>
+                <option value="vlan">VLAN</option>
+              </select>
+            </label>
+          </div>
+          <div class="map" id="map"></div>
+          <div class="legend" id="mapLegend"></div>
+        </div>
         <div class="warnings" id="warnings"></div>
       </div>
       <div class="table-wrap">
@@ -1618,6 +1656,7 @@
       if (visible.name) {
         const inp = textInput('', 'n', 'Name', 'Name');
         inp.addEventListener('input', () => { firstEdit(inp); setMeta(key, 'n', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
+        inp.addEventListener('change', renderMap);
         cell('', inp);
       }
       if (visible.vlan) {
@@ -1631,7 +1670,7 @@
           inp.title = ok ? '' : 'VLAN IDs run from 1 to 4094';
           if (ok) { setMeta(key, 'v', v ? String(+v) : ''); writeHashSoon(); }
         });
-        inp.addEventListener('change', renderSummary);
+        inp.addEventListener('change', () => { renderSummary(); renderMap(); });
         cell('', inp);
       }
       if (visible.netmask) cell('mono', ntoa(netmask(leaf.mask)));
@@ -1696,10 +1735,124 @@
       body.appendChild(tr);
     });
     renderSummary();
+    renderMap();
     return foundRow;
   };
 
   const update = () => { render(); writeHash(); };
+
+  // ---------- Address map: the active base network as a grid of up to 256 equal squares ----------
+  let mapOpen = true, mapMode = 'status';
+  try {
+    mapOpen = localStorage.getItem('subnetPlanner.mapOpen') !== '0';
+    mapMode = localStorage.getItem('subnetPlanner.mapColor') === 'vlan' ? 'vlan' : 'status';
+  } catch (e) { /* ignore */ }
+  const vlanHue = (v) => Math.round((Number(v) * 137.508) % 360);
+  const flashRow = (idx) => {
+    const tr = $('body').rows[idx];
+    if (!tr) return;
+    tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    tr.classList.add('flash');
+    setTimeout(() => tr.classList.remove('flash'), 1600);
+    const inp = tr.querySelector('input');
+    if (inp) inp.focus({ preventScroll: true });
+  };
+  const leafLook = (r) => {
+    const m = getMeta(r.key);
+    if (mapMode === 'vlan') return m.v ? { cls: 'vl', h: vlanHue(m.v) } : { cls: '' };
+    return { cls: m.s || '' };
+  };
+  const leafTitle = (r) => {
+    const m = getMeta(r.key);
+    return [r.key, m.n, m.v ? `VLAN ${m.v}` : '', m.s === 'used' ? 'In use' : m.s === 'reserved' ? 'Reserved' : 'Free', `${fmt(size(r.mask))} addresses`].filter(Boolean).join(' · ');
+  };
+  const renderMap = () => {
+    const map = $('map'), wrap = $('mapWrap');
+    $('mapToggle').setAttribute('aria-expanded', String(mapOpen));
+    $('mapToggle').textContent = (mapOpen ? '▾' : '▸') + ' Address map';
+    $('mapColor').value = mapMode;
+    map.hidden = $('mapLegend').hidden = !mapOpen;
+    $('mapColor').parentElement.hidden = !mapOpen;
+    const u = Math.min(state.mask + 8, 32);       // mask of one square
+    const cells = size(state.mask) / size(u);  // 1 .. 256
+    const cols = Math.min(16, cells);
+    $('mapScale').textContent = mapOpen ? `Each square is a /${u} (${fmt(size(u))} address${u === 32 ? '' : 'es'})` : '';
+    if (!mapOpen) { map.innerHTML = ''; return; }
+    map.style.setProperty('--cols', cols);
+    map.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    const mk = (r, idx, cls, extra) => {
+      const d = document.createElement('div');
+      d.className = 'mc ' + cls;
+      d.tabIndex = 0;
+      d.setAttribute('role', 'button');
+      d.title = extra || leafTitle(r);
+      d.setAttribute('aria-label', d.title);
+      if (foundIp !== null && inBlock(foundIp, r.addr, r.mask)) d.classList.add('found');
+      d.addEventListener('click', () => flashRow(idx));
+      d.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flashRow(idx); } });
+      return d;
+    };
+    const clashes = (r) => existing.some((e) => overlaps(e.addr, e.mask, r.addr, r.mask));
+    let i = 0;
+    while (i < rows.length) {
+      const r = rows[i];
+      const cell = Math.floor((r.addr - state.network) / size(u));
+      const col = cell % cols, row = Math.floor(cell / cols);
+      if (r.mask <= u) {
+        // One subnet covering one or more whole squares: always a rectangle, because subnets are aligned.
+        const k = size(r.mask) / size(u);
+        const look = leafLook(r);
+        const d = mk(r, i, look.cls);
+        if (look.h != null) d.style.setProperty('--h', look.h);
+        if (clashes(r)) d.classList.add('clash');
+        d.style.gridColumn = `${col + 1} / span ${Math.min(k, cols)}`;
+        d.style.gridRow = `${row + 1} / span ${Math.max(1, k / cols)}`;
+        const m = getMeta(r.key);
+        if (k >= 2) d.textContent = m.n || `/${r.mask}`;
+        frag.appendChild(d);
+        i++;
+      } else {
+        // Several subnets smaller than one square share it: draw them as proportional slivers.
+        const start = i, cellEnd = state.network + (cell + 1) * size(u);
+        while (i < rows.length && rows[i].addr < cellEnd) i++;
+        const inside = rows.slice(start, i);
+        const d = mk(r, start, 'mix', `${cidrStr(state.network + cell * size(u), u)}: ${inside.length} subnets\n` + inside.slice(0, 12).map(leafTitle).join('\n') + (inside.length > 12 ? `\n…and ${inside.length - 12} more` : ''));
+        d.style.gridColumn = `${col + 1}`;
+        d.style.gridRow = `${row + 1}`;
+        if (inside.some(clashes)) d.classList.add('clash');
+        for (const x of inside.slice(0, 32)) {
+          const look = leafLook(x);
+          const sl = document.createElement('i');
+          sl.className = look.cls;
+          if (look.h != null) sl.style.setProperty('--h', look.h);
+          sl.style.setProperty('--w', size(x.mask));
+          d.appendChild(sl);
+        }
+        frag.appendChild(d);
+      }
+    }
+    map.appendChild(frag);
+    // Legend: status colors are already explained by the usage bar; VLAN mode lists the VLANs.
+    const leg = $('mapLegend');
+    if (mapMode === 'vlan') {
+      const vl = [...new Set(rows.map((r) => getMeta(r.key).v).filter(Boolean))].sort((a, b) => a - b);
+      leg.innerHTML = vl.length
+        ? vl.slice(0, 24).map((v) => `<span><i style="background:hsl(${vlanHue(v)} var(--bar-s) 55%)"></i>VLAN ${esc(v)}</span>`).join('') + (vl.length > 24 ? `<span>+${vl.length - 24} more</span>` : '') + '<span><i style="background:var(--border)"></i>No VLAN</span>'
+        : '<span>No VLANs set yet. Type one in the VLAN column.</span>';
+    } else leg.innerHTML = '';
+    leg.hidden = !leg.innerHTML;
+  };
+  $('mapToggle').addEventListener('click', () => {
+    mapOpen = !mapOpen;
+    try { localStorage.setItem('subnetPlanner.mapOpen', mapOpen ? '1' : '0'); } catch (e) { /* ignore */ }
+    renderMap();
+  });
+  $('mapColor').addEventListener('change', () => {
+    mapMode = $('mapColor').value;
+    try { localStorage.setItem('subnetPlanner.mapColor', mapMode); } catch (e) { /* ignore */ }
+    renderMap();
+  });
 
   const syncControls = () => {
     netInput.value = ntoa(state.network);
