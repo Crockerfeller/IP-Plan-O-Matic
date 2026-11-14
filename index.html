@@ -595,7 +595,7 @@
   <section id="tab-vlsm" role="tabpanel" aria-labelledby="tb-vlsm" hidden>
     <div class="card pad">
       <h2>Auto-plan by host count</h2>
-      <p class="sub">List what you need, one per line as <span class="mono">Name, hosts</span> or <span class="mono">Name, hosts, VLAN</span>. Subnets are sized to fit, packed largest first into <b id="vlsmBase" class="mono"></b>, and use the <b id="vlsmPlat"></b> platform rules. Change either on the Plan IPv4 tab.</p>
+      <p class="sub">List what you need, one per line as <span class="mono">Name, hosts</span> or <span class="mono">Name, hosts, VLAN</span>. Subnets are sized to fit and placed largest first, each in the smallest free space that holds it, inside <b id="vlsmBase" class="mono"></b> using the <b id="vlsmPlat"></b> platform rules. Change either on the Plan IPv4 tab.</p>
       <textarea id="vlsmIn" spellcheck="false" placeholder="Servers, 200, 10&#10;Staff Wi-Fi, 120, 20&#10;Guest Wi-Fi, 60, 30&#10;VoIP, 50, 40&#10;Management, 10, 99&#10;Uplink to ISP, 2"></textarea>
       <div class="row" style="margin-top:12px">
         <div class="field">
@@ -610,10 +610,18 @@
             <option value="32">/32 allowed for single hosts</option>
           </select>
         </div>
+        <div class="field">
+          <label for="vlsmMode">Mode</label>
+          <select id="vlsmMode" title="Replace starts from an empty base network. Fill keeps named, VLAN-tagged, in-use and reserved subnets and only uses free space.">
+            <option value="replace">Replace the plan</option>
+            <option value="fill">Fill free space (keep existing)</option>
+          </select>
+        </div>
         <button type="button" class="primary" id="vlsmRun">Plan it</button>
         <button type="button" id="vlsmExample">Load example</button>
         <button type="button" id="vlsmApply" hidden>Apply to planner</button>
       </div>
+      <div class="msg" id="vlsmMsg" style="margin-top:10px"></div>
       <div class="result" id="vlsmOut"></div>
     </div>
   </section>
@@ -1960,11 +1968,17 @@
   // VLSM tab
   // =====================================================================
   let vlsmPlan = null;
+  const cloneTree = (n) => (n.c ? { c: n.c.map(cloneTree) } : { c: null });
   const updateVlsmBase = () => {
+    // Default to filling free space when the base network already has planned subnets.
+    if (!$('vlsmMode').dataset.touched) {
+      $('vlsmMode').value = collectLeaves().some((r) => { const m = getMeta(r.key); return m.s || m.n || m.v; }) ? 'fill' : 'replace';
+    }
     $('vlsmBase').textContent = cidrStr(state.network, state.mask);
     $('vlsmPlat').textContent = CLOUDS[settings.cloud].label;
     $('vlsmSmallF').hidden = settings.cloud !== 'std';
   };
+  $('vlsmMode').addEventListener('change', () => { $('vlsmMode').dataset.touched = '1'; });
   $('vlsmExample').addEventListener('click', () => {
     $('vlsmIn').value = 'Servers, 200, 10\nStaff Wi-Fi, 120, 20\nGuest Wi-Fi, 60, 30\nVoIP, 50, 40\nPrinters, 20, 50\nManagement, 10, 99\nUplink to ISP, 2';
     if (state.mask > 22 && !blockClash(aton('10.10.0.0'), 22, state.active)) {
@@ -1978,6 +1992,7 @@
   $('vlsmRun').addEventListener('click', () => {
     const out = $('vlsmOut');
     $('vlsmApply').hidden = true;
+    clearMsg('vlsmMsg');
     vlsmPlan = null;
     const errors = [], reqs = [];
     $('vlsmIn').value.split('\n').forEach((raw, i) => {
@@ -2006,50 +2021,86 @@
       out.innerHTML = `<div class="msg show error">${tooBig.map((r) => `${esc(r.name)} needs ${fmt(r.need)} hosts, which is more than ${cidrStr(state.network, state.mask)} can hold.`).join('<br>')}</div>`;
       return;
     }
+    const mode = $('vlsmMode').value;
     const sorted = [...reqs].sort((a, b) => a.mask - b.mask || a.idx - b.idx);
-    const baseEnd = lastAddr(state.network, state.mask);
-    let ptr = state.network;
-    const needTotal = sorted.reduce((s, r) => s + size(r.mask), 0);
-    if (state.network + needTotal - 1 > baseEnd) {
-      out.innerHTML = `<div class="msg show error">Doesn’t fit: these subnets need ${fmt(needTotal)} addresses but ${cidrStr(state.network, state.mask)} has ${fmt(size(state.mask))}. Try a bigger base network (smaller mask number) or less headroom.</div>`;
-      return;
+    // Best fit: largest request first, each into the smallest free subnet that holds it (lowest address on ties).
+    // "Fill" keeps the current tree and treats named, VLAN-tagged or in-use/reserved subnets as taken.
+    const root = mode === 'fill' ? cloneTree(state.root) : { c: null };
+    const taken = new Set();
+    const occupied = (k) => {
+      if (taken.has(k)) return true;
+      if (mode !== 'fill') return false;
+      const m = getMeta(k);
+      return !!(m.s || m.n || m.v);
+    };
+    const freeLeaves = (maxMask) => {
+      const out = [];
+      const walk = (n, a, m) => {
+        if (n.c) { walk(n.c[0], a, m + 1); walk(n.c[1], a + size(m + 1), m + 1); return; }
+        if (m <= maxMask && !occupied(cidrStr(a, m))) out.push({ addr: a, mask: m });
+      };
+      walk(root, state.network, state.mask);
+      return out;
+    };
+    for (const r of sorted) {
+      let best = null;
+      for (const f of freeLeaves(r.mask)) if (!best || f.mask > best.mask || (f.mask === best.mask && f.addr < best.addr)) best = f;
+      r.addr = best ? best.addr : null;
+      if (best) { carve(root, state.network, state.mask, best.addr, r.mask); taken.add(cidrStr(best.addr, r.mask)); }
     }
-    for (const r of sorted) { r.addr = ptr; ptr += size(r.mask); }
-    const free = ptr <= baseEnd ? rangeToCidrs(ptr, baseEnd) : [];
-    vlsmPlan = sorted;
+    const placed = sorted.filter((r) => r.addr !== null), failed = sorted.filter((r) => r.addr === null);
+    const free = freeLeaves(32);
+    const needTotal = placed.reduce((t, r) => t + size(r.mask), 0);
+    vlsmPlan = placed.length ? { placed, root, mode, active: state.active, base: cidrStr(state.network, state.mask), before: stateHash() } : null;
 
     let html = '';
     if (errors.length) html += `<div class="msg show error">${errors.map(esc).join('<br>')}</div>`;
-    html += `<div class="stat-line">Uses <b>${fmt(needTotal)}</b> of ${fmt(size(state.mask))} addresses (<b>${((needTotal / size(state.mask)) * 100).toFixed(1)}%</b>)${headroom ? `, with ${headroom}% growth headroom` : ''}.</div>`;
-    html += '<div class="table-wrap"><table><thead><tr><th>Name</th><th>VLAN</th><th class="num">Needs</th><th>Subnet</th><th class="num">Usable</th><th class="num">Spare</th><th>Usable range</th></tr></thead><tbody>';
-    for (const r of sorted) {
-      const i = hostInfo(r.addr, r.mask);
-      html += `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.vlan || '—')}</td><td class="num mono">${fmt(r.hosts)}</td><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="num mono">${fmt(i.hosts)}</td><td class="num mono">${fmt(i.hosts - r.hosts)}</td><td class="mono">${i.uF === null ? '—' : `${ntoa(i.uF)} – ${ntoa(i.uL)}`}</td></tr>`;
+    if (failed.length) {
+      html += `<div class="msg show error">Doesn’t fit: ${failed.map((r) => `${esc(r.name)} (needs a /${r.mask})`).join(', ')}. ` +
+        `${mode === 'fill' ? 'Free up space, switch to Replace the plan, use' : 'Try'} a bigger base network (smaller mask number) or less headroom.</div>`;
     }
-    html += '</tbody></table></div>';
-    html += free.length
-      ? `<div><span class="lbl">Left free</span><div class="codebox" style="margin-top:6px">${free.map((f) => `<code>${cidrStr(f.addr, f.mask)}</code>`).join('')}</div></div>`
-      : '<div class="stat-line">No space left over.</div>';
+    if (placed.length) {
+      html += mode === 'fill'
+        ? `<div class="stat-line">Places <b>${placed.length}</b> subnet${placed.length > 1 ? 's' : ''} using <b>${fmt(needTotal)}</b> addresses in free space. Existing subnets are kept.</div>`
+        : `<div class="stat-line">Uses <b>${fmt(needTotal)}</b> of ${fmt(size(state.mask))} addresses (<b>${((needTotal / size(state.mask)) * 100).toFixed(1)}%</b>)${headroom ? `, with ${headroom}% growth headroom` : ''}.</div>`;
+      html += '<div class="table-wrap"><table><thead><tr><th>Name</th><th>VLAN</th><th class="num">Needs</th><th>Subnet</th><th class="num">Usable</th><th class="num">Spare</th><th>Usable range</th></tr></thead><tbody>';
+      for (const r of placed) {
+        const i = hostInfo(r.addr, r.mask);
+        html += `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.vlan || '—')}</td><td class="num mono">${fmt(r.hosts)}</td><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="num mono">${fmt(i.hosts)}</td><td class="num mono">${fmt(i.hosts - r.hosts)}</td><td class="mono">${i.uF === null ? '—' : `${ntoa(i.uF)} – ${ntoa(i.uL)}`}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+      html += free.length
+        ? `<div><span class="lbl">Left free</span><div class="codebox" style="margin-top:6px">${free.map((f) => `<code>${cidrStr(f.addr, f.mask)}</code>`).join('')}</div></div>`
+        : '<div class="stat-line">No space left over.</div>';
+    }
     out.innerHTML = html;
-    $('vlsmApply').hidden = false;
+    $('vlsmApply').hidden = !vlsmPlan;
   });
   $('vlsmApply').addEventListener('click', () => {
-    if (!vlsmPlan) return;
-    if ((state.root.c || blockMetaKeys().length) && !confirm(`Replace the current plan for ${cidrStr(state.network, state.mask)} on the Plan IPv4 tab with this one?`)) return;
+    const plan = vlsmPlan;
+    if (!plan) return;
+    if (state.active !== plan.active || cidrStr(state.network, state.mask) !== plan.base || (plan.mode === 'fill' && stateHash() !== plan.before)) {
+      showMsg('vlsmMsg', 'The plan changed since this was calculated. Click Plan it again.', 'error');
+      $('vlsmApply').hidden = true;
+      vlsmPlan = null;
+      return;
+    }
+    if (plan.mode === 'replace' && (state.root.c || blockMetaKeys().length) && !confirm(`Replace the current plan for ${cidrStr(state.network, state.mask)} on the Plan IPv4 tab with this one?`)) return;
     checkpoint();
-    state.root = { c: null };
-    clearBlockMeta();
-    for (const r of vlsmPlan) {
-      carve(state.root, state.network, state.mask, r.addr, r.mask);
+    state.root = plan.root;
+    if (plan.mode === 'replace') clearBlockMeta();
+    for (const r of plan.placed) {
       const k = cidrStr(r.addr, r.mask);
       setMeta(k, 'n', r.name);
       setMeta(k, 'v', r.vlan);
       setMeta(k, 's', 'used');
       setMeta(k, 'o', `Needs ${r.hosts} hosts`);
     }
+    vlsmPlan = null;
+    $('vlsmApply').hidden = true;
     update();
     showTab('plan');
-    toast(`Applied ${vlsmPlan.length} subnets`, UNDO);
+    toast(`Applied ${plan.placed.length} subnets`, UNDO);
   });
 
   // =====================================================================
