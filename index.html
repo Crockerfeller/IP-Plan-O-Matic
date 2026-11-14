@@ -435,15 +435,21 @@
   .about summary { cursor: pointer; font-weight: 600; color: var(--text); }
   .about details p { margin: 8px 0 0; }
 
-  footer.site { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; color: var(--muted); font-size: 13px; }
+  footer.site { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 24px; color: var(--muted); font-size: 13px; }
   footer.site a { color: var(--muted); }
   footer.site a:hover { color: var(--text); }
-  .tip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .tip { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-basis: 100%; text-align: center; }
   .tip-btn { border: 1px solid var(--text); display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; text-decoration: none; }
   footer.site a.tip-btn, footer.site a.tip-btn:hover { color: var(--bg); }
   .tip-btn:hover { background: var(--text); filter: brightness(1.15); }
   .tip-note { font-size: 12px; }
-  .ver { flex-basis: 100%; text-align: right; font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .tip-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; }
+  footer.site a.tip-btn.alt { background: transparent; color: var(--text); }
+  footer.site a.tip-btn.alt:hover { background: var(--row-hover); filter: none; }
+  .credit, .meta { flex-basis: 100%; text-align: center; }
+  .meta { font-size: 12px; }
+  .ver { font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .ver::before { content: " · "; font-family: inherit; }
   footer.site .ver a { text-decoration: none; }
   .tip-note b { color: var(--text); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
@@ -744,12 +750,15 @@
   </main>
 
   <footer class="site">
-    <div>IP Plan-O-Matic by Huddacaster, a subsidiary of Crockerfeller Industries © 2026 · <a href="https://github.com/crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a></div>
+    <div class="credit">IP Plan-O-Matic by Huddacaster, a subsidiary of Crockerfeller Industries © 2026</div>
     <div class="tip">
-      <a class="tip-btn" id="tipBtn" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
-      <span class="tip-note">Free forever. If it saved you time: in the X app, <b>Money → Send → @wangooroo</b></span>
+      <div class="tip-btns">
+        <a class="tip-btn" id="tipBtn" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
+        <a class="tip-btn alt" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo @Crockerfeller</a>
+      </div>
+      <span class="tip-note">Free forever. If it saved you time please consider a tip:<br>in the X app, <b>Money → Send → @wangooroo</b></span>
     </div>
-    <div class="ver" id="ver" hidden></div>
+    <div class="meta"><a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -2365,7 +2374,7 @@
   if (!el) return;
   const show = (sha, date) => {
     const a = document.createElement('a');
-    a.href = 'https://github.com/crockerfeller/IP-Plan-O-Matic/commit/' + sha;
+    a.href = 'https://github.com/Crockerfeller/IP-Plan-O-Matic/commit/' + sha;
     a.textContent = 'v ' + sha.slice(0, 7) + (date ? ' · ' + date : '');
     a.title = 'Latest commit on GitHub';
     el.replaceChildren(a);
