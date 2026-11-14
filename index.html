@@ -407,6 +407,8 @@
     opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 10;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.act { pointer-events: auto; }
+  .toast button { margin-left: 12px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
   @media (max-width: 640px) {
     .wrap { padding-top: 20px; }
@@ -549,6 +551,8 @@
           <input type="text" id="findIp" spellcheck="false" inputmode="decimal" placeholder="e.g. 192.168.0.77">
         </div>
         <div class="actions">
+          <button type="button" id="undoBtn" title="Undo (Ctrl+Z / ⌘Z)" disabled>Undo</button>
+          <button type="button" id="redoBtn" title="Redo (Ctrl+Shift+Z / ⇧⌘Z)" disabled>Redo</button>
           <button type="button" id="resetBtn" title="Join everything back into the base network">Reset</button>
           <button type="button" id="linkBtn" title="Copy a link that restores this whole plan">Copy link</button>
           <button type="button" id="csvBtn" title="Copy the columns shown below as CSV">Copy CSV</button>
@@ -711,6 +715,7 @@
         <button type="submit" class="primary">Update</button>
         <div class="actions">
           <button type="button" id="v6Ula" title="Generate a random unique local /48 (RFC 4193)">Random ULA /48</button>
+          <button type="button" id="v6Undo" title="Undo (Ctrl+Z / ⌘Z)" disabled>Undo</button>
           <button type="button" id="v6Reset">Reset</button>
           <button type="button" id="v6Csv">Copy CSV</button>
         </div>
@@ -1172,12 +1177,21 @@
   const clearMsg = (id) => { const m = $(id); m.className = 'msg'; m.textContent = ''; };
 
   let toastTimer;
-  const toast = (text) => {
+  // toast(text) or toast(text, { label, fn }) for a clickable action such as Undo.
+  const toast = (text, action) => {
     const t = $('toast');
     t.textContent = text;
+    t.classList.toggle('act', !!action);
+    if (action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { t.classList.remove('show', 'act'); action.fn(); });
+      t.appendChild(b);
+    }
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+    toastTimer = setTimeout(() => t.classList.remove('show', 'act'), action ? 5000 : 1800);
   };
   const copyText = async (text) => {
     try {
@@ -1334,7 +1348,7 @@
     state.active = Number.isInteger(x.a) && x.a > 0 && x.a < blocks.length ? x.a : 0;
     settings.gw = x.g === 'last' ? 'last' : 'first';
     state.meta = (x.m && typeof x.m === 'object') ? { ...x.m } : {};
-    if (x.v6) v6Load(x.v6);
+    v6Load(x.v6 || { p: V6_DEFAULT });
     lastHash = hash || '';
     return true;
   };
@@ -1342,6 +1356,44 @@
     const hash = decodeURIComponent(location.hash.replace(/^#/, ''));
     return loadFromHash(hash, hash ? null : new URLSearchParams(location.search));
   };
+
+  // ---------- Undo / redo: snapshots of the whole plan, taken before each change ----------
+  const undoStack = [], redoStack = [];
+  const UNDO_MAX = 100;
+  const updUndo = () => {
+    $('undoBtn').disabled = $('v6Undo').disabled = !undoStack.length;
+    $('redoBtn').disabled = !redoStack.length;
+  };
+  const checkpoint = () => {
+    const h = stateHash();
+    if (undoStack[undoStack.length - 1] !== h) undoStack.push(h);
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    redoStack.length = 0;
+    updUndo();
+  };
+  // Text cells: one checkpoint per focus, so typing a whole name is a single undo step.
+  const firstEdit = (inp) => { if (!inp.dataset.cp) { checkpoint(); inp.dataset.cp = '1'; } };
+  const restore = (h) => {
+    loadFromHash(h);
+    syncControls();
+    render();
+    renderV6();
+    writeHash();
+    if (!$('tab-export').hidden) renderExport();
+    if (!$('tab-vlsm').hidden) updateVlsmBase();
+    updUndo();
+  };
+  const stepHistory = (from, to, verb) => {
+    const cur = stateHash();
+    while (from.length && from[from.length - 1] === cur) from.pop();
+    if (!from.length) { toast(`Nothing to ${verb}`); updUndo(); return; }
+    to.push(cur);
+    restore(from.pop());
+    toast(verb === 'undo' ? 'Undone' : 'Redone');
+  };
+  const undo = () => stepHistory(undoStack, redoStack, 'undo');
+  const redo = () => stepHistory(redoStack, undoStack, 'redo');
+  const UNDO = { label: 'Undo', fn: () => undo() };
 
   // =====================================================================
   // PLAN tab rendering
@@ -1463,12 +1515,13 @@
   const removeBlock = (i) => {
     const b = state.blocks[i];
     if ((b.root.c || blockMetaKeys(b).length) && !confirm(`Remove ${blockCidr(b)} and all its subnets, names and VLANs from this plan?`)) return;
+    checkpoint();
     clearBlockMeta(b);
     state.blocks.splice(i, 1);
     state.active = Math.min(state.active, state.blocks.length - 1);
     syncControls();
     update();
-    toast(`Removed ${blockCidr(b)}`);
+    toast(`Removed ${blockCidr(b)}`, UNDO);
   };
 
   const render = () => {
@@ -1517,6 +1570,7 @@
         inp.placeholder = placeholder;
         inp.setAttribute('aria-label', `${label} for ${key}`);
         inp.spellcheck = false;
+        inp.addEventListener('focus', () => { delete inp.dataset.cp; });
         return inp;
       };
 
@@ -1549,19 +1603,20 @@
           btn.title = settings.cloud === 'std' ? '/32 is a single address' : `${CLOUDS[settings.cloud].label} subnets can’t be smaller than /${limit}`;
         } else {
           btn.title = `Split into two /${leaf.mask + 1}s`;
-          btn.addEventListener('click', () => { leaf.node.c = [{ c: null }, { c: null }]; update(); });
+          btn.addEventListener('click', () => { checkpoint(); leaf.node.c = [{ c: null }, { c: null }]; update(); });
         }
         cell('col-divide', btn);
       }
       if (visible.name) {
         const inp = textInput('', 'n', 'Name', 'Name');
-        inp.addEventListener('input', () => { setMeta(key, 'n', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
+        inp.addEventListener('input', () => { firstEdit(inp); setMeta(key, 'n', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
         cell('', inp);
       }
       if (visible.vlan) {
         const inp = textInput('vlan', 'v', '—', 'VLAN ID');
         inp.inputMode = 'numeric';
         inp.addEventListener('input', () => {
+          firstEdit(inp);
           const v = inp.value.trim();
           const ok = v === '' || validVlan(v);
           inp.setAttribute('aria-invalid', String(!ok));
@@ -1585,12 +1640,12 @@
           const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o);
         }
         sel.value = meta.s || 'free';
-        sel.addEventListener('change', () => { setMeta(key, 's', sel.value === 'free' ? '' : sel.value); update(); });
+        sel.addEventListener('change', () => { checkpoint(); setMeta(key, 's', sel.value === 'free' ? '' : sel.value); update(); });
         cell('', sel);
       }
       if (visible.note) {
         const inp = textInput('note', 'o', 'Notes', 'Notes');
-        inp.addEventListener('input', () => { setMeta(key, 'o', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
+        inp.addEventListener('input', () => { firstEdit(inp); setMeta(key, 'o', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
         cell('', inp);
       }
       if (visible.binary) cell('mono bin', null).innerHTML = binHtml(leaf.addr, leaf.mask);
@@ -1622,7 +1677,7 @@
           td.addEventListener('mouseleave', () => hl(false));
           td.addEventListener('focus', () => hl(true));
           td.addEventListener('blur', () => hl(false));
-          const doJoin = () => { anc.node.c = null; update(); };
+          const doJoin = () => { checkpoint(); anc.node.c = null; update(); toast(`Joined ${span} subnets into ${cidrStr(anc.addr, anc.mask)}`, UNDO); };
           td.addEventListener('click', doJoin);
           td.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doJoin(); }
@@ -1707,6 +1762,7 @@
       showMsg('msg', `${cidrStr(aligned, m)} overlaps ${blockCidr(clash)}, which is already a base network in this plan.`, 'error');
       return;
     }
+    checkpoint();
     blk().label = $('blockLabel').value.trim();
     if (m !== state.mask || aligned !== state.network) {
       const hasWork = state.root.c || blockMetaKeys().length;
@@ -1731,6 +1787,7 @@
   });
 
   $('blockLabel').addEventListener('change', () => {
+    checkpoint();
     blk().label = $('blockLabel').value.trim();
     update();
   });
@@ -1766,6 +1823,7 @@
         const n = leafCount(existingNode);
         if (!confirm(`${p.cidr} is already divided into ${n} subnets. Join them into one?`)) return;
       }
+      checkpoint();
       state.active = bi;
       carve(b.root, b.network, b.mask, p.addr, p.mask);
       if (p.label) setMeta(p.cidr, 'n', p.label);
@@ -1778,6 +1836,7 @@
         showMsg('msg', `${p.cidr} ${relation(p.addr, p.mask, clash.network, clash.mask) || 'overlaps'} ${blockCidr(clash)}, which is already a base network. Base networks can’t overlap.`, 'error');
         return;
       }
+      checkpoint();
       state.blocks.push(mkBlock(p.addr, p.mask, settings.cloud, p.label.slice(0, 40)));
       state.active = state.blocks.length - 1;
       syncControls();
@@ -1789,6 +1848,7 @@
   });
 
   $('platform').addEventListener('change', () => {
+    checkpoint();
     settings.cloud = $('platform').value;
     syncControls();
     update();
@@ -1796,6 +1856,7 @@
     if (settings.cloud !== 'std') toast(`${CLOUDS[settings.cloud].label}: gateway is always .1, ${hostInfo(0, 24).reserved.length} addresses reserved per subnet, smallest /${lim}`);
   });
   $('gwPos').addEventListener('change', () => {
+    checkpoint();
     settings.gw = $('gwPos').value;
     if (!visible.gateway) {
       visible.gateway = true;
@@ -1840,9 +1901,23 @@
   $('resetBtn').addEventListener('click', () => {
     if (!state.root.c) return;
     if (blockMetaKeys().length && !confirm('Join everything back into the base network? Names and VLANs on the joined subnets will be dropped from the link.')) return;
+    checkpoint();
     state.root = { c: null };
     update();
-    toast('Joined back into one network');
+    toast('Joined back into one network', UNDO);
+  });
+  $('undoBtn').addEventListener('click', undo);
+  $('redoBtn').addEventListener('click', redo);
+  $('v6Undo').addEventListener('click', undo);
+  document.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'z' && k !== 'y') return;
+    const t = e.target;
+    // Leave text fields to the browser's own undo.
+    if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file'].includes(t.type)))) return;
+    e.preventDefault();
+    if (k === 'y' || e.shiftKey) redo(); else undo();
   });
   $('linkBtn').addEventListener('click', async () => {
     writeHash();
@@ -1893,6 +1968,7 @@
   $('vlsmExample').addEventListener('click', () => {
     $('vlsmIn').value = 'Servers, 200, 10\nStaff Wi-Fi, 120, 20\nGuest Wi-Fi, 60, 30\nVoIP, 50, 40\nPrinters, 20, 50\nManagement, 10, 99\nUplink to ISP, 2';
     if (state.mask > 22 && !blockClash(aton('10.10.0.0'), 22, state.active)) {
+      checkpoint();
       clearBlockMeta();
       state.network = aton('10.10.0.0'); state.mask = 22; state.root = { c: null };
       syncControls(); update(); updateVlsmBase();
@@ -1960,6 +2036,7 @@
   $('vlsmApply').addEventListener('click', () => {
     if (!vlsmPlan) return;
     if ((state.root.c || blockMetaKeys().length) && !confirm(`Replace the current plan for ${cidrStr(state.network, state.mask)} on the Plan IPv4 tab with this one?`)) return;
+    checkpoint();
     state.root = { c: null };
     clearBlockMeta();
     for (const r of vlsmPlan) {
@@ -1972,7 +2049,7 @@
     }
     update();
     showTab('plan');
-    toast(`Applied ${vlsmPlan.length} subnets`);
+    toast(`Applied ${vlsmPlan.length} subnets`, UNDO);
   });
 
   // =====================================================================
@@ -2408,6 +2485,7 @@
   const doImport = (text) => {
     clearMsg('imMsg');
     if ((state.blocks.length > 1 || state.root.c || Object.keys(state.meta).length) && !confirm('Importing replaces the current IPv4 plan. Continue?')) return;
+    checkpoint();
     try {
       const { count, skipped } = importText(text);
       showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'} into ${state.blocks.map(blockCidr).join(', ')}${skipped ? `. Skipped ${skipped} that didn’t fit the base network` : ''}.`, 'ok');
@@ -2457,7 +2535,8 @@
       inp.type = 'text'; inp.className = 'cell-input'; inp.placeholder = 'Name'; inp.spellcheck = false;
       inp.value = v6.meta[key] || '';
       inp.setAttribute('aria-label', 'Name for ' + key);
-      inp.addEventListener('input', () => { if (inp.value.trim()) v6.meta[key] = inp.value; else delete v6.meta[key]; writeHashSoon(); });
+      inp.addEventListener('focus', () => { delete inp.dataset.cp; });
+      inp.addEventListener('input', () => { firstEdit(inp); if (inp.value.trim()) v6.meta[key] = inp.value; else delete v6.meta[key]; writeHashSoon(); });
       td(inp);
 
       td(`${esc(fmt6(lf.a))} – ${esc(fmt6(lf.a + size6(lf.m) - 1n))}`, 'mono');
@@ -2471,7 +2550,7 @@
         const bits = k === 16 ? 4 : 1;
         if (lf.m + bits > 128) { b.disabled = true; b.title = 'Too small to split'; }
         else if (total + k - 1 > MAX6) { b.disabled = true; b.title = `Limit of ${MAX6} rows reached`; }
-        else b.addEventListener('click', () => { lf.node.c = Array.from({ length: k }, () => ({ c: null })); renderV6(); writeHash(); });
+        else b.addEventListener('click', () => { checkpoint(); lf.node.c = Array.from({ length: k }, () => ({ c: null })); renderV6(); writeHash(); });
         return b;
       };
       btns.append(mk('÷2', 2, `Split into two /${lf.m + 1}s`), mk('÷16', 16, `Split into sixteen /${lf.m + 4}s (next nibble)`));
@@ -2488,7 +2567,7 @@
         b.addEventListener('mouseleave', () => hl(false));
         b.addEventListener('focus', () => hl(true));
         b.addEventListener('blur', () => hl(false));
-        b.addEventListener('click', () => { lf.parent.node.c = null; renderV6(); writeHash(); });
+        b.addEventListener('click', () => { checkpoint(); lf.parent.node.c = null; renderV6(); writeHash(); toast(`Joined ${span} prefixes into ${v6Key(lf.parent.a, lf.parent.m)}`, UNDO); });
         td(b);
       } else td('');
       body.appendChild(tr);
@@ -2513,6 +2592,7 @@
     $('v6Net').removeAttribute('aria-invalid');
     if (p.net !== p.n) showMsg('v6Msg', `Host bits were set, so the prefix was adjusted to ${v6Key(p.net, p.mask)}.`, 'info');
     if (p.mask !== v6.mask && v6.root.c && !confirm('Changing the prefix length resets your IPv6 splits. Continue?')) return;
+    checkpoint();
     if (p.mask !== v6.mask) { v6.root = { c: null }; v6.meta = {}; }
     else if (p.net !== v6.net) v6.meta = {};
     v6.net = p.net; v6.mask = p.mask;
@@ -2522,6 +2602,7 @@
   $('v6Net').addEventListener('input', () => $('v6Net').removeAttribute('aria-invalid'));
   $('v6Ula').addEventListener('click', () => {
     if (v6.root.c && !confirm('Replace the current IPv6 plan with a new random ULA /48?')) return;
+    checkpoint();
     const b = crypto.getRandomValues(new Uint8Array(5));
     let g = 0n;
     for (const x of b) g = (g << 8n) | BigInt(x);
@@ -2531,7 +2612,7 @@
     showMsg('v6Msg', `Generated ${v6Key(v6.net, v6.mask)}: a random unique local prefix (RFC 4193). Private like 10.0.0.0/8, and very unlikely to clash with anyone else’s.`, 'ok');
     renderV6(); writeHash();
   });
-  $('v6Reset').addEventListener('click', () => { if (!v6.root.c) return; v6.root = { c: null }; renderV6(); writeHash(); });
+  $('v6Reset').addEventListener('click', () => { if (!v6.root.c) return; checkpoint(); v6.root = { c: null }; renderV6(); writeHash(); toast('IPv6 plan reset', UNDO); });
   $('v6Csv').addEventListener('click', async () => {
     const lines = [['Prefix', 'Name', 'First address', 'Last address', 'Size'].map(csvQ).join(',')];
     for (const lf of v6Walk()) {
@@ -2589,7 +2670,10 @@
   // =====================================================================
   window.addEventListener('hashchange', () => {
     const h = decodeURIComponent(location.hash.replace(/^#/, ''));
-    if (h && h !== lastHash && loadFromLocation()) { syncControls(); render(); renderV6(); }
+    if (h && h !== lastHash) {
+      const before = stateHash();
+      if (loadFromLocation()) { if (undoStack[undoStack.length - 1] !== before) undoStack.push(before); redoStack.length = 0; updUndo(); syncControls(); render(); renderV6(); }
+    }
   });
   loadFromLocation();
   syncControls();
