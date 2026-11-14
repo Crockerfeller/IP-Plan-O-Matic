@@ -443,6 +443,8 @@
   footer.site a.tip-btn, footer.site a.tip-btn:hover { color: var(--bg); }
   .tip-btn:hover { background: var(--text); filter: brightness(1.15); }
   .tip-note { font-size: 12px; }
+  .ver { flex-basis: 100%; text-align: right; font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  footer.site .ver a { text-decoration: none; }
   .tip-note b { color: var(--text); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
   @media print {
@@ -747,6 +749,7 @@
       <a class="tip-btn" id="tipBtn" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
       <span class="tip-note">Free forever. If it saved you time: in the X app, <b>Money → Send → @wangooroo</b></span>
     </div>
+    <div class="ver" id="ver" hidden></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -2355,6 +2358,31 @@
   let startTab = 'plan';
   try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
   showTab(startTab);
+})();
+/* Footer version: latest commit on main, from the public GitHub API */
+(() => {
+  const el = document.getElementById('ver');
+  if (!el) return;
+  const show = (sha, date) => {
+    const a = document.createElement('a');
+    a.href = 'https://github.com/crockerfeller/IP-Plan-O-Matic/commit/' + sha;
+    a.textContent = 'v ' + sha.slice(0, 7) + (date ? ' · ' + date : '');
+    a.title = 'Latest commit on GitHub';
+    el.replaceChildren(a);
+    el.hidden = false;
+  };
+  try {
+    const c = JSON.parse(sessionStorage.getItem('ipom.ver') || 'null');
+    if (c && c.s) { show(c.s, c.d); return; }
+  } catch (e) { /* ignore */ }
+  fetch('https://api.github.com/repos/crockerfeller/IP-Plan-O-Matic/commits/main', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(j => {
+      const d = ((j.commit && j.commit.committer && j.commit.committer.date) || '').slice(0, 10);
+      show(j.sha, d);
+      try { sessionStorage.setItem('ipom.ver', JSON.stringify({ s: j.sha, d })); } catch (e) { /* ignore */ }
+    })
+    .catch(() => { /* offline or rate-limited: leave hidden */ });
 })();
 </script>
 </body>
