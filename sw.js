@@ -1,0 +1,65 @@
+/* IP Plan-O-Matic service worker: makes the app work offline.
+   Bump CACHE whenever the list of files below changes. */
+const CACHE = 'ipom-v1';
+const FONT_CACHE = 'ipom-fonts-v1';
+const SHELL = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './favicon.svg',
+  './favicon.ico',
+  './favicon-32.png',
+  './apple-touch-icon.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png',
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== FONT_CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+const putIn = (name, req, res) => caches.open(name).then((c) => c.put(req, res));
+
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+
+  // Google Fonts: cache first, so the app looks the same offline.
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res.ok || res.type === 'opaque') putIn(FONT_CACHE, req, res.clone());
+      return res;
+    })));
+    return;
+  }
+  // Anything else off-site (the GitHub API for the footer version) goes straight to the network.
+  if (url.origin !== self.location.origin) return;
+
+  // The page itself: network first so a new deploy shows up right away, cached copy when offline.
+  if (req.mode === 'navigate') {
+    e.respondWith(fetch(req).then((res) => {
+      if (res.ok) putIn(CACHE, './index.html', res.clone());
+      return res;
+    }).catch(() => caches.match('./index.html').then((hit) => hit || caches.match('./'))));
+    return;
+  }
+
+  // Icons and other same-origin files: serve from cache, refresh in the background.
+  e.respondWith(caches.match(req).then((hit) => {
+    const net = fetch(req).then((res) => {
+      if (res.ok) putIn(CACHE, req, res.clone());
+      return res;
+    }).catch(() => hit);
+    return hit || net;
+  }));
+});

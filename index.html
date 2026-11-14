@@ -14,6 +14,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="IP Plan-O-Matic">
@@ -3325,6 +3326,10 @@
   try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
   showTab(startTab);
 })();
+/* Offline support: register the service worker (https or localhost only) */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+  addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ }); });
+}
 /* Footer version: latest commit on main, from the public GitHub API */
 (() => {
   const el = document.getElementById('ver');
