@@ -256,6 +256,28 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   button.primary:hover { filter: brightness(1.07); background: var(--accent); }
   button.icon { width: 38px; padding: 0; display: inline-grid; place-items: center; }
+  .top-btns { display: flex; gap: 8px; align-items: center; }
+  #plansBtn { display: inline-flex; align-items: center; gap: 6px; }
+  dialog#plansDlg {
+    width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
+  }
+  dialog#plansDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  .dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .dlg-head h2 { margin: 0; font-size: 18px; }
+  #plansDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  #plansDlg .msg { margin-top: 10px; }
+  .plans-list { margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 50vh; overflow: auto; }
+  .plans-list td { vertical-align: middle; }
+  .plans-list tr.current td { background: var(--accent-weak); }
+  .plans-list .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+  .plans-list td:nth-child(2) { white-space: nowrap; font-size: 13px; }
+  .plans-list .when { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .plans-list td:first-child { min-width: 160px; }
+  .plans-list .empty { color: var(--muted); text-align: center; padding: 18px; }
+  .dlg-foot { margin-top: 12px; }
+  .filebtn { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 14px; background: var(--panel); }
+  .filebtn input { display: none; }
   button.small { height: 28px; padding: 0 10px; font-size: 13px; }
   button:disabled { opacity: .4; cursor: not-allowed; }
 
@@ -518,10 +540,43 @@
         <div class="brand-tag">a subsidiary of Crockerfeller Industries © 2026</div>
       </div>
     </div>
-    <button class="icon no-print" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-    </button>
+    <div class="top-btns no-print">
+      <button type="button" id="plansBtn" title="Save this plan in your browser, or open one you saved" aria-haspopup="dialog">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Plans
+      </button>
+      <button class="icon" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
   </header>
+
+  <dialog id="plansDlg" aria-labelledby="plansTtl">
+    <div class="dlg-head">
+      <h2 id="plansTtl">Saved plans</h2>
+      <button type="button" class="icon" id="plansClose" aria-label="Close">✕</button>
+    </div>
+    <p class="sub">Plans are saved in this browser only. Use <b>Export all</b> to back them up or move them to another device. Your current work is also kept automatically and comes back when you reopen the page.</p>
+    <form class="row" id="planSaveForm" autocomplete="off">
+      <div class="field grow">
+        <label for="planName">Save the current plan as</label>
+        <input type="text" id="planName" maxlength="80" spellcheck="false" placeholder="e.g. HQ campus 2026">
+      </div>
+      <button type="submit" class="primary">Save</button>
+      <button type="button" id="planNew" title="Start an empty plan (your current one stays in the list if you saved it)">New plan</button>
+    </form>
+    <div class="msg" id="plansMsg" role="status"></div>
+    <div class="table-wrap plans-list">
+      <table>
+        <thead><tr><th>Name</th><th>Networks · saved</th><th></th></tr></thead>
+        <tbody id="plansBody"></tbody>
+      </table>
+    </div>
+    <div class="row dlg-foot">
+      <button type="button" id="plansExport">Export all</button>
+      <label class="filebtn"><input type="file" id="plansImport" accept=".json,application/json"> Import…</label>
+    </div>
+  </dialog>
 
   <main>
   <div class="intro">
@@ -1402,6 +1457,8 @@
     lastHash = h;
     try { history.replaceState(null, '', '#' + h); }
     catch (e) { location.hash = h; }
+    // Autosave the working plan so a bare visit (or the installed app) picks up where you left off.
+    try { localStorage.setItem('subnetPlanner.current', h); } catch (e) { /* storage unavailable */ }
   };
   let hashTimer;
   const writeHashSoon = () => { clearTimeout(hashTimer); hashTimer = setTimeout(writeHash, 300); };
@@ -3024,6 +3081,180 @@
   });
 
   // =====================================================================
+  // Saved plans (browser storage)
+  // =====================================================================
+  const PLANS_KEY = 'subnetPlanner.plans';
+  const DEFAULT_HASH = '192.168.0.0/24/1.0';
+  let currentPlanId = null;
+  try { currentPlanId = sessionStorage.getItem('subnetPlanner.planId'); } catch (e) { /* ignore */ }
+  const readPlans = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(PLANS_KEY) || '[]');
+      return Array.isArray(v) ? v.filter((x) => x && typeof x.hash === 'string' && typeof x.name === 'string') : [];
+    } catch (e) { return null; }
+  };
+  const writePlans = (list) => {
+    try { localStorage.setItem(PLANS_KEY, JSON.stringify(list)); return true; }
+    catch (e) { showMsg('plansMsg', 'Couldn’t save: this browser is blocking storage (private mode?) or it is full. Use Copy link or Export instead.', 'error'); return false; }
+  };
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const setCurrentPlan = (id) => {
+    currentPlanId = id;
+    try { if (id) sessionStorage.setItem('subnetPlanner.planId', id); else sessionStorage.removeItem('subnetPlanner.planId'); } catch (e) { /* ignore */ }
+  };
+  // "10.0.0.0/16 +2" from a stored hash, without loading it.
+  const planSummary = (h) => {
+    const [n, m, , blob] = String(h).split('/');
+    let more = 0, v6p = '';
+    try { const x = blob ? JSON.parse(b64d(blob)) : {}; more = Array.isArray(x.b) ? x.b.length : 0; v6p = x.v6 && x.v6.p && x.v6.p !== V6_DEFAULT ? x.v6.p : ''; } catch (e) { /* ignore */ }
+    return `${n}/${m}${more ? ` +${more} more` : ''}${v6p ? ` · ${v6p}` : ''}`;
+  };
+  const when = (t) => {
+    const d = new Date(t);
+    return isNaN(d) ? '' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  };
+  const openPlanHash = (h) => {
+    checkpoint();
+    loadFromHash(h);
+    syncControls();
+    update();
+    renderV6();
+    if (!$('tab-export').hidden) renderExport();
+    if (!$('tab-vlsm').hidden) updateVlsmBase();
+  };
+  const renderPlans = () => {
+    const list = readPlans();
+    const body = $('plansBody');
+    body.innerHTML = '';
+    if (list === null) { showMsg('plansMsg', 'Saved plans aren’t available because this browser is blocking storage. Use Copy link or Export instead.', 'error'); return; }
+    if (!list.length) { body.innerHTML = '<tr><td colspan="3" class="empty">No saved plans yet. Name this one above and click Save.</td></tr>'; return; }
+    const cur = stateHash();
+    for (const pl of [...list].sort((a, b) => (b.updated || 0) - (a.updated || 0))) {
+      const tr = document.createElement('tr');
+      if (pl.id === currentPlanId) tr.classList.add('current');
+      const nameTd = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'cell-input'; inp.value = pl.name; inp.maxLength = 80;
+      inp.setAttribute('aria-label', 'Rename plan ' + pl.name);
+      inp.title = 'Click to rename';
+      inp.addEventListener('change', () => {
+        const name = inp.value.trim();
+        if (!name) { inp.value = pl.name; return; }
+        const all = readPlans() || [];
+        const it = all.find((x) => x.id === pl.id);
+        if (it) { it.name = name; writePlans(all); }
+      });
+      nameTd.appendChild(inp);
+      tr.appendChild(nameTd);
+      const det = document.createElement('td');
+      const sum = document.createElement('div');
+      sum.className = 'mono';
+      sum.textContent = planSummary(pl.hash);
+      const t = document.createElement('div');
+      t.className = 'when';
+      t.textContent = when(pl.updated) + (pl.hash === cur ? ' · open now' : (pl.id === currentPlanId ? ' · unsaved changes' : ''));
+      det.append(sum, t);
+      tr.appendChild(det);
+      const acts = document.createElement('td');
+      const box = document.createElement('div');
+      box.className = 'acts';
+      const fresh = () => (readPlans() || []).find((x) => x.id === pl.id) || pl; // picks up renames made in this list
+      const btn = (label, title, fn, cls = 'small') => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = cls; b.textContent = label; b.title = title;
+        b.addEventListener('click', fn);
+        box.appendChild(b);
+      };
+      btn('Open', 'Open this plan (your current work can be undone back)', () => {
+        const f = fresh();
+        openPlanHash(f.hash);
+        setCurrentPlan(pl.id);
+        $('plansDlg').close();
+        toast(`Opened “${f.name}”`, UNDO);
+      }, 'small primary');
+      btn('Save here', 'Overwrite this saved plan with what’s on screen now', () => {
+        if (pl.hash !== cur && !confirm(`Overwrite “${fresh().name}” with the current plan?`)) return;
+        const all = readPlans() || [];
+        const it = all.find((x) => x.id === pl.id);
+        if (!it) return;
+        it.hash = stateHash(); it.updated = Date.now();
+        if (writePlans(all)) { setCurrentPlan(pl.id); showMsg('plansMsg', `Saved “${it.name}”.`, 'ok'); renderPlans(); }
+      });
+      btn('Duplicate', 'Save a copy of this plan', () => {
+        const all = readPlans() || [];
+        const f = fresh();
+        all.push({ id: newId(), name: `${f.name} (copy)`.slice(0, 80), hash: f.hash, updated: Date.now() });
+        if (writePlans(all)) renderPlans();
+      });
+      btn('Delete', 'Delete this saved plan', () => {
+        if (!confirm(`Delete “${fresh().name}”? This can’t be undone.`)) return;
+        const all = (readPlans() || []).filter((x) => x.id !== pl.id);
+        if (writePlans(all)) { if (pl.id === currentPlanId) setCurrentPlan(null); renderPlans(); }
+      });
+      acts.appendChild(box);
+      tr.appendChild(acts);
+      body.appendChild(tr);
+    }
+  };
+  $('plansBtn').addEventListener('click', () => {
+    clearMsg('plansMsg');
+    const list = readPlans() || [];
+    const cur = list.find((x) => x.id === currentPlanId);
+    $('planName').value = cur ? cur.name : '';
+    renderPlans();
+    if (typeof $('plansDlg').showModal === 'function') $('plansDlg').showModal(); else $('plansDlg').setAttribute('open', '');
+    $('planName').focus();
+  });
+  $('plansClose').addEventListener('click', () => $('plansDlg').close());
+  $('plansDlg').addEventListener('click', (e) => { if (e.target === $('plansDlg')) $('plansDlg').close(); });
+  $('planSaveForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearMsg('plansMsg');
+    const name = $('planName').value.trim();
+    if (!name) { showMsg('plansMsg', 'Give the plan a name first.', 'error'); $('planName').focus(); return; }
+    const all = readPlans();
+    if (all === null) { renderPlans(); return; }
+    const same = all.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (same && !confirm(`A plan called “${same.name}” already exists. Overwrite it?`)) return;
+    const h = stateHash();
+    let id;
+    if (same) { same.hash = h; same.updated = Date.now(); same.name = name; id = same.id; }
+    else { id = newId(); all.push({ id, name, hash: h, updated: Date.now() }); }
+    if (writePlans(all)) { setCurrentPlan(id); showMsg('plansMsg', `Saved “${name}”.`, 'ok'); renderPlans(); }
+  });
+  $('planNew').addEventListener('click', () => {
+    openPlanHash(DEFAULT_HASH);
+    setCurrentPlan(null);
+    $('planName').value = '';
+    $('plansDlg').close();
+    toast('Started a new plan', UNDO);
+  });
+  $('plansExport').addEventListener('click', () => {
+    const list = readPlans() || [];
+    if (!list.length) { showMsg('plansMsg', 'There are no saved plans to export yet.', 'info'); return; }
+    download('ip-plan-o-matic-plans.json', JSON.stringify({ format: 'ip-plan-o-matic-plans', version: 1, exported: new Date().toISOString(), plans: list }, null, 2), 'application/json');
+  });
+  $('plansImport').addEventListener('change', () => {
+    const f = $('plansImport').files[0];
+    if (!f) return;
+    f.text().then((t) => {
+      $('plansImport').value = '';
+      let incoming;
+      try { const j = JSON.parse(t); incoming = Array.isArray(j) ? j : j.plans; } catch (e) { incoming = null; }
+      if (!Array.isArray(incoming)) { showMsg('plansMsg', 'That file isn’t a saved-plans export from IP Plan-O-Matic.', 'error'); return; }
+      const all = readPlans() || [];
+      let added = 0, skipped = 0;
+      for (const x of incoming) {
+        if (!x || typeof x.hash !== 'string' || typeof x.name !== 'string' || !/^[\d.]+\/\d+/.test(x.hash)) { skipped++; continue; }
+        if (all.some((y) => y.hash === x.hash && y.name === x.name)) { skipped++; continue; }
+        all.push({ id: all.some((y) => y.id === x.id) || !x.id ? newId() : String(x.id), name: x.name.slice(0, 80), hash: x.hash, updated: Number(x.updated) || Date.now() });
+        added++;
+      }
+      if (writePlans(all)) { showMsg('plansMsg', `Imported ${added} plan${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} (duplicates or unreadable)` : ''}.`, 'ok'); renderPlans(); }
+    });
+  });
+
+  // =====================================================================
   // Tabs and theme
   // =====================================================================
   const TABS = ['plan', 'vlsm', 'tools', 'export', 'v6'];
@@ -3077,10 +3308,19 @@
       if (loadFromLocation()) { if (undoStack[undoStack.length - 1] !== before) undoStack.push(before); redoStack.length = 0; updUndo(); syncControls(); render(); renderV6(); }
     }
   });
-  loadFromLocation();
+  let restored = false;
+  if (!loadFromLocation()) {
+    try {
+      const h = localStorage.getItem('subnetPlanner.current');
+      if (h && h !== DEFAULT_HASH && loadFromHash(h)) restored = true;
+    } catch (e) { /* ignore */ }
+  }
   syncControls();
   update();
   renderV6();
+  if (restored) {
+    toast('Restored your last plan', { label: 'Start new', fn: () => { openPlanHash(DEFAULT_HASH); setCurrentPlan(null); } });
+  }
   let startTab = 'plan';
   try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
   showTab(startTab);
