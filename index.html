@@ -10,6 +10,7 @@
 <link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/">
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -418,7 +419,7 @@
   }
 
   .intro { margin: -8px 0 16px; color: var(--muted); font-size: 14px; max-width: 900px; }
-  .intro h2 { font-size: 15px; color: var(--text); margin: 0 0 2px; font-weight: 600; }
+  .intro h1 { font-size: 15px; line-height: inherit; color: var(--text); margin: 0 0 2px; font-weight: 600; }
   .intro p { margin: 0; }
   .nojs { margin-bottom: 16px; }
 
@@ -460,7 +461,6 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <h1 class="sr-only">IP Plan-O-Matic: free visual subnet calculator and IP address planner</h1>
     <div class="brand" role="img" aria-label="IP Plan-O-Matic by Huddacaster, a subsidiary of Crockerfeller Industries, copyright 2026">
       <svg viewBox="3 3 42 42" aria-hidden="true">
         <rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/>
@@ -480,8 +480,9 @@
     </button>
   </header>
 
+  <main>
   <div class="intro">
-    <h2>Free visual subnet calculator &amp; IP address planner</h2>
+    <h1>Free visual subnet calculator &amp; IP address planner</h1>
     <p>Split an IPv4 block into subnets with a click, auto-size them with VLSM, label each with a name, VLAN and status, and export ready-to-edit router or Terraform config. Cloud-aware for AWS, Azure and Google Cloud. Runs entirely in your browser, and your plan lives in the link.</p>
   </div>
   <noscript><div class="card pad nojs"><b>IP Plan-O-Matic needs JavaScript</b> to calculate and draw subnets. Please enable it, or read about what the tool does below.</div></noscript>
@@ -738,6 +739,7 @@
       <p>A /64 is the standard size for a single LAN or VLAN, and SLAAC requires it. Sites typically receive a /48 or /56, which you split on nibble (4-bit) boundaries so prefixes stay readable and reverse DNS delegation stays clean. Point-to-point links often use /127.</p>
     </details>
   </section>
+  </main>
 
   <footer class="site">
     <div>IP Plan-O-Matic by Huddacaster, a subsidiary of Crockerfeller Industries © 2026 · <a href="https://github.com/crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a></div>
