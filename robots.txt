@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://crockerfeller.github.io/IP-Plan-O-Matic/sitemap.xml

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 3 42 42">
+  <style>
+    .ink{fill:#0F1B2D}.mid{fill:#4A5A70}.acc{fill:#0B7A6E}
+    @media (prefers-color-scheme:dark){.ink{fill:#F4F7FB}.mid{fill:#9FB0C6}.acc{fill:#3DD9C4}}
+  </style>
+  <rect class="ink" x="3" y="3" width="19" height="42" rx="2.5"/>
+  <rect class="acc" x="26" y="3" width="19" height="19" rx="2.5"/>
+  <rect class="mid" x="26" y="26" width="9" height="19" rx="2.5"/>
+  <rect class="acc" x="37" y="26" width="8" height="8.5" rx="2"/>
+  <rect class="ink" x="37" y="36.5" width="8" height="8.5" rx="2"/>
+</svg>
