@@ -20,6 +20,34 @@ T.oci = async () => {
   check('oci /15 warning', $('warnings').textContent.includes('OCI VCN CIDR blocks must be between /16 and /30'), $('warnings').textContent);
 };
 
+T.groups = async () => {
+  await load('../index.html#10.0.0.0/22');
+  let copied = '';
+  W.navigator.clipboard.writeText = async (t) => { copied = t; };
+  divideRow(0);
+  click('#csvBtn'); await sleep(50);
+  check('groups: no Group column without named parents', !copied.split('\n')[0].includes('Group'), copied.split('\n')[0]);
+  type(qa('#body tr')[0].querySelector('input'), 'westus2');
+  divideRow(0);
+  const bar = qa('#body td.bar.joinable').find((b) => b.textContent.includes('/23'));
+  check('groups: bar shows the parent name', bar && bar.querySelector('.gname') && bar.querySelector('.gname').textContent === 'westus2', bar && bar.outerHTML);
+  check('groups: bar title names the group', bar && bar.title === 'Join 2 subnets into westus2 (10.0.0.0/23)', bar && bar.title);
+  click('#csvBtn'); await sleep(50);
+  const cells = (i) => copied.split('\n')[i].split(',').map((c) => c.replace(/"/g, ''));
+  const gi = cells(0).indexOf('Group');
+  check('groups: csv Group column', gi === 1 && cells(1)[gi] === 'westus2' && cells(2)[gi] === 'westus2' && cells(3)[gi] === '', copied);
+  type(qa('#body tr')[0].querySelector('input'), 'hub');
+  divideRow(0);
+  click('#csvBtn'); await sleep(50);
+  check('groups: nested groups outermost first', cells(1)[1] === 'westus2 / hub' && cells(3)[1] === 'westus2', copied);
+  click('#tb-export'); select('#exInc', 'all'); select('#exFmt', 'tf-aws');
+  let t = $('exOut').value;
+  check('groups: tf-aws Group tag and comment', t.includes('# Group: westus2 / hub') && t.includes('Group = "westus2 / hub"'), t.slice(0, 1200));
+  select('#exFmt', 'tf-azure'); t = $('exOut').value;
+  check('groups: tf-azure Group comment', t.includes('# Group: westus2\nresource "azurerm_subnet"'), t.slice(0, 1500));
+  click('#tb-plan');
+};
+
 const addBox = (v) => { $('addIn').value = v; $('addForm').requestSubmit(); };
 const chipsB = () => qa('#blocks .net-card');
 const rowFor = (cidr) => qa('#body tr').find((tr) => tr.textContent.startsWith(cidr));

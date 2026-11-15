@@ -531,6 +531,7 @@
   }
   td.bar .hint { display: block; font-size: 10px; font-weight: 500; opacity: 0; text-transform: uppercase; letter-spacing: .05em; height: 0; overflow: visible; }
   td.bar.joinable:hover .hint, td.bar.joinable:focus-visible .hint { opacity: .8; }
+  td.bar .gname { display: block; max-width: 120px; margin: 0 auto; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: inherit; font-size: 11px; }
 
   .help { color: var(--muted); font-size: 13px; padding: 12px 16px; border-top: 1px solid var(--border); }
   .help p { margin: 0 0 6px; }
@@ -2082,6 +2083,16 @@
   };
   // Leaves of every block, each tagged with its block's platform (for exports and cross-plan checks).
   const allRows = () => state.blocks.flatMap((b, bi) => collectLeaves(b).map((r) => ({ ...r, cloud: b.cloud, bi })));
+  // The group a subnet sits in: names of the divided subnets above it, outermost first ("westus2 / spoke1").
+  // Naming a subnet and then dividing it leaves the name on the parent, which has no row of its own.
+  const groupOf = (r) => {
+    const b = r.bi === undefined ? blk() : state.blocks[r.bi], out = [];
+    for (let m = b.mask + 1; m < r.mask; m++) {
+      const n = getMeta(cidrStr(Math.floor(r.addr / size(m)) * size(m), m)).n;
+      if (n) out.push(n);
+    }
+    return out.join(' / ');
+  };
 
   const renderSummary = () => {
     const base = cidrStr(state.network, state.mask);
@@ -2467,9 +2478,10 @@
           td.rowSpan = span;
           td.tabIndex = 0;
           td.setAttribute('role', 'button');
-          td.title = `Join ${span} subnets into ${cidrStr(anc.addr, anc.mask)}`;
+          const gname = getMeta(cidrStr(anc.addr, anc.mask)).n || '';
+          td.title = `Join ${span} subnets into ${gname ? gname + ' (' + cidrStr(anc.addr, anc.mask) + ')' : cidrStr(anc.addr, anc.mask)}`;
           td.setAttribute('aria-label', td.title);
-          td.innerHTML = `/${anc.mask}<span class="hint">join</span>`;
+          td.innerHTML = (gname ? `<span class="gname">${esc(gname)}</span>` : '') + `/${anc.mask}<span class="hint">join</span>`;
           const first = idx, lastIdx = idx + span - 1;
           const hl = (on) => {
             for (let r = first; r <= lastIdx; r++) body.rows[r] && body.rows[r].classList.toggle('hl', on);
@@ -2938,6 +2950,7 @@
   // CSV columns, keyed to the table columns they come from.
   const CSV_COLS = [
     { key: 'subnet',   head: ['Subnet'],                        val: (r) => [r.key] },
+    { key: 'group',    head: ['Group'],                         val: (r) => [groupOf(r)] },
     { key: 'name',     head: ['Name'],                          val: (r, i, m) => [m.n || ''] },
     { key: 'vlan',     head: ['VLAN'],                          val: (r, i, m) => [m.v || ''] },
     { key: 'zone',     head: ['Zone'],                          val: (r, i, m) => [m.z || ''] },
@@ -2954,11 +2967,14 @@
   ];
   // onlyVisible: the Copy CSV button (active base network, shown columns). Otherwise every base network, every column.
   const buildMatrix = (onlyVisible) => {
+    const src = onlyVisible ? rows : allRows();
     const anyZone = allRows().some((r) => getMeta(r.key).z), anyAz = allRows().some((r) => getMeta(r.key).d);
-    const cols = CSV_COLS.filter((c) => (c.key === 'azsvc' ? anyAz : onlyVisible ? visible[c.key] : c.key !== 'zone' || anyZone));
+    // Group appears only when some divided subnet has a name, so plans without one export exactly as before.
+    const anyGroup = src.some((r) => groupOf(r));
+    const cols = CSV_COLS.filter((c) => (c.key === 'azsvc' ? anyAz : c.key === 'group' ? anyGroup : onlyVisible ? visible[c.key] : c.key !== 'zone' || anyZone));
     const multi = !onlyVisible && state.blocks.length > 1;
     const head = (multi ? ['Base network'] : []).concat(cols.flatMap((c) => c.head));
-    const data = (onlyVisible ? rows : allRows()).map((r) => {
+    const data = src.map((r) => {
       const i = hostInfo(r.addr, r.mask, r.cloud), m = getMeta(r.key);
       return (multi ? [blockCidr(state.blocks[r.bi])] : []).concat(cols.flatMap((c) => c.val(r, i, m)));
     });
@@ -3876,7 +3892,7 @@
   // =====================================================================
   const exportList = () => {
     const inc = $('exInc').value;
-    const all = allRows().map((r) => ({ ...r, meta: getMeta(r.key), info: hostInfo(r.addr, r.mask, r.cloud) }));
+    const all = allRows().map((r) => ({ ...r, meta: getMeta(r.key), info: hostInfo(r.addr, r.mask, r.cloud), group: groupOf(r) }));
     let list = inc === 'all' ? all
       : inc === 'used' ? all.filter((x) => x.meta.s === 'used')
       : all.filter((x) => x.meta.n || x.meta.v || x.meta.s === 'used');
@@ -4062,7 +4078,9 @@
           const rid = nm(x);
           if (x.meta.d === 'aws-tgw') v.tgw.push(rid);
           if (!((x.meta.z || '') in v.byZone)) v.byZone[x.meta.z || ''] = rid;
+          if (x.group) out.push(`# Group: ${x.group}`);
           out.push(`resource "aws_subnet" "${rid}" {`, `  vpc_id     = aws_vpc.${v.id}.id`, `  cidr_block = "${x.key}"`, x.meta.z ? `  availability_zone = "${hq(x.meta.z)}"` : '  # availability_zone = "us-east-1a"', '  tags = {', `    Name = "${hq(x.meta.n || x.key)}"`);
+          if (x.group) out.push(`    Group = "${hq(x.group)}"`);
           if (x.meta.o) out.push(`    Notes = "${hq(x.meta.o)}"`);
           out.push('  }', '}', '');
         }
@@ -4109,6 +4127,7 @@
           // Service subnets keep their name: Azure requires GatewaySubnet, AzureBastionSubnet and friends exactly.
           const svc = svcOf(x.meta);
           const sname = svc && (svc.fixed || x.meta.n === svc.name) ? svc.name : `snet-${an(x)}`;
+          if (x.group) out.push(`# Group: ${x.group}`);
           out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "${hq(sname)}"`, '  resource_group_name  = var.resource_group_name', `  virtual_network_name = azurerm_virtual_network.${v.id}.name`, `  address_prefixes     = ["${x.key}"]`);
           if (svc && svc.deleg) out.push('', '  delegation {', '    name = "delegation"', '    service_delegation {', `      name = "${svc.deleg}"`, '    }', '  }');
           out.push('}', '');
@@ -4132,6 +4151,7 @@
       for (const v of nets) {
         out.push(`resource "oci_core_vcn" "${v.id}" {`, '  compartment_id = var.compartment_id', `  cidr_blocks    = ["${v.base}"]`, `  display_name   = "vcn-${v.slug}"`, `  dns_label      = "${v.dns}"`, '}', '');
         for (const x of v.items) {
+          if (x.group) out.push(`# Group: ${x.group}`);
           out.push(`resource "oci_core_subnet" "${nm(x)}" {`, '  compartment_id = var.compartment_id', `  vcn_id         = oci_core_vcn.${v.id}.id`, `  cidr_block     = "${x.key}"`, `  display_name   = "${hq(x.meta.n || x.key)}"`, `  dns_label      = "${dn(x)}"`);
           if (x.meta.v) out.push(`  freeform_tags  = { "VLAN" = "${x.meta.v}" }`);
           out.push('}', '');
@@ -4142,6 +4162,7 @@
       out.push('variable "region" {', '  type = string', '}', '');
       out.push('resource "google_compute_network" "main" {', '  name                    = "vpc-main"', '  auto_create_subnetworks = false', '}', '');
       for (const x of nets.flatMap((v) => v.items)) {
+        if (x.group) out.push(`# Group: ${x.group}`);
         out.push(`resource "google_compute_subnetwork" "${nm(x)}" {`, `  name          = "${gn(x)}"`, `  ip_cidr_range = "${x.key}"`, '  region        = var.region', '  network       = google_compute_network.main.id');
         if (x.meta.o || x.meta.n) out.push(`  description   = "${hq(x.meta.o || x.meta.n)}"`);
         out.push('}', '');
