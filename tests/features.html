@@ -97,6 +97,34 @@ T.exportMenu = async () => {
   check('help is short, rest folded', qa('#tab-plan .help > p').length === 2 && q('#tab-plan .help details.more-help') && !q('#tab-plan .help details.more-help').open);
 };
 
+T.groupEdit = async () => {
+  await load('../index.html#10.0.0.0/22');
+  divideRow(0); divideRow(0);
+  const bar = (m) => qa('#body td.bar.joinable').find((b) => b.textContent.includes('/' + m));
+  check('group edit: no Group column without groups', !q('#headRow th.col-group'));
+  check('group edit: no pencil on the base network bar', !bar(22).querySelector('.gedit'));
+  bar(23).querySelector('.gedit').click();
+  let inp = q('#body td.bar .gedit-in');
+  check('group edit: bar turns into a name box', inp && W.document.activeElement === inp);
+  inp.value = 'westus2';
+  inp.dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  check('group edit: Enter saves, no join', snap().rows.length === 3 && bar(23).querySelector('.gname').textContent === 'westus2', snap().rows);
+  check('group edit: group column prints but is hidden on screen', q('#headRow th.col-group.print-only') && qa('#body td.col-group')[0].textContent === 'westus2' && W.getComputedStyle(q('#headRow th.col-group')).display === 'none');
+  bar(23).querySelector('.gedit').click();
+  inp = q('#body td.bar .gedit-in');
+  check('group edit: rename starts with the current name', inp.value === 'westus2', inp.value);
+  inp.value = 'nope';
+  inp.dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  check('group edit: Escape cancels', bar(23).querySelector('.gname').textContent === 'westus2');
+  click('#undoBtn');
+  check('group edit: undo removes the name', !bar(23).querySelector('.gname'));
+  click('#redoBtn');
+  const chip = qa('#chips button').find((b) => b.textContent === 'Group');
+  chip.click();
+  check('group edit: Group chip shows the column on screen', q('#headRow th.col-group') && !q('#headRow th.col-group').classList.contains('print-only') && W.getComputedStyle(q('#headRow th.col-group')).display !== 'none');
+  chip.click();
+};
+
 const addBox = (v) => { $('addIn').value = v; $('addForm').requestSubmit(); };
 const chipsB = () => qa('#blocks .net-card');
 const rowFor = (cidr) => qa('#body tr').find((tr) => tr.textContent.startsWith(cidr));

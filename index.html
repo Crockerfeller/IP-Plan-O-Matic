@@ -534,6 +534,12 @@
   td.bar.joinable:hover .hint, td.bar.joinable:focus-visible .hint { opacity: .8; }
   .split-fix { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13px; }
   .warnings .tag button.small { margin-left: 6px; padding: 1px 8px; font-size: 12px; }
+  td.bar .gedit { height: auto; padding: 0 3px; margin-left: 2px; border: 0; background: none; color: inherit; font-size: 11px; opacity: .5; vertical-align: baseline; }
+  td.bar:hover .gedit, td.bar .gedit:focus-visible { opacity: 1; }
+  td.bar .gedit::before { content: '✎'; }   /* drawn by CSS so the bar's text (and copied rows) stay unchanged */
+  td.bar .gedit:hover { background: none; text-decoration: underline; }
+  td.bar .gedit-in { width: 120px; height: 26px; margin: 2px 4px; padding: 0 6px; font: inherit; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); }
+  .print-only { display: none; }
   td.bar .gname { display: block; max-width: 120px; margin: 0 auto; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: inherit; font-size: 11px; }
 
   .help { color: var(--muted); font-size: 13px; padding: 12px 16px; border-top: 1px solid var(--border); }
@@ -666,6 +672,7 @@
   @media print {
     .intro, .about, footer.site { display: none !important; }
     body { background: #fff; color: #000; }
+    th.print-only, td.print-only { display: table-cell !important; }
     .no-print, nav.tabs, .copy, th.col-divide, td.col-divide, th.join-h, td.bar, .chips, .help { display: none !important; }
     .card { box-shadow: none; border: none; }
     .wrap { padding: 0; max-width: none; }
@@ -1009,7 +1016,7 @@
           <p><b>Split everything into</b> divides every subnet bigger than the size you choose and leaves smaller, named subnets alone. Set Status to track what is in use.</p>
           <p>Keyboard: click a row or press <kbd>↓</kbd>, then <kbd>D</kbd> divides, <kbd>J</kbd> joins and <kbd>S</kbd> sets status.</p>
           <p>Use <b>Add</b> to carve out a specific subnet like <kbd>10.0.5.0/24 Servers</kbd>. A network outside every base network becomes another base network, so one plan can cover HQ, branches and cloud VPCs, each with its own platform.</p>
-          <p>Name a subnet before dividing it and the name stays on its colored bar as a group (westus2 /20), and in CSV and Terraform exports.</p>
+          <p>Name a subnet before dividing it and the name stays on its colored bar as a group (westus2 /20). Click ✎ on a bar to name or rename a group later. Groups appear in CSV, Terraform and print, and the Group column can show them in the table.</p>
           <p>Paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field.</p>
         </details>
       </div>
@@ -1574,6 +1581,7 @@
   const COLS = [
     { key: 'subnet',   label: 'Subnet', locked: true },
     { key: 'divide',   label: 'Divide', locked: true },
+    { key: 'group',    label: 'Group' },
     { key: 'name',     label: 'Name' },
     { key: 'vlan',     label: 'VLAN' },
     { key: 'zone',     label: 'Zone' },
@@ -1589,7 +1597,7 @@
     { key: 'join',     label: 'Join' },
   ];
   const visible = {
-    subnet: true, name: true, vlan: true, zone: false, netmask: false, wildcard: false, range: false, usable: true,
+    subnet: true, group: false, name: true, vlan: true, zone: false, netmask: false, wildcard: false, range: false, usable: true,
     gateway: true, hosts: true, status: true, note: false, binary: false, divide: true, join: true,
   };
   try {
@@ -2356,13 +2364,16 @@
     rows = collectLeaves();
     const limit = divLimit();
 
+    // Group names live on the join bars, which don't print; so a plan with groups always prints a Group column.
+    const anyGroup = rows.some((r) => groupOf(r));
+    const groupCls = visible.group ? '' : ' print-only';
     const head = $('headRow');
     head.innerHTML = '';
     for (const col of COLS) {
-      if (!visible[col.key]) continue;
+      if (!visible[col.key] && !(col.key === 'group' && anyGroup)) continue;
       const th = document.createElement('th');
       th.textContent = col.label;
-      th.className = 'col-' + col.key + (col.num ? ' num' : '');
+      th.className = 'col-' + col.key + (col.num ? ' num' : '') + (col.key === 'group' ? groupCls : '');
       if (col.key === 'join') { th.classList.add('join-h'); th.colSpan = H + 1; }
       head.appendChild(th);
     }
@@ -2459,6 +2470,7 @@
         }
         cell('col-divide', wrap);
       }
+      if (visible.group || anyGroup) cell('col-group' + groupCls, groupOf(leaf));
       if (visible.name) {
         const inp = textInput('', 'n', 'Name', 'Name');
         inp.addEventListener('input', () => { firstEdit(inp); setMeta(key, 'n', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
@@ -2526,10 +2538,20 @@
           td.rowSpan = span;
           td.tabIndex = 0;
           td.setAttribute('role', 'button');
-          const gname = getMeta(cidrStr(anc.addr, anc.mask)).n || '';
-          td.title = `Join ${span} subnets into ${gname ? gname + ' (' + cidrStr(anc.addr, anc.mask) + ')' : cidrStr(anc.addr, anc.mask)}`;
+          const gkey = cidrStr(anc.addr, anc.mask), gname = getMeta(gkey).n || '';
+          td.title = `Join ${span} subnets into ${gname ? gname + ' (' + gkey + ')' : gkey}`;
           td.setAttribute('aria-label', td.title);
           td.innerHTML = (gname ? `<span class="gname">${esc(gname)}</span>` : '') + `/${anc.mask}<span class="hint">join</span>`;
+          // Name or rename the group, except on the base network's own bar (its name is on the network card).
+          if (anc.mask > state.mask) {
+            const ed = document.createElement('button');
+            ed.type = 'button';
+            ed.className = 'gedit';
+            ed.title = gname ? `Rename the group ${gname} (${gkey})` : `Name the group ${gkey}`;
+            ed.setAttribute('aria-label', ed.title);
+            ed.addEventListener('click', (e) => { e.stopPropagation(); editGroup(td, gkey, gname); });
+            td.insertBefore(ed, td.querySelector('.hint'));
+          }
           const first = idx, lastIdx = idx + span - 1;
           const hl = (on) => {
             for (let r = first; r <= lastIdx; r++) body.rows[r] && body.rows[r].classList.toggle('hl', on);
@@ -2539,9 +2561,9 @@
           td.addEventListener('focus', () => hl(true));
           td.addEventListener('blur', () => hl(false));
           const doJoin = () => { checkpoint(); anc.node.c = null; update(); toast(`Joined ${span} subnets into ${cidrStr(anc.addr, anc.mask)}`, UNDO); };
-          td.addEventListener('click', doJoin);
+          td.addEventListener('click', (e) => { if (!e.target.closest('.gedit, .gedit-in')) doJoin(); });
           td.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doJoin(); }
+            if (e.target === td && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); doJoin(); }
           });
           tr.appendChild(td);
         }
@@ -2554,6 +2576,37 @@
   };
 
   const update = () => { render(); writeHash(); };
+
+  // Name a group in place: the bar becomes a text box. Enter or leaving the box saves, Escape cancels.
+  const editGroup = (td, key, old) => {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'gedit-in';
+    inp.spellcheck = false;
+    inp.maxLength = 64;
+    inp.value = old;
+    inp.placeholder = 'Group name';
+    inp.setAttribute('aria-label', `Group name for ${key}`);
+    td.textContent = '';
+    td.appendChild(inp);
+    inp.focus(); inp.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const v = oneLine(inp.value).trim();
+      if (!save || v === old) { render(); return; }
+      checkpoint();
+      setMeta(key, 'n', v);
+      update();
+      toast(v ? `Named ${key} ${v}` : `Removed the group name from ${key}`, UNDO);
+    };
+    inp.addEventListener('keydown', (e) => {
+      e.stopPropagation();   // not the table's shortcuts, and not Enter-to-join on the bar
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    inp.addEventListener('blur', () => finish(true));
+  };
 
   // ---------- Keyboard: select a row, then D divide, J join, S status, Enter rename ----------
   let selKey = null;
