@@ -1470,14 +1470,53 @@
     const x = extras(), b0 = state.blocks[0];
     return `${ntoa(b0.network)}/${b0.mask}/${packBits(treeToBits(b0.root))}${x ? '/' + x : ''}`;
   };
-  let lastHash = '';
+  // ---------- Compact links ----------
+  // Inside the app a plan is "net/mask/tree/blob" with blob = base64url(JSON). In the page address the blob is
+  // deflate-compressed when that is clearly shorter, written as "~" + base64url(deflate-raw(JSON)).
+  const canZip = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+  const bytesToB64u = (bytes) => {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const b64uToBytes = (s) => {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  };
+  const pipeBytes = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  const toUrlHash = async (h) => {
+    const parts = h.split('/');
+    if (parts.length < 4 || !canZip) return h;
+    try {
+      const z = '~' + bytesToB64u(await pipeBytes(new TextEncoder().encode(b64d(parts[3])), new CompressionStream('deflate-raw')));
+      if (z.length < parts[3].length * 0.85) parts[3] = z;
+    } catch (e) { /* keep the plain form */ }
+    return parts.join('/');
+  };
+  const fromUrlHash = async (h) => {
+    const parts = h.split('/');
+    if (!parts[3] || parts[3][0] !== '~') return h;
+    if (!canZip) throw new Error('This link is compressed, and this browser is too old to open it. Try a current version of Chrome, Safari, Edge or Firefox.');
+    parts[3] = b64e(new TextDecoder().decode(await pipeBytes(b64uToBytes(parts[3].slice(1)), new DecompressionStream('deflate-raw'))));
+    return parts.join('/');
+  };
+
+  let lastHash = '';   // what is in the address bar now (compact form)
+  let hashSeq = 0;
+  let hashWritten = Promise.resolve();
   const writeHash = () => {
     const h = stateHash();
-    lastHash = h;
-    try { history.replaceState(null, '', '#' + h); }
-    catch (e) { location.hash = h; }
     // Autosave the working plan so a bare visit (or the installed app) picks up where you left off.
     try { localStorage.setItem('subnetPlanner.current', h); } catch (e) { /* storage unavailable */ }
+    const seq = ++hashSeq;
+    hashWritten = toUrlHash(h).then((u) => {
+      if (seq !== hashSeq) return;   // a newer write is on its way
+      lastHash = u;
+      try { history.replaceState(null, '', '#' + u); }
+      catch (e) { location.hash = u; }
+    });
+    return hashWritten;
   };
   let hashTimer;
   const writeHashSoon = () => { clearTimeout(hashTimer); hashTimer = setTimeout(writeHash, 300); };
@@ -1515,12 +1554,17 @@
     settings.gw = x.g === 'last' ? 'last' : 'first';
     state.meta = (x.m && typeof x.m === 'object') ? { ...x.m } : {};
     v6Load(x.v6 || { p: V6_DEFAULT });
-    lastHash = hash || '';
     return true;
   };
-  const loadFromLocation = () => {
-    const hash = decodeURIComponent(location.hash.replace(/^#/, ''));
-    return loadFromHash(hash, hash ? null : new URLSearchParams(location.search));
+  // Async because compact links have to be decompressed first.
+  const loadFromLocation = async () => {
+    const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (!raw) return loadFromHash('', new URLSearchParams(location.search));
+    let h;
+    try { h = await fromUrlHash(raw); }
+    catch (e) { showMsg('msg', e.message || 'That link couldn’t be read.', 'error'); return false; }
+    lastHash = raw;
+    return loadFromHash(h);
   };
 
   // ---------- Undo / redo: snapshots of the whole plan, taken before each change ----------
@@ -2201,7 +2245,7 @@
     if (k === 'y' || e.shiftKey) redo(); else undo();
   });
   $('linkBtn').addEventListener('click', async () => {
-    writeHash();
+    await writeHash();
     toast((await copyText(location.href)) ? 'Link copied' : 'Couldn’t copy. Use the address bar.');
   });
   $('printBtn').addEventListener('click', () => window.print());
@@ -3320,29 +3364,32 @@
   // =====================================================================
   // Boot
   // =====================================================================
-  window.addEventListener('hashchange', () => {
+  window.addEventListener('hashchange', async () => {
     const h = decodeURIComponent(location.hash.replace(/^#/, ''));
     if (h && h !== lastHash) {
       const before = stateHash();
-      if (loadFromLocation()) { if (undoStack[undoStack.length - 1] !== before) undoStack.push(before); redoStack.length = 0; updUndo(); syncControls(); render(); renderV6(); }
+      if (await loadFromLocation()) { if (undoStack[undoStack.length - 1] !== before) undoStack.push(before); redoStack.length = 0; updUndo(); syncControls(); render(); renderV6(); }
     }
   });
-  let restored = false;
-  if (!loadFromLocation()) {
-    try {
-      const h = localStorage.getItem('subnetPlanner.current');
-      if (h && h !== DEFAULT_HASH && loadFromHash(h)) restored = true;
-    } catch (e) { /* ignore */ }
-  }
-  syncControls();
-  update();
-  renderV6();
-  if (restored) {
-    toast('Restored your last plan', { label: 'Start new', fn: () => { openPlanHash(DEFAULT_HASH); setCurrentPlan(null); } });
-  }
-  let startTab = 'plan';
-  try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
-  showTab(startTab);
+  (async () => {
+    let restored = false;
+    if (!(await loadFromLocation())) {
+      try {
+        const h = localStorage.getItem('subnetPlanner.current');
+        if (h && h !== DEFAULT_HASH && loadFromHash(h)) restored = true;
+      } catch (e) { /* ignore */ }
+    }
+    syncControls();
+    update();
+    renderV6();
+    if (restored) {
+      toast('Restored your last plan', { label: 'Start new', fn: () => { openPlanHash(DEFAULT_HASH); setCurrentPlan(null); } });
+    }
+    let startTab = 'plan';
+    try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
+    showTab(startTab);
+    document.documentElement.dataset.ready = '1';
+  })();
 })();
 /* Offline support: register the service worker (https or localhost only) */
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
