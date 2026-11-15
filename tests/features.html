@@ -21,19 +21,19 @@ T.oci = async () => {
 };
 
 const addBox = (v) => { $('addIn').value = v; $('addForm').requestSubmit(); };
-const chipsB = () => qa('#blocks .chip');
+const chipsB = () => qa('#blocks .net-card');
 const rowFor = (cidr) => qa('#body tr').find((tr) => tr.textContent.startsWith(cidr));
 T.blocks = async () => {
   await load('../index.html#10.0.0.0/22');
   divideRow(0);
   type(qa('#body tr')[0].querySelector('input'), 'A');
-  check('strip hidden with one block', $('blocks').hidden);
+  check('one network card, peering disabled', chipsB().length === 1 && $('peerBtn').disabled && $('netAddBtn'));
   addBox('10.0.3.0/25 Cams');
   check('add subnet carves', rowFor('10.0.3.0/25') && rowFor('10.0.3.0/25').querySelector('input').value === 'Cams', snap().rows);
   addBox('10.0.0.0/8');
   check('containing block refused', $('msg').textContent.includes('contains 10.0.0.0/22'), $('msg').textContent);
   addBox('172.16.0.0/16 AWS-VPC');
-  check('new block strip', !$('blocks').hidden && chipsB().length === 2 && chipsB()[1].getAttribute('aria-pressed') === 'true', $('blocks').textContent);
+  check('new block strip', chipsB().length === 2 && chipsB()[1].getAttribute('aria-pressed') === 'true', $('blocks').textContent);
   check('table shows new block', snap().rows.length === 1 && snap().rows[0].startsWith('172.16.0.0/16'), snap().rows);
   check('label field', $('blockLabel').value === 'AWS-VPC');
   select('#platform', 'aws');
@@ -68,7 +68,7 @@ T.blocks = async () => {
   check('json blocks', j.version === 3 && j.blocks.length === 2 && j.blocks[1].platform === 'aws' && j.subnets.some((x) => x.network === '172.16.0.0/16' && x.hosts === 32763), j.blocks);
   click('#tb-plan');
   click(q('#blocks .chip-x'));
-  check('remove block', $('blocks').hidden && snap().rows[0].startsWith('10.0.0.0/23'), snap().rows);
+  check('remove block', chipsB().length === 1 && snap().rows[0].startsWith('10.0.0.0/23'), snap().rows);
   click('#tb-export');
   $('imText').value = js; click('#imRun');
   click('#tb-plan');
@@ -117,7 +117,7 @@ T.undo = async () => {
   addBox('172.16.0.0/16 B');
   check('block added', chipsB().length === 2);
   key('z');
-  check('undo add block', $('blocks').hidden && snap().rows.length === 4, $('blocks').textContent);
+  check('undo add block', chipsB().length === 1 && snap().rows.length === 4, $('blocks').textContent);
   // ipv6
   click('#tb-v6');
   qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
@@ -554,7 +554,7 @@ T.azureHubSpoke = async () => {
   qa('#azVnets .az-vnet')[1].querySelector('input[type=text]').dispatchEvent(new W.Event('input'));
   check('spoke removed', !out().includes('Spoke 2') && !out().includes('Spoke 3') && out().includes('Spoke workload 10.0.16.0/20'), out().slice(0, 900));
   click('#azApply'); await sleep(50);
-  check('applied: two azure blocks', chipsB().length === 2 && chipsB()[0].textContent.startsWith('10.0.0.0/23') && chipsB()[1].textContent.startsWith('10.0.16.0/20') && $('platform').value === 'azure', $('blocks').textContent);
+  check('applied: two azure blocks', chipsB().length === 2 && chipsB()[0].dataset.cidr === '10.0.0.0/23' && chipsB()[1].dataset.cidr === '10.0.16.0/20' && $('platform').value === 'azure', $('blocks').textContent);
   const rowsHub = snap().rows;
   check('hub rows named', rowsHub.length === 7 && rowsHub.some((r) => r.startsWith('10.0.0.64/26') && r.includes('[AzureBastionSubnet]') && r.includes('[used]')), rowsHub);
   check('no azure warnings on defaults', !/must be|exact name/.test($('warnings').textContent), $('warnings').textContent);
@@ -573,7 +573,7 @@ T.azureHubSpoke = async () => {
   check('json: cloudService', js.subnets.some((x) => x.name === 'AzureBastionSubnet' && x.cloudService === 'bastion'));
   click('#tb-plan');
   click('#undoBtn'); await sleep(50);
-  check('undo restores 192.168.0.0/24', chipsB().length === 0 || $('blocks').hidden, $('blocks').textContent);
+  check('undo restores 192.168.0.0/24', chipsB().length === 1, $('blocks').textContent);
   check('undo restores platform', $('platform').value === 'std' && snap().rows.length === 1 && snap().rows[0].startsWith('192.168.0.0/24'));
   await load('../index.html' + link);
   check('link round trip', chipsB().length === 2 && snap().rows.some((r) => r.includes('[AzureBastionSubnet]')));
@@ -620,7 +620,7 @@ T.awsHubSpoke = async () => {
   spokeCard.querySelector('input[data-svc="aws-eksnodes"]').click();
   check('aws back to fitting', !$('azApply').disabled);
   click('#azApply'); await sleep(50);
-  check('aws applied', chipsB().length === 2 && $('platform').value === 'aws' && chipsB()[1].textContent.startsWith('10.0.32.0/19'), $('blocks').textContent);
+  check('aws applied', chipsB().length === 2 && $('platform').value === 'aws' && chipsB()[1].dataset.cidr === '10.0.32.0/19', $('blocks').textContent);
   check('aws rows have zones', snap().rows.some((r) => r.startsWith('10.0.0.0/28') && r.includes('[tgw-attach-us-east-1a]') && r.includes('[us-east-1a]')), snap().rows.slice(0, 3));
   check('no aws warnings on defaults', !/must be/.test($('warnings').textContent), $('warnings').textContent);
   click('#tb-export'); select('#exInc', 'all'); select('#exFmt', 'tf-aws');
@@ -650,7 +650,7 @@ T.peering = async () => {
   const tf = (f) => { click('#tb-export'); select('#exInc', 'all'); select('#exFmt', f); const t = $('exOut').value; click('#tb-plan'); return t; };
   // Azure: hub and two spokes from the template.
   await load('../index.html#192.168.0.0/24');
-  check('no peering button with one network', !$('peerBtn'));
+  check('peering disabled with one network', $('peerBtn').disabled);
   select('#platform', 'azure-hs'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
   check('template sets hub-and-spoke peering', pbtn().includes('Peering (2)'), pbtn());
   click('#peerBtn');
@@ -730,6 +730,50 @@ T.peering = async () => {
   click('#peerBtn');
   check('standard: explains and disables', $('peerPairs').textContent.includes('same cloud') && $('peerSave').disabled);
   $('peerDlg').close();
+};
+T.networksUi = async () => {
+  await load('../index.html#10.0.0.0/16');
+  check('one card, add button, peering off', chipsB().length === 1 && $('netAddBtn').textContent === '+ Add network' && $('peerBtn').disabled);
+  select('#platform', 'azure');
+  check('cloud word on add button', $('netAddBtn').textContent === '+ Add VNet');
+  click('#netAddBtn');
+  check('add dialog suggests next free space', $('netDlg').open && $('netCidr').value === '10.1.0.0/16' && $('netPlat').value === 'azure', $('netCidr').value);
+  $('netCidr').value = '10.0.128.0/17'; $('netForm2').requestSubmit();
+  check('add dialog refuses overlap', $('netMsg').textContent.includes('overlaps') && $('netDlg').open, $('netMsg').textContent);
+  $('netCidr').value = '10.1.0.0/16'; $('netName').value = 'Spoke prod'; $('netForm2').requestSubmit(); await sleep(50);
+  check('network added and selected', chipsB().length === 2 && chipsB()[1].getAttribute('aria-pressed') === 'true' && chipsB()[1].textContent.includes('Spoke prod') && !$('peerBtn').disabled, $('blocks').textContent);
+  chipsB()[0].dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  check('card selects with Enter', chipsB()[0].getAttribute('aria-pressed') === 'true');
+  click('#undoBtn'); await sleep(50);
+  check('undo add network', chipsB().length === 1);
+
+  // Template + Add VNet: a new network joins the hub's peering.
+  await load('../index.html#192.168.0.0/24');
+  select('#platform', 'azure-hs'); click('#azApply'); await sleep(50);
+  check('hub card marked', chipsB()[0].textContent.includes('★ Hub'));
+  click('#netAddBtn'); $('netForm2').requestSubmit(); await sleep(50);
+  check('new VNet peered with hub', $('peerBtn').textContent.includes('Peering (2)') && $('toast').textContent.includes('peered it with Hub'), [$('peerBtn').textContent, $('toast').textContent]);
+  await sleep(100);
+  check('peering arcs drawn', qa('#netsRow svg path').length === 2, qa('#netsRow svg path').length);
+
+  // Regions drawn as subnets of one /16 become separate networks.
+  await load('../index.html#10.50.0.0/16');
+  select('#platform', 'azure');
+  for (const v of ['10.50.0.0/20 eastus', '10.50.0.0/21 eastus-app', '10.50.8.0/24 eastus-dmz', '10.50.16.0/21 westeu-app', '10.50.24.0/24 westeu-bastion']) addBox(v);
+  const sx = q('#blocks .nc-act');
+  check('make separate link shown', sx && sx.textContent === 'Make separate VNets…');
+  sx.click();
+  const items = qa('#splitList .split-item');
+  check('split defaults to the named size', $('splitDlg').open && $('splitSize').value === '20', $('splitSize').value);
+  check('split candidates', items.length === 5 && items.filter((r) => r.querySelector('input[type=checkbox]').checked).length === 2, items.map((r) => r.textContent));
+  check('split names: given and suggested', items[0].querySelector('input[type=text]').value === 'eastus' && items[1].querySelector('input[type=text]').value === 'westeu', items.map((r) => r.querySelector('input[type=text]').value));
+  click('#splitApply'); await sleep(50);
+  check('two VNets made', chipsB().length === 2 && chipsB()[0].dataset.cidr === '10.50.0.0/20' && chipsB()[1].textContent.includes('westeu') && $('platform').value === 'azure', $('blocks').textContent);
+  check('subnets and names kept', snap().rows.some((r) => r.startsWith('10.50.0.0/21') && r.includes('[eastus-app]')), snap().rows);
+  chipsB()[1].click();
+  check('second VNet subnets', snap().rows.some((r) => r.includes('[westeu-bastion]')));
+  click('#undoBtn'); await sleep(50);
+  check('undo split', chipsB().length === 1 && chipsB()[0].dataset.cidr === '10.50.0.0/16');
 };
 T.updateCheck = async () => {
   await load('../index.html#10.0.0.0/24');

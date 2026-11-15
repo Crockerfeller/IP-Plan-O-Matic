@@ -309,11 +309,7 @@
   .peer-opts h3 { width: 100%; margin: 0; font-size: 14px; }
   .peer-opts > label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
   #peerMsg { margin-top: 12px; }
-  .peer-btn {
-    height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; margin-left: 6px;
-    border: 1px dashed var(--accent); background: transparent; color: var(--text);
-  }
-  .peer-btn:hover { background: var(--accent-weak); }
+  .peer-btn { height: 32px; padding: 0 12px; font-size: 13px; font-weight: 600; }
   dialog#azDlg {
     width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
     border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
@@ -350,10 +346,51 @@
   .find-out b { color: var(--text); }
 
   .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-  .blocks .chip { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
-  .blocks .chip .bl { font-family: inherit; color: var(--muted); }
-  .blocks .chip-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 6px; }
-  .blocks .chip-x:hover { color: var(--danger); background: var(--danger-weak); }
+  /* Networks panel: one card per base network (VNet / VPC), peering drawn as arcs under the cards. */
+  .nets { position: relative; }
+  .nets-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+  .nets-head .lbl { margin-right: auto; }
+  .nets-head .hint { color: var(--muted); font-size: 12px; width: 100%; margin-top: -4px; }
+  .nets-row { position: relative; display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: stretch; }
+  .nets-row.linked { padding-bottom: var(--arc, 0px); }
+  .net-card {
+    position: relative; z-index: 1; width: 200px; max-width: 100%; padding: 8px 10px 9px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel); cursor: pointer; display: grid; gap: 2px; font-size: 13px; text-align: left; color: var(--text);
+  }
+  .net-card:hover { border-color: var(--accent); }
+  .net-card[aria-pressed="true"] { border: 2px solid var(--accent); padding: 7px 9px 8px; background: var(--accent-weak); }
+  .net-card .nc-top { display: flex; align-items: center; gap: 6px; min-height: 20px; }
+  .net-card .nc-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .net-card .nc-name.none { color: var(--muted); font-weight: 400; font-style: italic; }
+  .net-card .nc-hub { font-size: 11px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .net-card .nc-cidr { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; }
+  .net-card .nc-sub { color: var(--muted); font-size: 12px; }
+  .net-card .nc-bar { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; display: flex; margin-top: 3px; }
+  .net-card .nc-bar i { display: block; height: 100%; }
+  .net-card .chip-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0 4px; height: 20px; border-radius: 6px; line-height: 1; }
+  .net-card .chip-x:hover { color: var(--danger); background: var(--danger-weak); }
+  .net-card .nc-act { justify-self: start; margin-top: 4px; border: 0; background: none; padding: 0; height: auto; color: var(--accent); font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .net-add {
+    width: 200px; max-width: 100%; min-height: 84px; border: 1.5px dashed var(--border); border-radius: 10px; background: transparent;
+    color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .net-add:hover { border-color: var(--accent); background: var(--accent-weak); }
+  .nets-links { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 0; }
+  .nets-links path { fill: none; stroke: var(--accent); stroke-width: 2; opacity: .75; }
+  .nets-links circle { fill: var(--accent); }
+  dialog#netDlg, dialog#splitDlg {
+    width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
+  }
+  dialog#splitDlg { width: min(720px, calc(100vw - 32px)); }
+  dialog#netDlg::backdrop, dialog#splitDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  #netDlg .sub, #splitDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  #netDlg .msg, #splitDlg .msg { margin-top: 10px; }
+  .split-list { display: grid; gap: 6px; margin-top: 12px; max-height: 45vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+  .split-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 14px; min-height: 36px; }
+  .split-item .mono { min-width: 130px; }
+  .split-item input[type=text] { width: 190px; height: 32px; }
+  .split-item .what { color: var(--muted); font-size: 12px; }
   #addForm .field.grow { flex: 1 1 320px; }
   .split-cell { display: inline-flex; gap: 4px; align-items: center; }
   select.split-sel { height: 28px; font-size: 13px; padding: 0 4px; width: 74px; }
@@ -767,6 +804,55 @@
     </div>
   </dialog>
 
+  <dialog id="netDlg" aria-labelledby="netTtl">
+    <div class="dlg-head">
+      <h2 id="netTtl">Add a network</h2>
+      <button type="button" class="icon" id="netClose" aria-label="Close">✕</button>
+    </div>
+    <p class="sub" id="netSub">Each network is one address space: an Azure VNet, AWS VPC, Google Cloud VPC, OCI VCN or on-prem site. Networks in a plan can’t overlap; peer them with the Peering button.</p>
+    <form class="row" id="netForm2" autocomplete="off">
+      <div class="field">
+        <label for="netCidr">Address space</label>
+        <input type="text" id="netCidr" spellcheck="false" style="width:180px" placeholder="10.1.0.0/16">
+      </div>
+      <div class="field grow">
+        <label for="netName">Name</label>
+        <input type="text" id="netName" spellcheck="false" maxlength="40" placeholder="e.g. Spoke prod">
+      </div>
+      <div class="field">
+        <label for="netPlat">Platform</label>
+        <select id="netPlat">
+          <option value="std">Standard (on-prem)</option>
+          <option value="aws">AWS VPC</option>
+          <option value="azure">Azure VNet</option>
+          <option value="gcp">Google Cloud VPC</option>
+          <option value="oci">Oracle Cloud (OCI) VCN</option>
+        </select>
+      </div>
+      <button type="submit" class="primary">Add</button>
+    </form>
+    <div class="msg" id="netMsg" role="status"></div>
+  </dialog>
+
+  <dialog id="splitDlg" aria-labelledby="splitTtl">
+    <div class="dlg-head">
+      <h2 id="splitTtl">Make separate networks</h2>
+      <button type="button" class="icon" id="splitClose" aria-label="Close">✕</button>
+    </div>
+    <p class="sub" id="splitSub"></p>
+    <div class="row">
+      <div class="field">
+        <label for="splitSize">Each network is a</label>
+        <select id="splitSize"></select>
+      </div>
+    </div>
+    <div class="split-list" id="splitList"></div>
+    <div class="msg" id="splitMsg" role="status"></div>
+    <div class="row dlg-foot">
+      <button type="button" class="primary" id="splitApply">Make separate networks</button>
+    </div>
+  </dialog>
+
   <main>
   <div class="intro">
     <h1>Free visual subnet calculator &amp; IP address planner</h1>
@@ -799,10 +885,10 @@
   <!-- ================= PLAN ================= -->
   <section id="tab-plan" role="tabpanel" aria-labelledby="tb-plan">
     <div class="card controls no-print">
-      <div class="chips blocks" id="blocks" hidden></div>
+      <div class="nets" id="blocks"></div>
       <form class="row" id="netForm" autocomplete="off">
         <div class="field grow">
-          <label for="network">Base network</label>
+          <label for="network">Network address space</label>
           <div class="cidr">
             <input type="text" id="network" value="192.168.0.0" spellcheck="false" inputmode="decimal" placeholder="10.0.0.0">
             <span class="slash">/</span>
@@ -810,7 +896,7 @@
           </div>
         </div>
         <div class="field">
-          <label for="blockLabel">Label</label>
+          <label for="blockLabel">Network name</label>
           <input type="text" id="blockLabel" spellcheck="false" placeholder="e.g. HQ" maxlength="40" style="width:130px">
         </div>
         <button type="submit" class="primary">Update</button>
@@ -848,7 +934,7 @@
       </form>
       <form class="row" id="addForm" autocomplete="off">
         <div class="field grow">
-          <label for="addIn">Add a subnet or another base network</label>
+          <label for="addIn">Add a subnet</label>
           <input type="text" id="addIn" spellcheck="false" placeholder="e.g. 10.0.5.0/24 Servers" title="A network inside a base network is carved out as a subnet. One outside every base network becomes a new base network.">
         </div>
         <button type="submit">Add</button>
@@ -2028,7 +2114,7 @@
       `<span>Total addresses <b>${fmt(total)}</b></span>` +
       `<span>Usable hosts <b>${fmt(usableTotal)}</b></span>` +
       `<span>Platform <b>${CLOUDS[settings.cloud].label}</b></span>` +
-      (state.blocks.length > 1 ? `<span>All ${state.blocks.length} base networks <b>${fmt(state.blocks.reduce((t, b) => t + size(b.mask), 0))}</b> addresses</span>` : '');
+      (state.blocks.length > 1 ? `<span>All ${state.blocks.length} ${netWord()}s <b>${fmt(state.blocks.reduce((t, b) => t + size(b.mask), 0))}</b> addresses</span>` : '');
     const pct = (x) => (x / total) * 100;
     $('usageBar').innerHTML = `<span class="u-used" style="width:${pct(by.used)}%"></span><span class="u-res" style="width:${pct(by.reserved)}%"></span>`;
     const p1 = (x) => (pct(x) < 0.1 && x > 0 ? '<0.1' : pct(x).toFixed(pct(x) < 10 ? 1 : 0));
@@ -2047,45 +2133,128 @@
     $('warnings').innerHTML = w.join('');
   };
 
+  // What a network is called on the platforms in this plan: VNet, VPC, VCN, or network when they differ.
+  const NET_WORD = { std: 'network', aws: 'VPC', azure: 'VNet', gcp: 'VPC', oci: 'VCN' };
+  const netWord = () => { const c = new Set(state.blocks.map((b) => b.cloud)); return c.size === 1 ? NET_WORD[[...c][0]] : 'network'; };
+  // Peering arcs are drawn after layout, and again whenever the cards move (resize, wrapping).
+  const drawPeerArcs = () => {
+    const row = $('netsRow');
+    if (!row) return;
+    const svg = row.querySelector('svg.nets-links');
+    const pairs = peerPairs();
+    row.classList.toggle('linked', pairs.length > 0);
+    if (!svg || !pairs.length) { if (svg) svg.innerHTML = ''; return; }
+    const box = row.getBoundingClientRect();
+    const at = (b) => {
+      const c = row.querySelector(`.net-card[data-cidr="${CSS.escape(blockCidr(b))}"]`);
+      if (!c) return null;
+      const r = c.getBoundingClientRect();
+      return { x: r.left - box.left + r.width / 2, y: r.bottom - box.top, right: r.right - box.left, mid: r.top - box.top + r.height / 2 };
+    };
+    let paths = '', depth = 0, under = false;
+    for (const [x, y] of pairs) {
+      const a = at(x), b = at(y);
+      if (!a || !b) continue;
+      const d = 12 + (depth++ % 6) * 7, t = `<title>${esc(blockName(x))} ⇄ ${esc(blockName(y))}</title>`;
+      if (Math.abs(a.x - b.x) < 8) {
+        // Cards stacked in one column (phones): a bracket down the right-hand side.
+        const out = Math.max(a.right, b.right) + d;
+        paths += `<path d="M${a.right} ${a.mid} C${out} ${a.mid}, ${out} ${b.mid}, ${b.right} ${b.mid}">${t}</path><circle cx="${a.right}" cy="${a.mid}" r="3"/><circle cx="${b.right}" cy="${b.mid}" r="3"/>`;
+      } else {
+        // Side by side: an arc under the cards.
+        const low = Math.max(a.y, b.y) + d;
+        under = true;
+        paths += `<path d="M${a.x} ${a.y} C${a.x} ${low}, ${b.x} ${low}, ${b.x} ${b.y}">${t}</path><circle cx="${a.x}" cy="${a.y}" r="3"/><circle cx="${b.x}" cy="${b.y}" r="3"/>`;
+      }
+    }
+    row.style.setProperty('--arc', under ? `${14 + Math.min(pairs.length, 6) * 7}px` : '0px');
+    svg.innerHTML = paths;
+  };
+  let arcObserver = null;
   const renderBlocks = () => {
     const el = $('blocks');
-    el.hidden = state.blocks.length < 2;
-    el.innerHTML = '<span class="lbl">Base networks</span>';
+    const word = netWord(), pairs = peerPairs(), hubC = state.peers && state.po.m === 'hub' && pairs.length ? state.po.h : '';
+    const many = state.blocks.length > 1;
+    el.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'nets-head';
+    head.innerHTML = `<span class="lbl">${many ? `${state.blocks.length} ${esc(word)}s in this plan` : `${esc(word === 'network' ? 'Network' : word)}`}</span>`;
+    const pb = document.createElement('button');
+    pb.type = 'button';
+    pb.className = 'peer-btn';
+    pb.id = 'peerBtn';
+    pb.textContent = `⇄ Peering${pairs.length ? ` (${pairs.length})` : ''}…`;
+    pb.disabled = !many;
+    pb.title = many ? `Choose which ${word}s connect, for the Azure and AWS Terraform exports` : `Add a second ${word} to set up peering`;
+    pb.addEventListener('click', openPeer);
+    head.appendChild(pb);
+    if (!many) {
+      const h = document.createElement('div');
+      h.className = 'hint';
+      h.textContent = `The table below plans this ${word}. Planning several ${word}s (a hub and spokes, regions, sites)? Add each one, then peer them.`;
+      head.appendChild(h);
+    }
+    el.appendChild(head);
+    const row = document.createElement('div');
+    row.className = 'nets-row';
+    row.id = 'netsRow';
+    row.innerHTML = '<svg class="nets-links" aria-hidden="true"></svg>';
     state.blocks.forEach((b, i) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chip';
-      btn.setAttribute('aria-pressed', String(i === state.active));
-      btn.title = `Show ${blockCidr(b)}${b.label ? ` (${b.label})` : ''} · ${CLOUDS[b.cloud].label}`;
-      btn.textContent = blockCidr(b);
-      if (b.label || b.cloud !== 'std') {
-        const sp = document.createElement('span');
-        sp.className = 'bl';
-        sp.textContent = ' · ' + [b.label, b.cloud !== 'std' ? CLOUDS[b.cloud].label : ''].filter(Boolean).join(' · ');
-        btn.appendChild(sp);
-      }
-      btn.addEventListener('click', () => { if (i !== state.active) selectBlock(i); });
-      el.appendChild(btn);
-      if (i === state.active && state.blocks.length > 1) {
+      const leaves = collectLeaves(b);
+      const by = { used: 0, reserved: 0 };
+      for (const r of leaves) { const s2 = getMeta(r.key).s; if (s2) by[s2] += size(r.mask); }
+      const tot = size(b.mask), peers = pairs.filter(([x, y]) => x === b || y === b).length;
+      const card = document.createElement('div');
+      card.className = 'net-card';
+      card.dataset.cidr = blockCidr(b);
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-pressed', String(i === state.active));
+      card.title = i === state.active ? `The table below shows ${blockCidr(b)}` : `Show ${blockCidr(b)} in the table`;
+      card.innerHTML =
+        `<div class="nc-top"><span class="nc-name${b.label ? '' : ' none'}">${esc(b.label || 'Unnamed')}</span>${blockCidr(b) === hubC ? '<span class="nc-hub">★ Hub</span>' : ''}</div>` +
+        `<div class="nc-cidr">${blockCidr(b)}</div>` +
+        `<div class="nc-sub">${esc(CLOUDS[b.cloud].label)} · ${fmt(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}${peers ? ` · ⇄ ${peers}` : ''}</div>` +
+        `<div class="nc-bar" title="In use ${Math.round((by.used / tot) * 100)}%, reserved ${Math.round((by.reserved / tot) * 100)}%"><i style="width:${(by.used / tot) * 100}%;background:var(--ok)"></i><i style="width:${(by.reserved / tot) * 100}%;background:var(--hl-border)"></i></div>`;
+      const pick = () => { if (i !== state.active) selectBlock(i); };
+      card.addEventListener('click', pick);
+      card.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); pick(); } });
+      if (i === state.active && many) {
         const x = document.createElement('button');
         x.type = 'button';
         x.className = 'chip-x';
-        x.textContent = '✕ Remove';
+        x.textContent = '✕';
         x.title = `Remove ${blockCidr(b)} from this plan`;
-        x.addEventListener('click', () => removeBlock(i));
-        el.appendChild(x);
+        x.setAttribute('aria-label', x.title);
+        x.addEventListener('click', (e) => { e.stopPropagation(); removeBlock(i); });
+        card.querySelector('.nc-top').appendChild(x);
       }
+      // Only on address-space-sized networks (regions or spokes drawn as subnets), not on small hubs.
+      if (i === state.active && b.root.c && b.mask <= 20) {
+        const sb = document.createElement('button');
+        sb.type = 'button';
+        sb.className = 'nc-act';
+        sb.textContent = `Make separate ${word === 'network' ? 'networks' : word + 's'}…`;
+        sb.title = `Turn this network’s subnets of one size into ${word}s of their own (for regions, spokes or sites drawn as subnets)`;
+        sb.addEventListener('click', (e) => { e.stopPropagation(); openSplitNets(); });
+        card.appendChild(sb);
+      }
+      row.appendChild(card);
     });
-    if (state.blocks.length > 1) {
-      const n = peerPairs().length;
-      const pb = document.createElement('button');
-      pb.type = 'button';
-      pb.className = 'peer-btn';
-      pb.id = 'peerBtn';
-      pb.textContent = `⇄ Peering${n ? ` (${n})` : ''}…`;
-      pb.title = 'Choose which base networks connect, for the Azure and AWS Terraform exports';
-      pb.addEventListener('click', openPeer);
-      el.appendChild(pb);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'net-add';
+    add.id = 'netAddBtn';
+    add.textContent = `+ Add ${word}`;
+    add.title = `Add another ${word} (address space) to this plan`;
+    add.addEventListener('click', openNetAdd);
+    row.appendChild(add);
+    el.appendChild(row);
+    drawPeerArcs();   // layout is ready now; the observer below redraws when the cards move
+    if (typeof ResizeObserver === 'function') {
+      if (arcObserver) arcObserver.disconnect();
+      arcObserver = new ResizeObserver(() => drawPeerArcs());
+      arcObserver.observe(row);
     }
   };
   const selectBlock = (i) => {
@@ -3289,6 +3458,154 @@
     $('peerDlg').close();
     update();
     toast(pairs.length ? `Saved ${pairs.length} peering${pairs.length === 1 ? '' : 's'}. The Terraform export includes them.` : 'Peering turned off', UNDO);
+  });
+
+  // =====================================================================
+  // Add a network; make separate networks out of one
+  // =====================================================================
+  const showDlg = (d) => { if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', ''); };
+  // Next free address space the size of the selected network, after the last one in the plan.
+  const suggestNet = () => {
+    const b = blk(), sz = size(b.mask);
+    let a = Math.max(...state.blocks.map((x) => lastAddr(x.network, x.mask) + 1));
+    for (let i = 0; i < 4096; i++) {
+      a = Math.ceil(a / sz) * sz;
+      if (a + sz - 1 > 0xffffffff) return '';
+      const c = blockClash(a, b.mask);
+      if (!c) return cidrStr(a, b.mask);
+      a = lastAddr(c.network, c.mask) + 1;
+    }
+    return '';
+  };
+  const openNetAdd = () => {
+    const word = netWord();
+    $('netTtl').textContent = `Add a ${word}`;
+    $('netCidr').value = suggestNet();
+    $('netName').value = '';
+    $('netPlat').value = blk().cloud;
+    clearMsg('netMsg');
+    showDlg($('netDlg'));
+    $('netName').focus();
+  };
+  $('netClose').addEventListener('click', () => $('netDlg').close());
+  $('netDlg').addEventListener('click', (e) => { if (e.target === $('netDlg')) $('netDlg').close(); });
+  $('netForm2').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const raw = $('netCidr').value.trim(), p = parseCidr(raw);
+    if (!p || !raw.includes('/')) { showMsg('netMsg', 'Enter the address space with its prefix length, like 10.1.0.0/16.', 'error'); return; }
+    const clash = blockClash(p.addr, p.mask);
+    if (clash) { showMsg('netMsg', `${p.cidr} overlaps ${blockName(clash)}. Networks in a plan can’t overlap.`, 'error'); return; }
+    checkpoint();
+    const nb = mkBlock(p.addr, p.mask, $('netPlat').value, $('netName').value.trim().slice(0, 40));
+    state.blocks.push(nb);
+    state.active = state.blocks.length - 1;
+    // Keep the peering layout: a new network joins the hub, or every network in a full mesh, on the same cloud.
+    let peered = '';
+    if (state.peers && PEER_CLOUDS.includes(nb.cloud)) {
+      const same = state.blocks.filter((b) => b !== nb && b.cloud === nb.cloud);
+      const hub = blockByCidr(state.po.h);
+      if (state.po.m === 'hub' && hub && hub.cloud === nb.cloud) { state.peers.push([state.po.h, p.cidr]); peered = ` and peered it with ${blockName(hub)}`; }
+      else if (state.po.m === 'mesh' && same.length) { for (const b of same) state.peers.push([blockCidr(b), p.cidr]); peered = ` and peered it with the other ${same.length}`; }
+    }
+    $('netDlg').close();
+    syncControls();
+    update();
+    toast(`Added ${p.cidr}${p.aligned ? '' : ` (from ${raw})`}${peered}`, UNDO);
+  });
+
+  let splitCands = [];
+  const openSplitNets = () => {
+    const b = blk(), word = netWord();
+    // Default size: the biggest subnets that have a name (often the regions or spokes), else halves.
+    let def = null;
+    const walk = (n, a, m) => {
+      if (m > b.mask && getMeta(cidrStr(a, m)).n && (def === null || m < def)) def = m;
+      if (n.c) { walk(n.c[0], a, m + 1); walk(n.c[1], a + size(m + 1), m + 1); }
+    };
+    walk(b.root, b.network, b.mask);
+    const deepest = Math.min(30, Math.max(...collectLeaves(b).map((r) => r.mask)));
+    const sel = $('splitSize');
+    sel.innerHTML = '';
+    for (let m = b.mask + 1; m <= deepest; m++) sel.add(new Option(`/${m}`, String(m)));
+    sel.value = String(def !== null && def <= deepest ? def : b.mask + 1);
+    $('splitTtl').textContent = `Make separate ${word === 'network' ? 'networks' : word + 's'}`;
+    $('splitSub').textContent = `For when ${blockName(b)} is an address space holding several ${word}s, such as regions or spokes drawn as subnets. Each ticked piece becomes a ${word} of its own, keeping its subnets, names and statuses, so it can be peered. Unticked pieces are dropped from the plan. Undo puts everything back.`;
+    clearMsg('splitMsg');
+    renderSplitList();
+    showDlg($('splitDlg'));
+  };
+  const renderSplitList = () => {
+    const b = blk(), n = Number($('splitSize').value), word = netWord();
+    const metaIn = (a, m) => Object.keys(state.meta).filter((k) => { const c = parseCidr(k); return c && c.mask >= m && inBlock(c.addr, a, m); });
+    splitCands = [];
+    const walk = (node, a, m) => {
+      if (m === n || !node.c) { splitCands.push({ node, a, m, name: getMeta(cidrStr(a, m)).n || '', st: getMeta(cidrStr(a, m)).s || '', keys: metaIn(a, m) }); return; }
+      walk(node.c[0], a, m + 1); walk(node.c[1], a + size(m + 1), m + 1);
+    };
+    walk(b.root, b.network, b.mask);
+    // Suggest a name for unnamed pieces: the word their subnet names share that no other piece uses
+    // ("uksouth" from uksouth-dmz-public, uksouth-AzureBastionSubnet, ...).
+    const words = (c) => c.keys.map((k) => getMeta(k).n).filter(Boolean).map((n) => new Set(n.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !/^\d+$/.test(w))));
+    const sets = splitCands.map(words);
+    splitCands.forEach((c, i) => {
+      if (c.name) return;
+      const count = new Map();
+      for (const ws of sets[i]) for (const w of ws) count.set(w, (count.get(w) || 0) + 1);
+      const own = [...count].filter(([w]) => !sets.some((ss, j) => j !== i && ss.some((ws) => ws.has(w))));
+      own.sort((x, y) => y[1] - x[1] || y[0].length - x[0].length);
+      if (own.length) c.guess = own[0][0];
+    });
+    const list = $('splitList');
+    list.innerHTML = '';
+    splitCands.forEach((c, i) => {
+      const row = document.createElement('label');
+      row.className = 'split-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!c.node.c || !!c.name;   // divided or named: a network; plain reserved / free space: not
+      const cidr = document.createElement('span');
+      cidr.className = 'mono';
+      cidr.textContent = cidrStr(c.a, c.m);
+      const name = document.createElement('input');
+      name.type = 'text'; name.maxLength = 40; name.spellcheck = false;
+      name.value = c.name || c.guess || '';
+      if (!c.name && c.guess) name.title = 'Suggested from its subnet names';
+      name.placeholder = `${word === 'network' ? 'Network' : word} ${i + 1}`;
+      name.setAttribute('aria-label', `Name for ${cidrStr(c.a, c.m)}`);
+      const what = document.createElement('span');
+      what.className = 'what';
+      const k = leafCount(c.node);
+      what.textContent = c.node.c ? `${k} subnets` : c.st === 'reserved' ? 'reserved, not divided' : c.st === 'used' ? 'in use, not divided' : 'free space';
+      row.append(cb, cidr, name, what);
+      c.cb = cb; c.nameIn = name;
+      list.appendChild(row);
+    });
+  };
+  $('splitSize').addEventListener('change', renderSplitList);
+  $('splitClose').addEventListener('click', () => $('splitDlg').close());
+  $('splitDlg').addEventListener('click', (e) => { if (e.target === $('splitDlg')) $('splitDlg').close(); });
+  $('splitApply').addEventListener('click', () => {
+    const b = blk(), bi = state.active, word = netWord();
+    const chosen = splitCands.filter((c) => c.cb.checked);
+    if (!chosen.length) { showMsg('splitMsg', 'Tick at least one piece to make into a network.', 'error'); return; }
+    checkpoint();
+    const made = chosen.map((c) => {
+      const x = mkBlock(c.a, c.m, b.cloud, (c.nameIn.value.trim() || c.nameIn.placeholder).slice(0, 40));
+      x.root = c.node;
+      // The piece's own name is now the network's name; on a divided piece it wasn't visible anywhere anyway.
+      const key = cidrStr(c.a, c.m);
+      if (c.node.c) delete state.meta[key];
+      return x;
+    });
+    for (const c of splitCands) if (!c.cb.checked) for (const k of c.keys) delete state.meta[k];
+    state.blocks.splice(bi, 1, ...made);
+    if (state.peers) state.peers = state.peers.filter((pr) => !pr.includes(blockCidr(b)));
+    if (state.po.h === blockCidr(b)) state.po.h = '';
+    state.active = bi;
+    $('splitDlg').close();
+    syncControls();
+    update();
+    toast(`Made ${made.length} ${word === 'network' ? 'network' : word}${made.length === 1 ? '' : 's'} from ${blockCidr(b)}. Connect them with ⇄ Peering.`, UNDO);
   });
 
   // =====================================================================
