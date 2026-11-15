@@ -553,6 +553,10 @@
   .tip-h:hover { filter: brightness(1.15); }
   .tip-h.alt { background: transparent; color: var(--text); }
   .tip-h.alt:hover { background: var(--row-hover); filter: none; }
+  /* Brand colors: Venmo blue, Ko-fi coral red */
+  .tip-h.venmo, footer.site a.tip-btn.venmo { background: #008cff; border-color: #008cff; color: #fff; }
+  .tip-h.kofi, footer.site a.tip-btn.kofi { background: #ff5e5b; border-color: #ff5e5b; color: #fff; }
+  .tip-h.venmo:hover, .tip-h.kofi:hover, footer.site a.tip-btn.venmo:hover, footer.site a.tip-btn.kofi:hover { filter: brightness(1.08); color: #fff; }
   @media (min-width: 641px) { header.top .brand { zoom: 1.3; } }
   .tip-foot { display: none; }
   @media (max-width: 640px) {
@@ -593,9 +597,9 @@
     </div>
     <div class="top-btns no-print">
       <nav class="tip-stack" aria-label="Tip the developer">
-        <a class="tip-h alt" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo @Crockerfeller</a>
+        <a class="tip-h venmo" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo @Crockerfeller</a>
         <a class="tip-h js-xmoney" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
-        <a class="tip-h alt" href="https://ko-fi.com/crockerfeller" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi">☕ Buy me a coffee</a>
+        <a class="tip-h kofi" href="https://ko-fi.com/crockerfeller" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi">☕ Buy me a coffee</a>
       </nav>
       <button class="icon" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -1038,8 +1042,8 @@
     <div class="tip tip-foot">
       <div class="tip-btns">
         <a class="tip-btn js-xmoney" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
-        <a class="tip-btn alt" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo @Crockerfeller</a>
-        <a class="tip-btn alt" href="https://ko-fi.com/crockerfeller" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi">☕ Buy me a coffee</a>
+        <a class="tip-btn alt venmo" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo @Crockerfeller</a>
+        <a class="tip-btn alt kofi" href="https://ko-fi.com/crockerfeller" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi">☕ Buy me a coffee</a>
       </div>
       <span class="tip-note">Free forever. If it saved you time please consider a tip:<br>in the X app, <b>Money → Send → @wangooroo</b></span>
     </div>
