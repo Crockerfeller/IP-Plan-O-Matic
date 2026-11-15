@@ -2974,8 +2974,9 @@
   });
   maskInput.addEventListener('input', () => maskInput.removeAttribute('aria-invalid'));
 
-  $('netForm').addEventListener('submit', (e) => {
-    e.preventDefault();
+  // Apply the typed base network. Runs on Update / Enter and when the address or mask field is left after an edit,
+  // so dividing straight after typing works on the new network. A toast with Undo confirms every change.
+  const applyBase = () => {
     clearMsg('msg');
     const n = aton(netInput.value);
     const m = Number(maskInput.value);
@@ -2994,20 +2995,25 @@
       netInput.value = ntoa(aligned);
       showMsg('msg', `${ntoa(n)} isn’t on a /${m} boundary, so it was adjusted to ${ntoa(aligned)}.`, 'info');
     }
+    const label = $('blockLabel').value.trim();
+    const same = m === state.mask && aligned === state.network;
+    if (same && label === (blk().label || '')) return;   // nothing changed (e.g. Update after leaving the field applied it)
     const clash = blockClash(aligned, m, state.active);
     if (clash) {
       showMsg('msg', `${cidrStr(aligned, m)} overlaps ${blockCidr(clash)}, which is already a base network in this plan.`, 'error');
       return;
     }
+    const hasWork = state.root.c || blockMetaKeys().length;
+    const reset = !same && m !== state.mask && hasWork;
+    if (reset && !confirm(`Changing the base network from /${state.mask} to /${m} will reset your splits, names and VLANs. Continue?`)) {
+      netInput.value = ntoa(state.network);
+      maskInput.value = state.mask;
+      return;
+    }
     checkpoint();
     const oldC = blockCidr(blk());
-    blk().label = $('blockLabel').value.trim();
-    if (m !== state.mask || aligned !== state.network) {
-      const hasWork = state.root.c || blockMetaKeys().length;
-      if (m !== state.mask && hasWork && !confirm(`Changing the base network from /${state.mask} to /${m} will reset your splits, names and VLANs. Continue?`)) {
-        maskInput.value = state.mask;
-        return;
-      }
+    blk().label = label;
+    if (!same) {
       if (m !== state.mask) { state.root = { c: null }; clearBlockMeta(); state.mask = m; }
       else {
         // Same size, new address: carry names and VLANs across to the matching subnets.
@@ -3023,7 +3029,11 @@
     state.network = aligned;
     renamePeers(oldC, blockCidr(blk()));
     update();
-  });
+    if (!same) toast(`Base network is now ${cidrStr(aligned, m)}${reset ? '; its subnets were reset' : hasWork ? '; names and VLANs moved with it' : ''}`, UNDO);
+  };
+  $('netForm').addEventListener('submit', (e) => { e.preventDefault(); applyBase(); });
+  netInput.addEventListener('change', applyBase);
+  maskInput.addEventListener('change', applyBase);
 
   $('blockLabel').addEventListener('change', () => {
     checkpoint();

@@ -771,6 +771,29 @@ T.reloadBtn = async () => {
   check('reload happened', reloaded);
   check('plan and unsaved edit survive reload', qa('#body tr').length === 2 && qa('#body tr')[0].querySelector('input').value === 'Kept', snap().rows);
 };
+T.baseOnLeave = async () => {
+  await load('../index.html#192.168.0.0/24');
+  divideRow(0);
+  type(qa('#body tr')[0].querySelector('input'), 'LAN');
+  // Typing a new address and leaving the field applies it: no Update click needed.
+  type('#network', '10.20.30.0'); await sleep(30);
+  check('leaving the field applies the address', snap().rows[0].startsWith('10.20.30.0/25') && snap().rows[0].includes('[LAN]'), snap().rows);
+  check('toast confirms with undo', $('toast').textContent.includes('Base network is now 10.20.30.0/24') && $('toast').textContent.includes('names and VLANs moved') && !!q('#toast button'), $('toast').textContent);
+  // Update right after does nothing more (no second undo step).
+  $('netForm').requestSubmit(); await sleep(30);
+  click('#undoBtn'); await sleep(30);
+  check('one undo restores the old address', snap().rows[0].startsWith('192.168.0.0/25') && $('network').value === '192.168.0.0', [snap().rows[0], $('network').value]);
+  // A half-typed address changes nothing and says why.
+  type('#network', '10.20.'); await sleep(30);
+  check('invalid address on leave: error, no change', $('msg').textContent.includes('isn’t a valid IPv4 address') && snap().rows[0].startsWith('192.168.0.0/25'), $('msg').textContent);
+  // New mask with subnets: still asks; cancelling puts the fields back.
+  confirmAnswer = false;
+  $('network').value = '192.168.0.0'; type('#mask', '23'); await sleep(30);
+  check('mask change asks, cancel keeps plan', dialogs.some((d) => d.includes('reset your splits')) && $('mask').value === '24' && snap().rows.length === 2, [$('mask').value, snap().rows.length]);
+  confirmAnswer = true;
+  type('#mask', '23'); await sleep(30);
+  check('mask change accepted: toast says reset', snap().rows.length === 1 && snap().rows[0].startsWith('192.168.0.0/23') && $('toast').textContent.includes('its subnets were reset'), $('toast').textContent);
+};
 T.awsHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azCloud', 'aws'); select('#azLayout', 'hub');
