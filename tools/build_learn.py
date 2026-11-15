@@ -15,6 +15,7 @@ import html
 import ipaddress
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LEARN = ROOT / 'learn'
@@ -417,31 +418,137 @@ page('aws-vpc-subnet-sizing', 'AWS VPC subnet sizing: reserved IPs, CIDR limits 
         ('What is the smallest AWS subnet?', 'A /28, which has 16 addresses and 11 usable after AWS reserves 5. The largest is a /16.'),
      ])
 
-page('azure-vnet-subnet-sizing', 'Azure VNet subnet sizing: reserved IPs, minimum size and special subnets',
-     'How to size Azure virtual network subnets: the 5 addresses Azure reserves, the /29 minimum, usable addresses per size, and the sizes for GatewaySubnet, Azure Bastion and Azure Firewall.',
-     f'''    <p class="lede">Azure reserves 5 addresses in every subnet, and some Azure services need dedicated subnets of a minimum size.</p>
+# ---------------------------------------------------------------- Azure
+# The service subnet catalog is read from the app (AZURE_SVCS in index.html), so the guide and the
+# Azure / AWS subnet wizard always agree on names, delegations and sizes.
+def azure_services():
+    src = (ROOT / 'index.html').read_text()
+    block = src[src.index('const AZURE_SVCS = ['):]
+    block = block[:block.index('\n  ];')]
+    out = []
+    for line in re.findall(r'^\s*\{ id: .*\},?\s*$', block, re.M):
+        d = {}
+        for k, v in re.findall(r"(\w+): ('(?:[^'\\]|\\.)*'|true|false|\d+)", line):
+            d[k] = v[1:-1] if v.startswith("'") else (v == 'true' if v in ('true', 'false') else int(v))
+        out.append(d)
+    assert len(out) > 10 and all('min' in d and 'rec' in d for d in out), 'AZURE_SVCS not parsed'
+    return out
+
+
+AZ_SVCS = azure_services()
+AZ_LEARN = 'https://learn.microsoft.com/azure/'
+
+
+def az_rows(svcs):
+    r = []
+    for d in svcs:
+        if not d.get('doc'):
+            continue   # plain workload tiers: no Azure requirement to show
+        label = f'<a href="{AZ_LEARN}{esc(d["doc"])}">{esc(d["label"])}</a>'
+        name = f'<code>{esc(d["name"])}</code>' if d.get('fixed') else 'Any'
+        deleg = f'<code>{esc(d["deleg"])}</code>' if d.get('deleg') else '—'
+        mn = f'/{d["min"]}' + (' (advice)' if d.get('soft') else '')
+        r.append([label, name, deleg, mn, f'/{d["rec"]}', fmt(usable(d['rec'], 'azure'))])
+    return r
+
+
+def az_table(svcs):
+    return table(['Service', 'Subnet name', 'Delegation', 'Minimum', 'Recommended', 'Usable at rec.'],
+                 az_rows(svcs), num_cols=(5,))
+
+
+# The template's default layout: each VNet's default-on services at the recommended size, largest first.
+def az_layout(vnet, role):
+    net = ipaddress.IPv4Network(vnet)
+    svcs = sorted((d for d in AZ_SVCS if d['role'] == role and d['on']), key=lambda d: d['rec'])
+    nxt, rows = int(net.network_address), []
+    for d in svcs:
+        sz = 2 ** (32 - d['rec'])
+        nxt = (nxt + sz - 1) // sz * sz
+        sub = ipaddress.IPv4Network((nxt, d['rec']))
+        assert sub.subnet_of(net)
+        rows.append([f'<code>{esc(d["name"])}</code>', esc(d['label']), str(sub), fmt(usable(d['rec'], 'azure'))])
+        nxt += sz
+    return rows, (nxt - int(net.network_address)) * 100 // net.num_addresses
+
+
+hub_rows, hub_pct = az_layout('10.0.0.0/23', 'hub')
+spoke_rows, spoke_pct = az_layout('10.0.16.0/20', 'spoke')
+# Captured from the app: Azure / AWS subnet wizard… with its defaults, applied (the same layout as az_layout).
+AZ_HUB_PLAN = '10.0.0.0/23/13.7610/~pZRNb9swDIb_isDTBqjxRwMn1W1Dl-2yoGiA9lD0IFtMKsSRDEm2txX574M_BMdJm6wYciEd8XlfioReIQMG_E9pECjkwOBHmQKFHbBXiMJJ-wvipEkVMPjSnFxIgzXP81WZKnRAQQCDdQ0ULDAoLQqgoIHBLQqZcYeCOE3aUuJrYU89P5keC3zl1kmtRvy0-_ZPIn39gUYUz4N45kW-c4c1_z3iby75f7hbkoB8-1UYtPZelw7JpuMc6iRhEM-9jlXoroSyV1L1KkJZeamH2-WK3BlZcYfkHq3OKzREqlSXSpBPAnPc-KM_ZWa01Ws3WaKrtdkGQllfYz8fGpslbxnTpRucdcmHrenS_Y-3KGk2bDqyxouinUdjzMdnx14UeZNJrUg_XFLFg8TsVKLAnt8G5-C-YVSi0FI5O3Dnp9wa0x7cRUfkR222ueaCkRpT4iSagXbz5kUM13COxotiTIvDU5rgjvtxd-G7vOb_I2A0egm8PVtlg8MuuTApskJTyQxJQBalypqhWfKwREekcrgx3RjfW6ZHTAOLpkKz4GbX7NGeQgrs6elwnUKgEN1M1tPkugn9A7cq9BZJ3XcJz88UiqG0vbFroGNQe0g3be-AwUv7PL4AOypZA4sobICFFBwwcO3OGmDRfv8X'
+
+
+def az_fit(n):
+    return next(p for p in range(29, 1, -1) if usable(p, 'azure') >= n)
+
+
+# AKS: with Azure CNI on the node subnet each node takes 1 address plus one per pod it can run;
+# with Azure CNI Overlay only the node takes a VNet address.
+AKS_NODES, AKS_SURGE, AKS_PODS = 50, 1, 30
+aks_ovl = AKS_NODES + AKS_SURGE
+aks_cni = (AKS_NODES + AKS_SURGE) * (AKS_PODS + 1)
+aks_ovl_p, aks_cni_p = az_fit(aks_ovl), az_fit(aks_cni)
+aks_rows = [
+    ['Azure CNI Overlay', f'{AKS_NODES} + {AKS_SURGE} = {fmt(aks_ovl)}', f'/{aks_ovl_p}', fmt(usable(aks_ovl_p, 'azure'))],
+    ['Azure CNI (node subnet)', f'({AKS_NODES} + {AKS_SURGE}) × ({AKS_PODS} + 1) = {fmt(aks_cni)}', f'/{aks_cni_p}', fmt(usable(aks_cni_p, 'azure'))],
+]
+
+page('azure-vnet-subnet-sizing', 'Azure VNet subnet sizing: reserved IPs, service subnets and hub-and-spoke layout',
+     'How to size Azure VNet subnets: the 5 reserved addresses, the /29 minimum, usable addresses per size, names and sizes for GatewaySubnet, Bastion, Firewall and delegated subnets, AKS sizing and a hub-and-spoke example.',
+     f'''    <p class="lede">Azure reserves 5 addresses in every subnet, many services need a subnet of their own with a fixed name or minimum size, and a subnet is hard to resize once it’s in use. Here is how to size them before you build.</p>
+    <div class="note"><b>Quick answers:</b> a /24 has 251 usable addresses in Azure. The smallest subnet is a /29, with 3 usable. <code>GatewaySubnet</code> should be a /27, <code>AzureBastionSubnet</code> and <code>AzureFirewallSubnet</code> a /26, and Application Gateway v2 a /24. <a href="../?wizard=azure">Open the subnet wizard</a> to create them.</div>
     <h2>The 5 reserved addresses</h2>
-    <p>In <code>10.1.0.0/24</code>, Azure keeps <code>10.1.0.0</code> (network), <code>10.1.0.1</code> (default gateway), <code>10.1.0.2</code> and <code>10.1.0.3</code> (Azure DNS) and <code>10.1.0.255</code> (broadcast).</p>
-    <h2>Sizes</h2>
-    <p>The smallest IPv4 subnet is a <b>/29</b>, which leaves just 3 usable addresses.</p>
-    {sizes_table('azure', [16, 20, 22, 23, 24, 25, 26, 27, 28, 29])}
+    <p>In a subnet such as <code>10.1.0.0/24</code>, Azure keeps:</p>
+    <ul>
+      <li><code>10.1.0.0</code>: the network address</li>
+      <li><code>10.1.0.1</code>: the default gateway</li>
+      <li><code>10.1.0.2</code> and <code>10.1.0.3</code>: map Azure DNS into the VNet</li>
+      <li><code>10.1.0.255</code>: the broadcast address (Azure has no broadcast, but reserves it)</li>
+    </ul>
+    <p>The first address you can give a VM is <code>.4</code>. The same 5 are reserved at every size, so small subnets lose the most: a /29 keeps only 3 of its 8.</p>
+    <h2>Size limits</h2>
+    <p>An IPv4 subnet can be anything from a <b>/29</b> up to a /2. IPv6 subnets in a dual-stack VNet must be exactly a <b>/64</b>. A VNet can have several address spaces, and you can add more later, even while it’s peered.</p>
+    {sizes_table('azure', [16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29])}
+    <h3>Ranges you can’t use</h3>
+    <p>Any <a href="private-ip-address-ranges.html">private range</a> works for a VNet, but Azure refuses <code>224.0.0.0/4</code> (multicast), <code>255.255.255.255/32</code> (broadcast), <code>127.0.0.0/8</code> (loopback), <code>169.254.0.0/16</code> (link-local) and <code>168.63.129.16/32</code> (the Azure platform’s virtual IP).</p>
     <h2>Subnets Azure services need</h2>
-    {table(['Subnet name', 'Used by', 'Size'], [
-        ['<code>GatewaySubnet</code>', 'VPN and ExpressRoute gateways', '/27 or larger recommended'],
-        ['<code>AzureBastionSubnet</code>', 'Azure Bastion', '/26 or larger'],
-        ['<code>AzureFirewallSubnet</code>', 'Azure Firewall', '/26'],
-    ])}
-    <p>These subnets must use exactly these names. Plan them into the VNet before filling it with workload subnets.</p>
+    <p>Some services need a subnet with an exact name. Others need a subnet <b>delegated</b> to them, which other resources can’t share. Plan these before you fill the VNet with workloads. Each service links to its Microsoft Learn page.</p>
+    {try_box('<b>Create these subnets in the planner.</b> The subnet wizard lists every service below: tick the ones you need, and each gets its own subnet with the required name or delegation, at the recommended size and never below the minimum. You get one VNet with all of them, or switch to hub and spoke to put shared services in a hub, then export it to Terraform.', '../?wizard=azure', 'Open the subnet wizard →')}
+    <h3>Required names, usually in the hub</h3>
+    {az_table(d for d in AZ_SVCS if d.get('fixed'))}
+    <p>Azure won’t deploy these services into a subnet with any other name. A network security group on <code>GatewaySubnet</code> isn’t supported.</p>
+    <h3>Dedicated and delegated subnets</h3>
+    {az_table(d for d in AZ_SVCS if not d.get('fixed'))}
+    <p>“Advice” means Azure doesn’t enforce that minimum, but a smaller subnet limits scaling. Private endpoints don’t need a subnet of their own; a dedicated one just keeps network security groups and routes simple.</p>
+    <h2>A hub-and-spoke example</h2>
+    <p>Most Azure landing zones put shared network services in a hub VNet and workloads in spoke VNets peered to it. This is the planner’s default template in <code>10.0.0.0/16</code>, at the recommended sizes, largest first. The hub is <code>10.0.0.0/23</code>:</p>
+    {table(['Subnet name', 'For', 'Subnet', 'Usable'], hub_rows, num_cols=(3,), mono_cols=(2,))}
+    <p>That fills {hub_pct}% of the hub. The spoke is <code>10.0.16.0/20</code>:</p>
+    {table(['Subnet name', 'For', 'Subnet', 'Usable'], spoke_rows, num_cols=(3,), mono_cols=(2,))}
+    <p>That fills {spoke_pct}% of the spoke, leaving room for AKS, a database or more tiers. Further spokes take the next /20s (<code>10.0.32.0/20</code>, <code>10.0.48.0/20</code> …), so one /16 holds the hub and 15 spokes.</p>
+    {try_box('Open this hub and spoke in the planner. Subnets keep their names and delegations, and the Terraform export writes the VNets, subnets and peerings for azurerm. To pick other services or add spokes, <a href="../?wizard=azure">open the subnet wizard</a> and set Layout to Hub and spokes (the <b>Azure / AWS subnet wizard…</b> button on the Plan IPv4 tab).', app(AZ_HUB_PLAN))}
+    <h2>Sizing an AKS subnet</h2>
+    <p>How many VNet addresses AKS uses depends on its network plugin. Count the most nodes the cluster can scale to, plus the extra nodes an upgrade adds (surge, 1 by default):</p>
+    <ul>
+      <li><b>Azure CNI Overlay</b> (the default for new clusters): only nodes take VNet addresses. Pods get theirs from a separate range, <code>10.244.0.0/16</code> by default.</li>
+      <li><b>Azure CNI on the node subnet</b> (the traditional plugin): each node also reserves one address for every pod it can run, so it takes max pods + 1. Max pods defaults to 30.</li>
+    </ul>
+    <p>For {AKS_NODES} nodes:</p>
+    {table(['Plugin', 'Addresses needed', 'Smallest subnet', 'Usable'], aks_rows, num_cols=(3,), mono_cols=(2,))}
+    <p>Either way, the pod range and the Kubernetes service range (<code>10.0.0.0/16</code> by default) must not overlap the VNet or anything connected to it. If your VNets use <code>10.0.0.0/16</code>, pick another service range when you create the cluster.</p>
     <h2>Tips</h2>
     <ul>
-      <li><b>AKS with traditional Azure CNI gives every pod a VNet address</b>, so those subnets get large quickly. Overlay networking avoids that.</li>
-      <li><b>Peered VNets and on-premises networks can’t overlap.</b> Carve every VNet from one master plan.</li>
-      <li>Subnets can be resized only while empty, so leave growth room.</li>
+      <li><b>Leave room to grow.</b> Changing a subnet’s range generally means emptying it first, so keep free space in each VNet rather than handing it all out.</li>
+      <li><b>Connected networks can’t overlap.</b> Peering, VPN and ExpressRoute all need unique ranges, so carve every VNet from one master plan. The planner’s Check &amp; summarize tab tests a plan against your existing networks.</li>
+      <li><b>Give each region or environment its own block</b>, such as a /16. Routes stay easy to summarize, and each hub and its spokes have a clean boundary.</li>
+      <li><b>Count IP addresses, not VMs.</b> Load balancers, private endpoints, scale sets and App Service instances use addresses too. See <a href="how-many-hosts-in-a-subnet.html">how many hosts are in a subnet</a>.</li>
     </ul>
-    {try_box('The planner applies Azure’s 5 reserved addresses and /29 minimum to every subnet, and exports Terraform for azurerm.', app(cloud_plan('10.1.0.0/16', 'azure')))}
 ''', h1='Azure VNet subnet sizing', faq=[
-        ('How many IP addresses does Azure reserve per subnet?', 'Five: the network address, the default gateway (.1), two addresses for Azure DNS (.2 and .3) and the broadcast address.'),
-        ('What is the smallest subnet in Azure?', 'A /29, with 8 addresses and 3 usable after Azure reserves 5.'),
+        ('How many IP addresses does Azure reserve per subnet?', 'Five: the network address, the default gateway (.1), two addresses that map Azure DNS (.2 and .3) and the broadcast address. A /24 has 251 usable addresses.'),
+        ('What is the smallest subnet in Azure?', 'A /29, with 8 addresses and 3 usable after Azure reserves 5. The largest is a /2, and IPv6 subnets must be exactly /64.'),
+        ('What size should GatewaySubnet be?', 'A /27 or larger. Use a /26 for 16 ExpressRoute circuits or for VPN and ExpressRoute gateways side by side. The smallest allowed is a /29.'),
+        ('What size should AzureBastionSubnet and AzureFirewallSubnet be?', 'Both need a /26 or larger, with exactly those names. Azure Firewall with forced tunneling or the Basic SKU also needs a /26 AzureFirewallManagementSubnet.'),
+        ('How big should an AKS subnet be?', f'With Azure CNI Overlay, one address per node plus upgrade surge: {AKS_NODES} nodes fit in a /{aks_ovl_p}. With traditional Azure CNI each node also reserves an address per pod: {AKS_NODES} nodes with 30 max pods need {fmt(aks_cni)} addresses, a /{aks_cni_p}.'),
      ])
 
 page('google-cloud-vpc-subnet-sizing', 'Google Cloud VPC subnet sizing: reserved IPs, regional subnets and expansion',

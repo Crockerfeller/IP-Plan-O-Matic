@@ -316,6 +316,11 @@
   }
   dialog#azDlg::backdrop { background: rgba(10, 14, 22, .45); }
   #azDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  /* Apply stays in reach: the footer sticks to the dialog's bottom edge while the services and preview scroll. */
+  #azDlg .az-foot { position: sticky; bottom: -16px; z-index: 1; align-items: center; margin: 12px -16px -16px; padding: 12px 16px;
+    background: var(--panel); border-top: 1px solid var(--border); }
+  .az-sum { margin-right: auto; color: var(--muted); font-size: 13px; }
+  .az-sum.err { color: var(--danger); font-weight: 600; }
   .az-vnet { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
   .az-vnet-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin-bottom: 8px; }
   .az-vnet-head h3 { margin: 0 auto 8px 0; font-size: 15px; }
@@ -331,6 +336,10 @@
   .filebtn { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 14px; background: var(--panel); }
   .filebtn input { display: none; }
   button.small { height: 28px; padding: 0 10px; font-size: 13px; }
+  /* The cloud subnet wizard: tinted so it reads as an action, not another field beside the Platform menu. */
+  button.wiz { display: inline-flex; align-items: center; gap: 7px; background: var(--accent-weak); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button.wiz:hover { background: var(--accent); color: var(--accent-text); }
+  button.wiz svg { width: 16px; height: 16px; flex: none; }
   button:disabled { opacity: .4; cursor: not-allowed; }
 
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
@@ -351,6 +360,12 @@
   .nets-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
   .nets-head .lbl { margin-right: auto; }
   .nets-head .hint { color: var(--muted); font-size: 12px; width: 100%; margin-top: -4px; }
+  .nets-head .nudge { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; color: var(--muted); }
+  .nets-head .nudge .chip-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0 4px; height: 20px; border-radius: 6px; line-height: 1; }
+  .nets-head .nudge .chip-x:hover { color: var(--text); background: var(--row-hover); }
+  button.linkish { height: auto; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+  button.linkish:hover { background: none; }
+  .net-tip { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
   .nets-row { position: relative; display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: stretch; }
   .nets-row.linked { padding-bottom: var(--arc, 0px); }
   .net-card {
@@ -358,7 +373,21 @@
     background: var(--panel); cursor: pointer; display: grid; gap: 2px; font-size: 13px; text-align: left; color: var(--text);
   }
   .net-card:hover { border-color: var(--accent); }
-  .net-card[aria-pressed="true"] { border: 2px solid var(--accent); padding: 7px 9px 8px; background: var(--accent-weak); }
+  .net-card[aria-current="true"] { border: 2px solid var(--accent); padding: 7px 9px 8px; background: var(--accent-weak); }
+  /* The selected card is the editor for its network, and points down at the bar that names it above the tools and table. */
+  .net-card.editing { width: min(100%, 520px); cursor: default; gap: 6px; }
+  .net-card.editing::after { content: ''; position: absolute; left: 28px; bottom: -11px; border: 9px solid transparent; border-bottom: 0; border-top-color: var(--accent); }
+  .net-edit { display: contents; }
+  .net-card .net-edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; font-size: 14px; }
+  .net-card .net-edit .field.grow { flex: 1 1 210px; }
+  .net-card .net-edit #blockLabel { width: 150px !important; }
+  .net-card .net-edit > button[type=submit] { order: 1; margin-left: auto; }
+  @media (max-width: 640px) { .net-card.editing::after { display: none; } }   /* cards stack: the pointer would land on the next card */
+  .net-ctx { margin-top: 2px; padding: 8px 12px; border-left: 4px solid var(--accent); border-radius: 6px; background: var(--accent-weak); font-size: 13px; color: var(--muted); }
+  .net-ctx b { color: var(--text); }
+  .net-ctx .mono { color: var(--text); }
+  .net-row-acts { display: contents; }
+  .net-row-acts:empty { display: none; }
   .net-card .nc-top { display: flex; align-items: center; gap: 6px; min-height: 20px; }
   .net-card .nc-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   .net-card .nc-name.none { color: var(--muted); font-weight: 400; font-style: italic; }
@@ -773,7 +802,14 @@
         </select>
       </div>
       <div class="field">
-        <label for="azSpace">Address space for the hub and spokes</label>
+        <label for="azLayout">Layout</label>
+        <select id="azLayout">
+          <option value="single">Single VNet</option>
+          <option value="hub">Hub and spokes</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="azSpace" id="azSpaceL">Address space for the hub and spokes</label>
         <input type="text" id="azSpace" spellcheck="false" value="10.0.0.0/16" style="width:170px" title="The hub and spokes are placed inside this range, hub first, each on its own boundary">
       </div>
       <div class="field grow" id="azZonesF" hidden>
@@ -784,7 +820,8 @@
     </div>
     <div id="azVnets"></div>
     <div id="azOut" aria-live="polite"></div>
-    <div class="row dlg-foot">
+    <div class="row dlg-foot az-foot">
+      <span class="az-sum" id="azSum"></span>
       <button type="button" class="primary" id="azApply">Apply to plan</button>
     </div>
   </dialog>
@@ -841,14 +878,6 @@
     <p class="sub" id="netSub">Each network is one address space: an Azure VNet, AWS VPC, Google Cloud VPC, OCI VCN or on-prem site. Networks in a plan can’t overlap; peer them with the Peering button.</p>
     <form class="row" id="netForm2" autocomplete="off">
       <div class="field">
-        <label for="netCidr">Address space</label>
-        <input type="text" id="netCidr" spellcheck="false" style="width:180px" placeholder="10.1.0.0/16">
-      </div>
-      <div class="field grow">
-        <label for="netName">Name</label>
-        <input type="text" id="netName" spellcheck="false" maxlength="40" placeholder="e.g. Spoke prod">
-      </div>
-      <div class="field">
         <label for="netPlat">Platform</label>
         <select id="netPlat">
           <option value="std">Standard (on-prem)</option>
@@ -858,8 +887,17 @@
           <option value="oci">Oracle Cloud (OCI) VCN</option>
         </select>
       </div>
+      <div class="field">
+        <label for="netCidr">Address space</label>
+        <input type="text" id="netCidr" spellcheck="false" style="width:180px" placeholder="10.1.0.0/16">
+      </div>
+      <div class="field grow">
+        <label for="netName">Name</label>
+        <input type="text" id="netName" spellcheck="false" maxlength="40" placeholder="e.g. Spoke prod">
+      </div>
       <button type="submit" class="primary">Add</button>
     </form>
+    <p class="net-tip" id="netTip">Cloud networks: pick Azure VNet, AWS VPC… above, or <button type="button" class="linkish" id="netWizLink">use the subnet wizard</button> to start from the services you need.</p>
     <div class="msg" id="netMsg" role="status"></div>
   </dialog>
 
@@ -916,23 +954,27 @@
   <section id="tab-plan" role="tabpanel" aria-labelledby="tb-plan">
     <div class="card controls no-print">
       <div class="nets" id="blocks"></div>
+      <div class="net-ctx" id="netCtx" hidden></div>
       <form class="row" id="netForm" autocomplete="off">
+        <span id="netEditHome" hidden></span>
+        <!-- One network's settings. On-prem with a single network: inline in this row. Otherwise: inside the selected card. -->
+        <div class="net-edit" id="netEdit">
         <div class="field grow">
-          <label for="network">Network address space</label>
+          <label for="network" id="networkL">Network address space</label>
           <div class="cidr">
-            <input type="text" id="network" value="192.168.0.0" spellcheck="false" inputmode="decimal" placeholder="10.0.0.0">
+            <input type="text" id="network" form="netForm" value="192.168.0.0" spellcheck="false" inputmode="decimal" placeholder="10.0.0.0">
             <span class="slash">/</span>
-            <input type="number" id="mask" value="24" min="0" max="32">
+            <input type="number" id="mask" form="netForm" value="24" min="0" max="32">
           </div>
         </div>
         <div class="field">
-          <label for="blockLabel">Network name</label>
-          <input type="text" id="blockLabel" spellcheck="false" placeholder="e.g. HQ" maxlength="40" style="width:130px">
+          <label for="blockLabel" id="blockLabelL">Network name</label>
+          <input type="text" id="blockLabel" form="netForm" spellcheck="false" placeholder="e.g. HQ" maxlength="40" style="width:130px">
         </div>
-        <button type="submit" class="primary">Update</button>
+        <button type="submit" form="netForm" class="primary">Update</button>
         <div class="field">
           <label for="platform">Platform</label>
-          <select id="platform" title="Changes which addresses are reserved in each subnet">
+          <select id="platform" form="netForm" title="Changes which addresses are reserved in each subnet">
             <option value="std">Standard (on-prem)</option>
             <option value="aws">AWS VPC</option>
             <option value="azure">Azure VNet</option>
@@ -940,7 +982,9 @@
             <option value="oci">Oracle Cloud (OCI) VCN</option>
           </select>
         </div>
-        <button type="button" id="tplBtn" title="Start from an Azure or AWS hub and spokes with service subnets. Applying it replaces the current IPv4 plan.">Hub-and-spoke template…</button>
+        </div>
+        <span class="net-row-acts" id="netRowActs"></span>
+        <button type="button" id="tplBtn" class="wiz" title="Pick the Azure or AWS services you need (gateway, firewall, Bastion, delegated subnets…) and get a VNet or VPC, or a hub and spokes, with a correctly named, correctly sized subnet for each. Applying it replaces the current IPv4 plan."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.6 3.4 3.4 1.6-3.4 1.6L8 11.5 6.4 8.1 3 6.5l3.4-1.6z" fill="currentColor"/><path d="M13 10.5l.7 1.3 1.3.7-1.3.7-.7 1.3-.7-1.3-1.3-.7 1.3-.7z" fill="currentColor"/></svg>Azure / AWS subnet wizard…</button>
         <div class="field" id="gwField">
           <label for="gwPos">Gateway</label>
           <select id="gwPos">
@@ -1229,7 +1273,7 @@
         <li><a href="learn/vlsm-subnetting.html"><b>VLSM subnetting, explained with an example</b><span>Variable Length Subnet Masking (VLSM) explained step by step: size each subnet from its host count, place them largest first, and see a worked example that packs seven networks into a /22.</span></a></li>
         <li><a href="learn/private-ip-address-ranges.html"><b>Private IP address ranges and special-purpose blocks</b><span>The private IPv4 ranges from RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), CGNAT, link-local, loopback, documentation and multicast blocks, and the IPv6 equivalents, with tips on which to avoid.</span></a></li>
         <li><a href="learn/aws-vpc-subnet-sizing.html"><b>AWS VPC subnet sizing</b><span>How to size AWS VPC subnets: the 5 addresses AWS reserves in every subnet, the /16 to /28 limits, usable addresses per size, and a three-AZ public/private/database layout.</span></a></li>
-        <li><a href="learn/azure-vnet-subnet-sizing.html"><b>Azure VNet subnet sizing</b><span>How to size Azure virtual network subnets: the 5 addresses Azure reserves, the /29 minimum, usable addresses per size, and the sizes for GatewaySubnet, Azure Bastion and Azure Firewall.</span></a></li>
+        <li><a href="learn/azure-vnet-subnet-sizing.html"><b>Azure VNet subnet sizing</b><span>How to size Azure VNet subnets: the 5 reserved addresses, the /29 minimum, usable addresses per size, names and sizes for GatewaySubnet, Bastion, Firewall and delegated subnets, AKS sizing and a hub-and-spoke example.</span></a></li>
         <li><a href="learn/google-cloud-vpc-subnet-sizing.html"><b>Google Cloud VPC subnet sizing</b><span>How to size Google Cloud VPC subnets: the 4 addresses Google reserves, the /29 minimum, auto mode versus custom mode, expanding a subnet, and secondary ranges for GKE.</span></a></li>
         <li><a href="learn/oracle-cloud-vcn-subnet-sizing.html"><b>Oracle Cloud (OCI) VCN subnet sizing</b><span>How to size Oracle Cloud Infrastructure VCN subnets: the 3 addresses OCI reserves, the /16 to /30 VCN limits, usable addresses per size, and regional versus AD-specific subnets.</span></a></li>
         <li><a href="learn/ipv6-subnetting.html"><b>IPv6 subnetting: /48, /56, /64 and nibbles</b><span>A practical guide to IPv6 subnetting: what /48, /56 and /64 are for, why you split on nibble (4-bit) boundaries, point-to-point /127s, ip6.arpa reverse DNS, and unique local addresses.</span></a></li>
@@ -1488,9 +1532,13 @@
   // One template per cloud: the dialog, placement and checks are shared.
   const TEMPLATES = {
     azure: { cloud: 'azure', net: 'VNet', svcs: AZURE_SVCS, docBase: LEARN, maxNet: 8, title: 'Azure hub-and-spoke with service subnets',
-      sub: 'Pick the Azure services you need. Each one gets a subnet of its own, named and sized for it: the hub VNet holds the shared services (gateway, firewall, Bastion, DNS), and each spoke VNet holds workloads. Sizes start at Microsoft’s recommendation; the menus never go below the minimum. Applying replaces the IPv4 plan, and Undo brings it back.' },
+      sub: 'Pick the Azure services you need. Each one gets a subnet of its own, named and sized for it: the hub VNet holds the shared services (gateway, firewall, Bastion, DNS), and each spoke VNet holds workloads. Sizes start at Microsoft’s recommendation; the menus never go below the minimum. Applying replaces the IPv4 plan, and Undo brings it back.',
+      singleTitle: 'Azure VNet with service subnets',
+      singleSub: 'Pick the Azure services you need. Each one gets a subnet of its own in this VNet, with the name or delegation Azure requires and a size from Microsoft’s recommendation; the menus never go below the minimum. Need shared services in a hub instead? Convert to hub and spoke, and your choices carry over. Applying replaces the IPv4 plan, and Undo brings it back.' },
     aws: { cloud: 'aws', net: 'VPC', svcs: AWS_SVCS, docBase: 'https://docs.aws.amazon.com/', maxNet: 16, zones: true, title: 'AWS hub-and-spoke with service subnets',
-      sub: 'Pick the AWS services you need. Each gets a subnet of its own in every Availability Zone: the hub VPC holds the shared network (Transit Gateway attachments, Network Firewall, central NAT), and each spoke VPC holds workloads, all joined by a Transit Gateway. VPCs can be /16 at most. Applying replaces the IPv4 plan, and Undo brings it back.' },
+      sub: 'Pick the AWS services you need. Each gets a subnet of its own in every Availability Zone: the hub VPC holds the shared network (Transit Gateway attachments, Network Firewall, central NAT), and each spoke VPC holds workloads, all joined by a Transit Gateway. VPCs can be /16 at most. Applying replaces the IPv4 plan, and Undo brings it back.',
+      singleTitle: 'AWS VPC with service subnets',
+      singleSub: 'Pick the AWS services you need. Each gets a subnet of its own in every Availability Zone of this VPC, sized from AWS guidance. A VPC can be /16 at most. Need a shared network hub instead? Convert to hub and spoke, and your choices carry over. Applying replaces the IPv4 plan, and Undo brings it back.' },
   };
   const dict = (pairs) => Object.assign(Object.create(null), Object.fromEntries(pairs));  // no prototype: "constructor" isn't a key
   const SVCS = [...AZURE_SVCS, ...AWS_SVCS];
@@ -2242,11 +2290,49 @@
     svg.innerHTML = paths;
   };
   let arcObserver = null;
+  const NUDGE_KEY = 'subnetPlanner.cloudNudgeOff';
+  let nudgeHidden = false;
+  const nudgeOff = () => { if (nudgeHidden) return true; try { return localStorage.getItem(NUDGE_KEY) === '1'; } catch (e) { return false; } };
   const renderBlocks = () => {
     const el = $('blocks');
     const word = netWord(), pairs = peerPairs(), hubC = state.peers && state.po.m === 'hub' && pairs.length ? state.po.h : '';
     const many = state.blocks.length > 1;
+    // Cards only for cloud networks or several networks. A single on-prem network is the plain calculator:
+    // its address space, name and platform stay inline in the row below.
+    const cards = many || blk().cloud !== 'std';
+    const ed = $('netEdit');
+    let foc = ed.contains(document.activeElement) ? document.activeElement : null;
+    $('networkL').textContent = cards ? 'Address space' : 'Network address space';
+    $('blockLabelL').textContent = cards ? 'Name' : 'Network name';
+    const acts = $('netRowActs');
+    acts.innerHTML = '';
     el.innerHTML = '';
+    el.hidden = !cards;
+    const ctx = $('netCtx');
+    ctx.hidden = !cards;
+    if (!cards) {
+      $('netEditHome').after(ed);
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.id = 'netAddBtn';
+      add.textContent = '+ Add network';
+      add.title = 'Plan several networks side by side (sites, regions, cloud VNets or VPCs)';
+      add.addEventListener('click', openNetAdd);
+      acts.appendChild(add);
+      if (blk().root.c && blk().mask <= 20) {
+        const sb = document.createElement('button');
+        sb.type = 'button';
+        sb.className = 'nc-act';
+        sb.textContent = 'Make separate networks…';
+        sb.title = 'Turn this network’s subnets of one size into networks of their own (for regions or sites drawn as subnets)';
+        sb.addEventListener('click', openSplitNets);
+        acts.appendChild(sb);
+      }
+      if (foc) foc.focus();
+      return;
+    }
+    const b0 = blk(), w0 = NET_WORD[b0.cloud] === 'network' ? 'network' : NET_WORD[b0.cloud];
+    ctx.innerHTML = `Working in ${esc(w0)} ${b0.label ? `<b>${esc(b0.label)}</b> ` : ''}<span class="mono">${blockCidr(b0)}</span> · ${esc(CLOUDS[b0.cloud].label)}. The tools and table below apply to this ${esc(w0)}${many ? '; click another card to switch' : ''}.`;
     const head = document.createElement('div');
     head.className = 'nets-head';
     head.innerHTML = `<span class="lbl">${many ? `${state.blocks.length} ${esc(word)}s in this plan` : `${esc(word === 'network' ? 'Network' : word)}`}</span>`;
@@ -2262,7 +2348,23 @@
     if (!many) {
       const h = document.createElement('div');
       h.className = 'hint';
-      h.textContent = `The table below plans this ${word}. Planning several ${word}s (a hub and spokes, regions, sites)? Add each one, then peer them.`;
+      h.textContent = `Planning several ${word}s (a hub and spokes, regions, sites)? Add each one, then peer them.`;
+      head.appendChild(h);
+    } else if (state.blocks.every((b) => b.cloud === 'std') && !nudgeOff()) {
+      // Several on-prem networks may really be cloud ones. A quiet hint, never a prompt; ✕ hides it for good.
+      const h = document.createElement('div');
+      h.className = 'hint nudge';
+      h.id = 'cloudNudge';
+      h.innerHTML = '<span>Planning cloud networks? Set each card’s Platform, or start from the <button type="button" class="linkish">subnet wizard</button>.</span>';
+      h.querySelector('.linkish').addEventListener('click', () => openAz('azure'));
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'chip-x';
+      x.textContent = '✕';
+      x.title = 'Don’t show this again';
+      x.setAttribute('aria-label', 'Dismiss: don’t show this hint again');
+      x.addEventListener('click', () => { try { localStorage.setItem(NUDGE_KEY, '1'); } catch (e) { /* ignore */ } nudgeHidden = true; h.remove(); });
+      h.appendChild(x);
       head.appendChild(h);
     }
     el.appendChild(head);
@@ -2276,20 +2378,33 @@
       for (const r of leaves) { const s2 = getMeta(r.key).s; if (s2) by[s2] += size(r.mask); }
       const tot = size(b.mask), peers = pairs.filter(([x, y]) => x === b || y === b).length;
       const card = document.createElement('div');
-      card.className = 'net-card';
+      const on = i === state.active;
+      card.className = 'net-card' + (on ? ' editing' : '');
       card.dataset.cidr = blockCidr(b);
-      card.tabIndex = 0;
-      card.setAttribute('role', 'button');
-      card.setAttribute('aria-pressed', String(i === state.active));
-      card.title = i === state.active ? `The table below shows ${blockCidr(b)}` : `Show ${blockCidr(b)} in the table`;
-      card.innerHTML =
-        `<div class="nc-top"><span class="nc-name${b.label ? '' : ' none'}">${esc(b.label || 'Unnamed')}</span>${blockCidr(b) === hubC ? '<span class="nc-hub">★ Hub</span>' : ''}</div>` +
-        `<div class="nc-cidr">${blockCidr(b)}</div>` +
-        `<div class="nc-sub">${esc(CLOUDS[b.cloud].label)} · ${fmt(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}${peers ? ` · ⇄ ${peers}` : ''}</div>` +
-        `<div class="nc-bar" title="In use ${Math.round((by.used / tot) * 100)}%, reserved ${Math.round((by.reserved / tot) * 100)}%"><i style="width:${(by.used / tot) * 100}%;background:var(--ok)"></i><i style="width:${(by.reserved / tot) * 100}%;background:var(--hl-border)"></i></div>`;
+      const bar = `<div class="nc-bar" title="In use ${Math.round((by.used / tot) * 100)}%, reserved ${Math.round((by.reserved / tot) * 100)}%"><i style="width:${(by.used / tot) * 100}%;background:var(--ok)"></i><i style="width:${(by.reserved / tot) * 100}%;background:var(--hl-border)"></i></div>`;
+      const subs = `${fmt(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}${peers ? ` · ⇄ ${peers}` : ''}`;
+      if (on) {
+        // The selected card is a group of fields (the editor), not a button.
+        card.setAttribute('role', 'group');
+        card.setAttribute('aria-current', 'true');
+        card.setAttribute('aria-label', `Selected ${NET_WORD[b.cloud]}: ${b.label ? b.label + ' ' : ''}${blockCidr(b)}`);
+        card.innerHTML =
+          `<div class="nc-top"><span class="nc-sub">Selected · ${subs}</span>${blockCidr(b) === hubC ? '<span class="nc-hub">★ Hub</span>' : ''}<span style="flex:1"></span></div>`;
+        card.appendChild(ed);
+        card.insertAdjacentHTML('beforeend', bar);
+      } else {
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-pressed', 'false');
+        card.title = `Edit ${blockCidr(b)} and show it in the table`;
+        card.innerHTML =
+          `<div class="nc-top"><span class="nc-name${b.label ? '' : ' none'}">${esc(b.label || 'Unnamed')}</span>${blockCidr(b) === hubC ? '<span class="nc-hub">★ Hub</span>' : ''}</div>` +
+          `<div class="nc-cidr">${blockCidr(b)}</div>` +
+          `<div class="nc-sub">${esc(CLOUDS[b.cloud].label)} · ${subs}</div>` + bar;
+      }
       const pick = () => { if (i !== state.active) selectBlock(i); };
       card.addEventListener('click', pick);
-      card.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); pick(); } });
+      card.addEventListener('keydown', (e) => { if (!on && (e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); pick(); } });
       if (i === state.active && many) {
         const x = document.createElement('button');
         x.type = 'button';
@@ -2327,6 +2442,8 @@
       arcObserver = new ResizeObserver(() => drawPeerArcs());
       arcObserver.observe(row);
     }
+    if (foc && !foc.isConnected) foc = null;
+    if (foc && document.activeElement !== foc) foc.focus();
   };
   const selectBlock = (i) => {
     state.active = i;
@@ -3286,10 +3403,30 @@
   // =====================================================================
   // Cloud hub-and-spoke templates (Azure, AWS)
   // =====================================================================
-  // tplState[cloud]: { hub: { size, svcs: { id: mask | null } }, spokes: [{ name, size, svcs }] }. size is 'auto' or a mask.
+  // tplState[cloud]: { hub: { size, svcs: { id: mask | null } }, spokes: [{ name, size, svcs }], single: { name, svcs } }.
+  // size is 'auto' or a mask. tplLayout: 'single' (one network holding every service, the default) or 'hub'.
   let tpl = TEMPLATES.azure;
+  let tplLayout = 'single';
   const tplState = {};
-  const inRole = (x, role) => x.role === role || x.role === 'both';
+  const inRole = (x, role) => role === 'single' || x.role === role || x.role === 'both';
+  // Switching layout carries the choices over: single → hub sends hub services to the hub and the rest to the first
+  // spoke; hub → single merges the hub and the first spoke.
+  const tplSetLayout = (layout) => {
+    const st = tplState[tpl.cloud];
+    if (layout === tplLayout) return;
+    const pick = (svcs, role) => Object.fromEntries(tpl.svcs.filter((x) => inRole(x, role)).map((x) => [x.id, svcs[x.id] ?? null]));
+    if (layout === 'hub') {
+      st.hub.svcs = pick(st.single.svcs, 'hub');
+      if (!st.spokes.length) st.spokes.push(tplNewSpoke(1));
+      st.spokes[0].svcs = pick(st.single.svcs, 'spoke');
+      if (st.single.name.trim() && st.single.name !== tpl.net) st.spokes[0].name = st.single.name;
+    } else {
+      const sp = st.spokes[0] ? st.spokes[0].svcs : {};
+      st.single.svcs = Object.fromEntries(tpl.svcs.map((x) => [x.id, sp[x.id] ?? st.hub.svcs[x.id] ?? null]));
+      if (st.spokes[0] && st.spokes[0].name.trim() && !/^Spoke( workload)?$/i.test(st.spokes[0].name.trim())) st.single.name = st.spokes[0].name;
+    }
+    tplLayout = layout;
+  };
   const tplDefaults = (role) => Object.fromEntries(tpl.svcs.filter((x) => inRole(x, role)).map((x) => [x.id, x.on ? x.rec : null]));
   const tplNewSpoke = (i) => ({ name: i === 1 ? 'Spoke workload' : `Spoke ${i}`, size: 'auto', svcs: tplDefaults('spoke') });
   // Smallest network (largest mask) that holds these subnets. Aligned power-of-two blocks packed largest first
@@ -3306,7 +3443,11 @@
     if (!sp || !/\//.test($('azSpace').value)) return { errors: ['Enter the address space as a network with a prefix length, like 10.0.0.0/16.'], notes };
     const zones = tplZones();
     if (tpl.zones && (zones.length < 1 || zones.length > 6)) return { errors: ['List 1 to 6 Availability Zones, like us-east-1a, us-east-1b, us-east-1c.'], notes };
-    const vnets = [{ role: 'hub', label: 'Hub', cfg: st.hub }, ...st.spokes.map((x) => ({ role: 'spoke', label: x.name.trim().slice(0, 40) || 'Spoke', cfg: x }))];
+    const single = tplLayout === 'single';
+    const vnets = single
+      ? [{ role: 'single', label: st.single.name.trim().slice(0, 40) || tpl.net, cfg: st.single }]
+      : [{ role: 'hub', label: 'Hub', cfg: st.hub }, ...st.spokes.map((x) => ({ role: 'spoke', label: x.name.trim().slice(0, 40) || 'Spoke', cfg: x }))];
+    if (single && sp.mask < tpl.maxNet) return { errors: [`A ${tpl.net} can be /${tpl.maxNet} at most. Use a /${tpl.maxNet} or smaller address space.`], notes };
     const short = new Set();
     for (const v of vnets) {
       // One subnet per service, or per service and AZ.
@@ -3320,9 +3461,11 @@
       v.reqs.sort((x, y) => x.mask - y.mask || x.idx - y.idx || x.zi - y.zi);
       const need = azNeed(v.reqs);
       const auto = v.role === 'hub' ? Math.min(23, need ?? 23) : Math.max(tpl.maxNet, Math.min(22, need == null ? 22 : need - 1));
-      v.mask = v.cfg.size === 'auto' ? auto : Number(v.cfg.size);
+      v.mask = single ? sp.mask : v.cfg.size === 'auto' ? auto : Number(v.cfg.size);
       if (need != null && need < tpl.maxNet) errors.push(`${v.label}: the subnets ticked need a /${need}, but a ${tpl.net} can be /${tpl.maxNet} at most. Untick some or make them smaller.`);
-      else if (need != null && v.mask > need) errors.push(`${v.label} needs at least a /${need} for the subnets ticked.`);
+      else if (need != null && v.mask > need) errors.push(single
+        ? `The subnets ticked need at least a /${need}, more than ${sp.cidr} holds. Use a bigger address space, or untick some or make them smaller.`
+        : `${v.label} needs at least a /${need} for the subnets ticked.`);
     }
     for (const l of short) notes.push(`${l} needs subnets in at least two Availability Zones.`);
     if (errors.length) return { errors, notes };
@@ -3343,6 +3486,13 @@
   const azPreview = () => {
     const res = azCompute();
     $('azApply').disabled = !!res.errors.length;
+    const sum = $('azSum');
+    sum.classList.toggle('err', !!res.errors.length);
+    if (res.errors.length) sum.textContent = res.errors.length === 1 ? 'Can’t apply yet: see the problem above' : `Can’t apply yet: see the ${res.errors.length} problems above`;
+    else {
+      const n = res.vnets.reduce((t, v) => t + v.reqs.length, 0);
+      sum.textContent = `${res.vnets.length} ${tpl.net}${res.vnets.length === 1 ? '' : 's'} · ${n} subnet${n === 1 ? '' : 's'}`;
+    }
     const notes = res.notes.length ? `<div class="msg show info">${res.notes.map(esc).join('<br>')}</div>` : '';
     if (res.errors.length) { $('azOut').innerHTML = `<div class="msg show error">${res.errors.map(esc).join('<br>')}</div>` + notes; return res; }
     let html = notes;
@@ -3379,16 +3529,17 @@
       const h = document.createElement('h3');
       h.textContent = title;
       head.appendChild(h);
-      if (role === 'spoke') {
+      if (role === 'spoke' || role === 'single') {
         const f = document.createElement('div'); f.className = 'field';
-        const id = `azName${spokeIdx}`;
-        f.innerHTML = `<label for="${id}">Spoke name</label>`;
+        const id = role === 'single' ? 'azNameSingle' : `azName${spokeIdx}`;
+        f.innerHTML = `<label for="${id}">${role === 'single' ? tpl.net + ' name' : 'Spoke name'}</label>`;
         const inp = document.createElement('input');
         inp.type = 'text'; inp.id = id; inp.maxLength = 40; inp.spellcheck = false; inp.value = cfg.name; inp.style.width = '170px';
         inp.addEventListener('input', () => { cfg.name = inp.value; azPreview(); });
         f.appendChild(inp); head.appendChild(f);
       }
       const f2 = document.createElement('div'); f2.className = 'field';
+      if (role === 'single') f2.hidden = true;   // the single network is the whole address space
       const sid = role === 'hub' ? 'azHubSize' : `azSize${spokeIdx}`;
       f2.innerHTML = `<label for="${sid}">${tpl.net} size</label>`;
       const ss = azSizeSel(cfg.size, tpl.maxNet, 28, true);
@@ -3438,19 +3589,29 @@
       box.appendChild(list);
       wrap.appendChild(box);
     };
-    card(`Hub ${tpl.net} (shared ${tpl.cloud === 'aws' ? 'network: inspection and egress' : 'services'})`, st.hub, 'hub');
-    st.spokes.forEach((x, i) => card(`Spoke ${tpl.net} ${i + 1} (workloads)`, x, 'spoke', i));
+    const single = tplLayout === 'single';
+    $('azLayout').value = tplLayout;
+    $('azLayout').options[0].textContent = `Single ${tpl.net}`;
+    $('azTtl').textContent = single ? tpl.singleTitle : tpl.title;
+    $('azSub').textContent = single ? tpl.singleSub : tpl.sub;
+    $('azSpaceL').textContent = single ? `${tpl.net} address space` : 'Address space for the hub and spokes';
+    $('azAddSpoke').textContent = single ? 'Convert to hub and spoke' : 'Add spoke';
+    $('azAddSpoke').title = single ? `Move the shared services (gateway, firewall, Bastion, DNS) into a hub ${tpl.net} and the rest into a spoke, keeping what you ticked` : `Add another spoke ${tpl.net}`;
+    if (single) card(`${tpl.net} (all services)`, st.single, 'single');
+    else {
+      card(`Hub ${tpl.net} (shared ${tpl.cloud === 'aws' ? 'network: inspection and egress' : 'services'})`, st.hub, 'hub');
+      st.spokes.forEach((x, i) => card(`Spoke ${tpl.net} ${i + 1} (workloads)`, x, 'spoke', i));
+    }
     azPreview();
   };
   const openAz = (cloud = 'azure') => {
     tpl = TEMPLATES[cloud];
     if (!tplState[cloud]) {
-      tplState[cloud] = { hub: { size: 'auto', svcs: tplDefaults('hub') }, spokes: [tplNewSpoke(1)], space: '10.0.0.0/16' };
+      tplState[cloud] = { hub: { size: 'auto', svcs: tplDefaults('hub') }, spokes: [tplNewSpoke(1)], single: { name: TEMPLATES[cloud].net, svcs: null }, space: '10.0.0.0/16' };
+      tplState[cloud].single.svcs = Object.fromEntries(TEMPLATES[cloud].svcs.map((x) => [x.id, x.on ? x.rec : null]));
       // Use the current base network as the address space when it's big enough to be one.
       if (state.blocks.length === 1 && state.mask <= 16) tplState[cloud].space = blockCidr(blk());
     }
-    $('azTtl').textContent = tpl.title;
-    $('azSub').textContent = tpl.sub;
     $('azSpace').value = tplState[cloud].space;
     $('azZonesF').hidden = !tpl.zones;
     $('azCloud').value = cloud;
@@ -3466,7 +3627,9 @@
   $('azCloud').addEventListener('change', () => openAz($('azCloud').value));
   $('azSpace').addEventListener('input', () => { tplState[tpl.cloud].space = $('azSpace').value; azPreview(); });
   $('azZones').addEventListener('input', azPreview);
+  $('azLayout').addEventListener('change', () => { tplSetLayout($('azLayout').value); azRender(); });
   $('azAddSpoke').addEventListener('click', () => {
+    if (tplLayout === 'single') { tplSetLayout('hub'); azRender(); return; }
     const st = tplState[tpl.cloud];
     // Next number whose default name isn't taken (spokes can be removed from the middle).
     let i = st.spokes.length + 1;
@@ -3479,14 +3642,15 @@
   $('azApply').addEventListener('click', () => {
     const res = azPreview();
     if (res.errors.length) return;
-    if (planInUse() && !confirm('Replace the current IPv4 plan with this hub and spokes?')) return;
+    const single = tplLayout === 'single';
+    if (planInUse() && !confirm(`Replace the current IPv4 plan with this ${single ? tpl.net : 'hub and spokes'}?`)) return;
     checkpoint();
     state.blocks = res.vnets.map((v) => { const b = mkBlock(v.addr, v.mask, tpl.cloud, v.label); b.root = v.root; return b; });
     state.active = 0;
     state.meta = {};
     // Hub and spoke peering to match; the Peering button changes it.
-    const hubC = cidrStr(res.vnets[0].addr, res.vnets[0].mask);
-    state.peers = res.vnets.slice(1).map((v) => [hubC, cidrStr(v.addr, v.mask)]);
+    const hubC = single ? '' : cidrStr(res.vnets[0].addr, res.vnets[0].mask);
+    state.peers = single ? null : res.vnets.slice(1).map((v) => [hubC, cidrStr(v.addr, v.mask)]);
     state.po = { ...PEER_DEFAULTS, h: hubC };
     let n = 0;
     for (const v of res.vnets) for (const r of v.reqs) {
@@ -3503,7 +3667,7 @@
     syncControls();
     update();
     const sp = res.vnets.length - 1;
-    toast(`Applied a hub and ${sp} spoke${sp === 1 ? '' : 's'} with ${n} subnets. Switch ${tpl.net}s with the buttons above.`, UNDO);
+    toast(single ? `Applied a ${tpl.net} with ${n} subnets.` : `Applied a hub and ${sp} spoke${sp === 1 ? '' : 's'} with ${n} subnets. Switch ${tpl.net}s with the buttons above.`, UNDO);
   });
 
   // =====================================================================
@@ -3632,6 +3796,7 @@
     $('netName').focus();
   };
   $('netClose').addEventListener('click', () => $('netDlg').close());
+  $('netWizLink').addEventListener('click', () => { const c = $('netPlat').value === 'aws' ? 'aws' : 'azure'; $('netDlg').close(); openAz(c); });
   $('netDlg').addEventListener('click', (e) => { if (e.target === $('netDlg')) $('netDlg').close(); });
   $('netForm2').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -5269,6 +5434,14 @@
     let startTab = 'plan';
     try { startTab = localStorage.getItem('subnetPlanner.tab') || 'plan'; } catch (e) { /* ignore */ }
     showTab(startTab);
+    // ?wizard=azure or ?wizard=aws (the guides link here): open the service-subnet wizard for that cloud.
+    // The parameter is dropped from the address bar so a reload or a shared plan link doesn't reopen it.
+    const wiz = new URLSearchParams(location.search).get('wizard');
+    if (wiz === 'azure' || wiz === 'aws') {
+      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
+      showTab('plan');
+      openAz(wiz);
+    }
     document.documentElement.dataset.ready = '1';
   })();
 })();

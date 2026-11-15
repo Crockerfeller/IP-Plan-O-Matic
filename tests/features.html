@@ -132,13 +132,13 @@ T.blocks = async () => {
   await load('../index.html#10.0.0.0/22');
   divideRow(0);
   type(qa('#body tr')[0].querySelector('input'), 'A');
-  check('one network card, peering disabled', chipsB().length === 1 && $('peerBtn').disabled && $('netAddBtn'));
+  check('single on-prem: plain row, no cards', chipsB().length === 0 && $('blocks').hidden && $('netCtx').hidden && $('netAddBtn') && $('netForm').contains($('network')), $('blocks').textContent);
   addBox('10.0.3.0/25 Cams');
   check('add subnet carves', rowFor('10.0.3.0/25') && rowFor('10.0.3.0/25').querySelector('input').value === 'Cams', snap().rows);
   addBox('10.0.0.0/8');
   check('containing block refused', $('msg').textContent.includes('contains 10.0.0.0/22'), $('msg').textContent);
   addBox('172.16.0.0/16 AWS-VPC');
-  check('new block strip', chipsB().length === 2 && chipsB()[1].getAttribute('aria-pressed') === 'true', $('blocks').textContent);
+  check('new block strip', chipsB().length === 2 && chipsB()[1].getAttribute('aria-current') === 'true', $('blocks').textContent);
   check('table shows new block', snap().rows.length === 1 && snap().rows[0].startsWith('172.16.0.0/16'), snap().rows);
   check('label field', $('blockLabel').value === 'AWS-VPC');
   select('#platform', 'aws');
@@ -154,12 +154,12 @@ T.blocks = async () => {
   await sleep(400);
   const h = hash();
   await load('../index.html#' + encodeURI(h));
-  check('round trip blocks', chipsB().length === 2 && chipsB()[1].textContent.includes('AWS-VPC') && chipsB()[1].textContent.includes('AWS VPC'), $('blocks').textContent);
-  check('round trip active', chipsB()[1].getAttribute('aria-pressed') === 'true' && $('platform').value === 'aws');
+  check('round trip blocks', chipsB().length === 2 && $('blockLabel').value === 'AWS-VPC' && $('platform').value === 'aws' && chipsB()[1].contains($('network')), $('blocks').textContent);
+  check('round trip active', chipsB()[1].getAttribute('aria-current') === 'true' && $('platform').value === 'aws');
   click(chipsB()[0]);
   check('round trip names', rowFor('10.0.3.0/25').querySelector('input').value === 'Cams');
   type('#findIp', '172.16.200.1'); await sleep(20);
-  check('find switches block', chipsB()[1].getAttribute('aria-pressed') === 'true' && $('findOut').textContent.includes('172.16.128.0/17'), $('findOut').textContent);
+  check('find switches block', chipsB()[1].getAttribute('aria-current') === 'true' && $('findOut').textContent.includes('172.16.128.0/17'), $('findOut').textContent);
   type('#findIp', '');
   click('#tb-export'); select('#exFmt', 'tf-aws');
   let t = $('exOut').value;
@@ -174,7 +174,7 @@ T.blocks = async () => {
   check('json blocks', j.version === 3 && j.blocks.length === 2 && j.blocks[1].platform === 'aws' && j.subnets.some((x) => x.network === '172.16.0.0/16' && x.hosts === 32763), j.blocks);
   click('#tb-plan');
   click(q('#blocks .chip-x'));
-  check('remove block', chipsB().length === 1 && snap().rows[0].startsWith('10.0.0.0/23'), snap().rows);
+  check('remove block', chipsB().length === 0 && snap().rows[0].startsWith('10.0.0.0/23'), snap().rows);
   click('#tb-export');
   $('imText').value = js; click('#imRun');
   click('#tb-plan');
@@ -223,7 +223,7 @@ T.undo = async () => {
   addBox('172.16.0.0/16 B');
   check('block added', chipsB().length === 2);
   key('z');
-  check('undo add block', chipsB().length === 1 && snap().rows.length === 4, $('blocks').textContent);
+  check('undo add block', chipsB().length === 0 && snap().rows.length === 4, $('blocks').textContent);
   // ipv6
   click('#tb-v6');
   qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
@@ -639,11 +639,12 @@ T.hardening = async () => {
 };
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
-  click('#tplBtn');
+  click('#tplBtn'); select('#azLayout', 'hub');
   check('az dialog opens, platform unchanged', $('azDlg').open && $('platform').value === 'std');
   const out = () => $('azOut').textContent;
   const hub = ['10.0.0.0/26AzureFirewallSubnet', '10.0.0.64/26AzureBastionSubnet', '10.0.0.128/27GatewaySubnet', '10.0.0.160/28snet-dns-in', '10.0.0.176/28snet-dns-out'];
   const spoke = ['10.0.16.0/24snet-appgw', '10.0.17.0/24snet-pe', '10.0.18.0/24snet-web', '10.0.19.0/24snet-app', '10.0.20.0/24snet-data', '10.0.21.0/26snet-appsvc'];
+  check('footer summary', $('azSum').textContent === '2 VNets · 11 subnets', $('azSum').textContent);
   check('preview hub 10.0.0.0/23 + spoke 10.0.16.0/20', out().includes('Hub 10.0.0.0/23') && out().includes('Spoke workload 10.0.16.0/20'), out().slice(0, 300));
   check('preview default subnets', [...hub, ...spoke].every((x) => out().includes(x)), out());
   check('preview free space', out().includes('10.0.0.192/26') && out().includes('10.0.24.0/21'), out());
@@ -651,6 +652,7 @@ T.azureHubSpoke = async () => {
   check('second spoke on 10.0.32.0/20', out().includes('Spoke 2 10.0.32.0/20'), out().slice(0, 600));
   type('#azSpace', '10.0.0.0/22');
   check('too small space', /use at least a \/18 address space/i.test(out()) && $('azApply').disabled, out());
+  check('footer says why apply is off', $('azSum').classList.contains('err') && /Can’t apply yet/.test($('azSum').textContent), $('azSum').textContent);
   type('#azSpace', '10.0.0.0/16');
   qa('#azVnets .az-vnet')[1].querySelector('button').click();   // remove spoke 1: Spoke 2 is left
   click('#azAddSpoke');
@@ -679,7 +681,7 @@ T.azureHubSpoke = async () => {
   check('json: cloudService', js.subnets.some((x) => x.name === 'AzureBastionSubnet' && x.cloudService === 'bastion'));
   click('#tb-plan');
   click('#undoBtn'); await sleep(50);
-  check('undo restores 192.168.0.0/24', chipsB().length === 1, $('blocks').textContent);
+  check('undo restores 192.168.0.0/24', chipsB().length === 0 && $('network').value === '192.168.0.0' && $('mask').value === '24', $('blocks').textContent);
   check('undo restores platform', $('platform').value === 'std' && snap().rows.length === 1 && snap().rows[0].startsWith('192.168.0.0/24'));
   await load('../index.html' + link);
   check('link round trip', chipsB().length === 2 && snap().rows.some((r) => r.includes('[AzureBastionSubnet]')));
@@ -707,9 +709,56 @@ T.azureHubSpoke = async () => {
   check('tf renamed delegated subnet keeps delegation', /snet-apps"[\s\S]*?Microsoft\.Web\/serverFarms/.test(tfr), tfr);
   click('#tb-plan');
 };
+T.wizardLink = async () => {
+  await load('../index.html?wizard=azure#192.168.0.0/24');
+  check('?wizard=azure opens the azure wizard', $('azDlg').open && $('azCloud').value === 'azure' && $('azOut').textContent.includes('GatewaySubnet'), $('azOut').textContent.slice(0, 200));
+  const foot = q('#azDlg .az-foot'), dlg = $('azDlg');
+  dlg.scrollTop = 0; await sleep(30);
+  const fb = foot.getBoundingClientRect().bottom, db = dlg.getBoundingClientRect().bottom;
+  check('apply footer pinned to the dialog bottom', dlg.scrollHeight > dlg.clientHeight && Math.abs(fb - db) < 3, { fb, db, sh: dlg.scrollHeight, ch: dlg.clientHeight });
+  check('wizard param dropped from the address bar', !W.location.search.includes('wizard'), W.location.href);
+  $('azClose').click();
+  await load('../index.html?wizard=aws');
+  check('?wizard=aws opens the aws wizard', $('azDlg').open && $('azCloud').value === 'aws');
+  $('azClose').click();
+  await load('../index.html?wizard=nope');
+  check('unknown wizard value ignored', !$('azDlg').open);
+};
+T.azureSingle = async () => {
+  await load('../index.html#192.168.0.0/24');
+  click('#tplBtn');
+  const out = () => $('azOut').textContent, sum = () => $('azSum').textContent;
+  const box = (id) => q(`#azVnets input[type=checkbox][data-svc="${id}"]`);
+  check('single VNet is the default', $('azLayout').value === 'single' && $('azTtl').textContent === 'Azure VNet with service subnets' && $('azSpaceL').textContent === 'VNet address space', [$('azLayout').value, $('azTtl').textContent]);
+  check('one card lists hub and spoke services', qa('#azVnets .az-vnet').length === 1 && !!box('bastion') && !!box('appgw') && !!box('sqlmi'));
+  check('single summary', sum() === '1 VNet · 11 subnets', sum());
+  check('single VNet is the whole space', out().includes('VNet 10.0.0.0/16') && out().includes('AzureBastionSubnet') && out().includes('snet-appgw'), out().slice(0, 300));
+  box('fw').click();
+  check('untick firewall', sum() === '1 VNet · 10 subnets' && !out().includes('AzureFirewallSubnet'), sum());
+  check('convert button shown', $('azAddSpoke').textContent === 'Convert to hub and spoke');
+  click('#azAddSpoke');
+  check('converted to hub and spoke', $('azLayout').value === 'hub' && qa('#azVnets .az-vnet').length === 2 && $('azAddSpoke').textContent === 'Add spoke', $('azLayout').value);
+  check('choices carried to hub and spoke', !box('fw').checked && qa('#azVnets .az-vnet')[0].querySelector('[data-svc="bastion"]').checked && qa('#azVnets .az-vnet')[1].querySelector('[data-svc="appgw"]').checked && sum() === '2 VNets · 10 subnets', sum());
+  select('#azLayout', 'single');
+  check('back to single keeps choices', qa('#azVnets .az-vnet').length === 1 && !box('fw').checked && box('bastion').checked && sum() === '1 VNet · 10 subnets', sum());
+  type('#azSpace', '10.5.0.0/24');
+  check('single too small', $('azApply').disabled && /need at least a \/\d+, more than 10\.5\.0\.0\/24 holds/.test(out()), out());
+  type('#azSpace', '10.5.0.0/16');
+  type('#azNameSingle', 'Prod');
+  click('#azApply'); await sleep(50);
+  check('applied one VNet', chipsB().length === 1 && chipsB()[0].dataset.cidr === '10.5.0.0/16' && $('platform').value === 'azure' && $('blockLabel').value === 'Prod', [chipsB().length, $('blockLabel').value]);
+  const rows = snap().rows;
+  check('single rows named', rows.some((r) => r.includes('[AzureBastionSubnet]')) && rows.some((r) => r.includes('[snet-appgw]')) && !rows.some((r) => r.includes('AzureFirewallSubnet')), rows);
+  check('single: no peering, toast', $('peerBtn').disabled && $('toast').textContent.includes('Applied a VNet with 10 subnets'), $('toast').textContent);
+  click('#tplBtn'); select('#azCloud', 'aws');
+  check('aws single', $('azLayout').value === 'single' && $('azLayout').options[0].textContent === 'Single VPC' && $('azTtl').textContent === 'AWS VPC with service subnets');
+  type('#azSpace', '10.0.0.0/8');
+  check('aws single over /16 refused', $('azApply').disabled && out().includes('A VPC can be /16 at most'), out());
+  $('azDlg').close();
+};
 T.awsHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
-  click('#tplBtn'); select('#azCloud', 'aws');
+  click('#tplBtn'); select('#azCloud', 'aws'); select('#azLayout', 'hub');
   check('aws dialog opens', $('azDlg').open && $('azTtl').textContent.startsWith('AWS') && !$('azZonesF').hidden && $('platform').value === 'std');
   const out = () => $('azOut').textContent;
   check('aws hub /23, spoke /19', out().includes('Hub 10.0.0.0/23') && out().includes('Spoke workload 10.0.32.0/19'), out().slice(0, 400));
@@ -758,8 +807,8 @@ T.peering = async () => {
   const tf = (f) => { click('#tb-export'); select('#exInc', 'all'); select('#exFmt', f); const t = $('exOut').value; click('#tb-plan'); return t; };
   // Azure: hub and two spokes from the template.
   await load('../index.html#192.168.0.0/24');
-  check('peering disabled with one network', $('peerBtn').disabled);
-  click('#tplBtn'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
+  check('no peering button for one on-prem network', !$('peerBtn'));
+  click('#tplBtn'); select('#azLayout', 'hub'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
   check('template sets hub-and-spoke peering', pbtn().includes('Peering (2)'), pbtn());
   click('#peerBtn');
   check('wizard opens on hub and spoke', $('peerDlg').open && $('peerMode').value === 'hub' && $('peerHub').value === '10.0.0.0/23');
@@ -809,7 +858,7 @@ T.peering = async () => {
 
   // AWS: Transit Gateway with routes, then VPC peering.
   await load('../index.html#192.168.0.0/24');
-  click('#tplBtn'); select('#azCloud', 'aws'); click('#azApply'); await sleep(50);
+  click('#tplBtn'); select('#azCloud', 'aws'); select('#azLayout', 'hub'); click('#azApply'); await sleep(50);
   t = tf('tf-aws');
   check('tf-aws tgw routes both ways', /resource "aws_route" "hub_to_spoke_workload" \{[\s\S]*?destination_cidr_block = "10\.0\.32\.0\/19"[\s\S]*?transit_gateway_id     = aws_ec2_transit_gateway\.main\.id[\s\S]*?depends_on             = \[aws_ec2_transit_gateway_vpc_attachment\.hub\]/.test(t) && t.includes('resource "aws_route" "spoke_workload_to_hub"'), t.slice(-1800));
   click('#peerBtn');
@@ -841,23 +890,54 @@ T.peering = async () => {
 };
 T.networksUi = async () => {
   await load('../index.html#10.0.0.0/16');
-  check('one card, add button, peering off', chipsB().length === 1 && $('netAddBtn').textContent === '+ Add network' && $('peerBtn').disabled);
+  check('on-prem: add button in the row', chipsB().length === 0 && $('netAddBtn').textContent === '+ Add network' && $('netRowActs').contains($('netAddBtn')));
   select('#platform', 'azure');
+  check('cloud: one editable card, peering off', chipsB().length === 1 && chipsB()[0].classList.contains('editing') && chipsB()[0].contains($('network')) && chipsB()[0].contains($('platform')) && $('peerBtn').disabled);
+  check('platform keeps focus after moving into the card', D.activeElement !== $('platform') || chipsB()[0].contains(D.activeElement));
   check('cloud word on add button', $('netAddBtn').textContent === '+ Add VNet');
+  check('context bar names the VNet', !$('netCtx').hidden && $('netCtx').textContent.startsWith('Working in VNet 10.0.0.0/16 · Azure VNet'), $('netCtx').textContent);
+  type('#blockLabel', 'Prod');
+  check('name shows in the context bar', $('netCtx').textContent.startsWith('Working in VNet Prod 10.0.0.0/16'), $('netCtx').textContent);
+  setBase('10.9.0.0/16'); await sleep(30);
+  check('address edited from the card', chipsB()[0].dataset.cidr === '10.9.0.0/16' && $('netCtx').textContent.includes('10.9.0.0/16'), $('netCtx').textContent);
+  select('#platform', 'std');
+  check('back to on-prem: fields return to the row', chipsB().length === 0 && $('netForm').contains($('network')) && $('netCtx').hidden);
+  select('#platform', 'azure'); setBase('10.0.0.0/16'); type('#blockLabel', '');
   click('#netAddBtn');
+  check('add dialog: platform first, wizard hint', $('netForm2').querySelector('select, input').id === 'netPlat' && $('netTip').textContent.includes('subnet wizard'));
   check('add dialog suggests next free space', $('netDlg').open && $('netCidr').value === '10.1.0.0/16' && $('netPlat').value === 'azure', $('netCidr').value);
   $('netCidr').value = '10.0.128.0/17'; $('netForm2').requestSubmit();
   check('add dialog refuses overlap', $('netMsg').textContent.includes('overlaps') && $('netDlg').open, $('netMsg').textContent);
   $('netCidr').value = '10.1.0.0/16'; $('netName').value = 'Spoke prod'; $('netForm2').requestSubmit(); await sleep(50);
-  check('network added and selected', chipsB().length === 2 && chipsB()[1].getAttribute('aria-pressed') === 'true' && chipsB()[1].textContent.includes('Spoke prod') && !$('peerBtn').disabled, $('blocks').textContent);
+  check('network added and selected', chipsB().length === 2 && chipsB()[1].getAttribute('aria-current') === 'true' && $('blockLabel').value === 'Spoke prod' && !$('peerBtn').disabled, $('blocks').textContent);
   chipsB()[0].dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  check('card selects with Enter', chipsB()[0].getAttribute('aria-pressed') === 'true');
+  check('card selects with Enter', chipsB()[0].getAttribute('aria-current') === 'true');
   click('#undoBtn'); await sleep(50);
-  check('undo add network', chipsB().length === 1);
+  check('undo add network', chipsB().length === 1 && chipsB()[0].classList.contains('editing'));
+  // Wizard link in the Add dialog opens the wizard for the picked cloud.
+  click('#netAddBtn'); select('#netPlat', 'aws'); click('#netWizLink');
+  check('add dialog wizard link', !$('netDlg').open && $('azDlg').open && $('azCloud').value === 'aws');
+  $('azDlg').close();
+  // Two on-prem networks: a quiet, dismissible nudge toward cloud.
+  W.localStorage.removeItem('subnetPlanner.cloudNudgeOff');
+  await load('../index.html#10.0.0.0/16');
+  check('no nudge for one on-prem network', !$('cloudNudge'));
+  addBox('10.1.0.0/16 Branch');
+  check('nudge for two on-prem networks', !!$('cloudNudge') && $('cloudNudge').textContent.includes('Planning cloud networks?'));
+  $('cloudNudge').querySelector('.linkish').click();
+  check('nudge opens the wizard', $('azDlg').open); $('azDlg').close();
+  select('#platform', 'azure');
+  check('no nudge once a network is cloud', !$('cloudNudge'));
+  select('#platform', 'std');
+  $('cloudNudge').querySelector('.chip-x').click();
+  check('nudge dismissed', !$('cloudNudge') && W.localStorage.getItem('subnetPlanner.cloudNudgeOff') === '1');
+  await load('../index.html#10.0.0.0/16'); addBox('10.1.0.0/16 Branch');
+  check('nudge stays dismissed', !$('cloudNudge'));
+  W.localStorage.removeItem('subnetPlanner.cloudNudgeOff');
 
   // Template + Add VNet: a new network joins the hub's peering.
   await load('../index.html#192.168.0.0/24');
-  click('#tplBtn'); click('#azApply'); await sleep(50);
+  click('#tplBtn'); select('#azLayout', 'hub'); click('#azApply'); await sleep(50);
   check('hub card marked', chipsB()[0].textContent.includes('★ Hub'));
   click('#netAddBtn'); $('netForm2').requestSubmit(); await sleep(50);
   check('new VNet peered with hub', $('peerBtn').textContent.includes('Peering (2)') && $('toast').textContent.includes('peered it with Hub'), [$('peerBtn').textContent, $('toast').textContent]);
