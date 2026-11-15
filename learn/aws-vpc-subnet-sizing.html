@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWS VPC subnet sizing: reserved IPs, CIDR limits and AZ layouts | IP Plan-O-Matic</title>
+<meta name="description" content="How to size AWS VPC subnets: the 5 addresses AWS reserves in every subnet, the /16 to /28 limits, usable addresses per size, and a three-AZ public/private/database layout.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/aws-vpc-subnet-sizing.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="AWS VPC subnet sizing">
+<meta property="og:description" content="How to size AWS VPC subnets: the 5 addresses AWS reserves in every subnet, the /16 to /28 limits, usable addresses per size, and a three-AZ public/private/database layout.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/aws-vpc-subnet-sizing.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "AWS VPC subnet sizing", "description": "How to size AWS VPC subnets: the 5 addresses AWS reserves in every subnet, the /16 to /28 limits, usable addresses per size, and a three-AZ public/private/database layout.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/aws-vpc-subnet-sizing.html", "dateModified": "2026-11-14", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "AWS VPC subnet sizing", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/aws-vpc-subnet-sizing.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Why does AWS reserve 5 IP addresses per subnet?", "acceptedAnswer": {"@type": "Answer", "text": "AWS reserves the network address, the VPC router (+1), the DNS server (+2), one address for future use (+3) and the last address in every subnet."}}, {"@type": "Question", "name": "What is the smallest AWS subnet?", "acceptedAnswer": {"@type": "Answer", "text": "A /28, which has 16 addresses and 11 usable after AWS reserves 5. The largest is a /16."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › AWS VPC subnet sizing</nav>
+  <article>
+    <h1>AWS VPC subnet sizing</h1>
+    <p class="lede">AWS reserves 5 addresses in every subnet and limits sizes to /16 through /28. Here is what that means for your plan.</p>
+    <h2>The 5 reserved addresses</h2>
+    <p>In a subnet such as <code>10.0.0.0/24</code>, AWS keeps:</p>
+    <ul>
+      <li><code>10.0.0.0</code>: the network address</li>
+      <li><code>10.0.0.1</code>: the VPC router</li>
+      <li><code>10.0.0.2</code>: the Amazon-provided DNS server</li>
+      <li><code>10.0.0.3</code>: reserved for future use</li>
+      <li><code>10.0.0.255</code>: the last address (AWS doesn’t support broadcast, but reserves it)</li>
+    </ul>
+    <h2>Size limits</h2>
+    <p>A VPC’s IPv4 CIDR block and each subnet must be between <b>/16</b> (65,536 addresses) and <b>/28</b> (16 addresses). You can add secondary CIDR blocks to a VPC later, but you can’t resize a subnet, so size generously up front.</p>
+    <div class="table-wrap"><table><thead><tr><th>Subnet size</th><th class=n>Addresses</th><th class=n>Usable</th></tr></thead><tbody><tr><td class=" m">/16</td><td class="n">65,536</td><td class="n">65,531</td></tr><tr><td class=" m">/18</td><td class="n">16,384</td><td class="n">16,379</td></tr><tr><td class=" m">/19</td><td class="n">8,192</td><td class="n">8,187</td></tr><tr><td class=" m">/20</td><td class="n">4,096</td><td class="n">4,091</td></tr><tr><td class=" m">/21</td><td class="n">2,048</td><td class="n">2,043</td></tr><tr><td class=" m">/22</td><td class="n">1,024</td><td class="n">1,019</td></tr><tr><td class=" m">/23</td><td class="n">512</td><td class="n">507</td></tr><tr><td class=" m">/24</td><td class="n">256</td><td class="n">251</td></tr><tr><td class=" m">/25</td><td class="n">128</td><td class="n">123</td></tr><tr><td class=" m">/26</td><td class="n">64</td><td class="n">59</td></tr><tr><td class=" m">/27</td><td class="n">32</td><td class="n">27</td></tr><tr><td class=" m">/28</td><td class="n">16</td><td class="n">11</td></tr></tbody></table></div>
+    <h2>A three-AZ layout</h2>
+    <p>Each subnet lives in one Availability Zone, so most designs repeat every tier in each AZ. Here is a <code>10.20.0.0/16</code> VPC with public, private app and database tiers across three AZs, sized largest first:</p>
+    <div class="table-wrap"><table><thead><tr><th>Tier</th><th>Zones</th><th class=n>Hosts per AZ</th><th>Size</th><th>Subnets</th><th class=n>Usable each</th></tr></thead><tbody><tr><td>Private app</td><td>us-east-1a / 1b / 1c</td><td class="n">4,000</td><td class=" m">/20</td><td class=" m">10.20.0.0/20, 10.20.16.0/20, 10.20.32.0/20</td><td class="n">4,091</td></tr><tr><td>Public</td><td>us-east-1a / 1b / 1c</td><td class="n">250</td><td class=" m">/24</td><td class=" m">10.20.48.0/24, 10.20.49.0/24, 10.20.50.0/24</td><td class="n">251</td></tr><tr><td>Database</td><td>us-east-1a / 1b / 1c</td><td class="n">120</td><td class=" m">/25</td><td class=" m">10.20.51.0/25, 10.20.51.128/25, 10.20.52.0/25</td><td class="n">123</td></tr></tbody></table></div>
+    <p>That uses about 22% of the /16, leaving plenty of room for more tiers or AZs.</p>
+    <h2>Tips</h2>
+    <ul>
+      <li><b>Private subnets need the most room.</b> With the default Amazon VPC CNI, each EKS pod takes a VPC address, and load balancers, endpoints and Lambda functions in a VPC use addresses too.</li>
+      <li><b>Plan for peering and Transit Gateway from day one.</b> Connected VPCs and on-premises networks can’t overlap.</li>
+      <li><b>Leave the default VPC (172.31.0.0/16) alone</b> and don’t reuse its range for VPCs you’ll connect.</li>
+    </ul>
+    <div class="try"><p>Open this three-AZ VPC in the planner. Every subnet carries its availability zone, and the Terraform export writes it as availability_zone.</p><a class="cta" href="../#10.20.0.0/16/29.f4f49300/~ndDdCoIwGMbxWxnPsdq7pWE77ji6hW0OEiqjaUHivYdRUTb8Otx78PuPp4aBhLo5BDhC1uAUCYooooWg9n2CxO6SX1VpmTqfWeVCq1wZcoUAd0j8HNzzYDMEKCCxtTZzLCYiti9c6dAErwBfDRd0t6CnFJZiuGC6BTOlEKdtIf4UKn3IzZyBRPJvr3vt8dN47IR67fGj-Gze2snb3qhSaeXsnFW48OlcpL3--GV8vhj4_fhtvvSmeQA">Open in the planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

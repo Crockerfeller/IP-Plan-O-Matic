@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subnetting guides: CIDR, VLSM, IPv6 and cloud subnet sizing | IP Plan-O-Matic</title>
+<meta name="description" content="Short, accurate guides to IPv4 and IPv6 subnetting: a CIDR cheat sheet, host counts, VLSM, private ranges, IPv6 prefixes and subnet sizing for AWS, Azure, Google Cloud and Oracle Cloud.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="Subnetting guides">
+<meta property="og:description" content="Short, accurate guides to IPv4 and IPv6 subnetting: a CIDR cheat sheet, host counts, VLSM, private ranges, IPv6 prefixes and subnet sizing for AWS, Azure, Google Cloud and Oracle Cloud.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "CollectionPage", "headline": "Subnetting guides", "description": "Short, accurate guides to IPv4 and IPv6 subnetting: a CIDR cheat sheet, host counts, VLSM, private ranges, IPv6 prefixes and subnet sizing for AWS, Azure, Google Cloud and Oracle Cloud.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/", "dateModified": "2026-11-14", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › Guides</nav>
+  <article>
+    <h1>Subnetting guides</h1>
+    <p class="lede">Short, practical guides to the subnetting questions that come up when you plan a network. Every number is computed, not typed by hand.</p>
+    <ul class="grid"><li><a href="cidr-cheat-sheet.html">CIDR cheat sheet (IPv4 /0 to /32)</a><p>Every IPv4 prefix length from /0 to /32 with its netmask, wildcard mask, total addresses and usable hosts, plus usable addresses in AWS, Azure, Google Cloud and Oracle Cloud subnets.</p></li><li><a href="how-many-hosts-in-a-subnet.html">How many hosts are in a subnet?</a><p>How to work out the number of usable hosts in any IPv4 subnet, with the formula, worked examples from /24 to /32, the /31 and /32 exceptions and the cloud differences.</p></li><li><a href="vlsm-subnetting.html">VLSM subnetting, explained with an example</a><p>Variable Length Subnet Masking (VLSM) explained step by step: size each subnet from its host count, place them largest first, and see a worked example that packs seven networks into a /22.</p></li><li><a href="private-ip-address-ranges.html">Private IP address ranges and special-purpose blocks</a><p>The private IPv4 ranges from RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), CGNAT, link-local, loopback, documentation and multicast blocks, and the IPv6 equivalents, with tips on which to avoid.</p></li><li><a href="aws-vpc-subnet-sizing.html">AWS VPC subnet sizing</a><p>How to size AWS VPC subnets: the 5 addresses AWS reserves in every subnet, the /16 to /28 limits, usable addresses per size, and a three-AZ public/private/database layout.</p></li><li><a href="azure-vnet-subnet-sizing.html">Azure VNet subnet sizing</a><p>How to size Azure virtual network subnets: the 5 addresses Azure reserves, the /29 minimum, usable addresses per size, and the sizes for GatewaySubnet, Azure Bastion and Azure Firewall.</p></li><li><a href="google-cloud-vpc-subnet-sizing.html">Google Cloud VPC subnet sizing</a><p>How to size Google Cloud VPC subnets: the 4 addresses Google reserves, the /29 minimum, auto mode versus custom mode, expanding a subnet, and secondary ranges for GKE.</p></li><li><a href="oracle-cloud-vcn-subnet-sizing.html">Oracle Cloud (OCI) VCN subnet sizing</a><p>How to size Oracle Cloud Infrastructure VCN subnets: the 3 addresses OCI reserves, the /16 to /30 VCN limits, usable addresses per size, and regional versus AD-specific subnets.</p></li><li><a href="ipv6-subnetting.html">IPv6 subnetting: /48, /56, /64 and nibbles</a><p>A practical guide to IPv6 subnetting: what /48, /56 and /64 are for, why you split on nibble (4-bit) boundaries, point-to-point /127s, ip6.arpa reverse DNS, and unique local addresses.</p></li></ul>
+    <div class="try"><p>Ready to plan? The free planner splits, joins, auto-sizes and exports your network.</p><a class="cta" href="../">Open in the planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

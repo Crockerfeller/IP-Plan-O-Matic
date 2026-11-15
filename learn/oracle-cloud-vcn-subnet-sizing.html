@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oracle Cloud (OCI) VCN subnet sizing: reserved IPs and CIDR limits | IP Plan-O-Matic</title>
+<meta name="description" content="How to size Oracle Cloud Infrastructure VCN subnets: the 3 addresses OCI reserves, the /16 to /30 VCN limits, usable addresses per size, and regional versus AD-specific subnets.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/oracle-cloud-vcn-subnet-sizing.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="Oracle Cloud (OCI) VCN subnet sizing">
+<meta property="og:description" content="How to size Oracle Cloud Infrastructure VCN subnets: the 3 addresses OCI reserves, the /16 to /30 VCN limits, usable addresses per size, and regional versus AD-specific subnets.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/oracle-cloud-vcn-subnet-sizing.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "Oracle Cloud (OCI) VCN subnet sizing", "description": "How to size Oracle Cloud Infrastructure VCN subnets: the 3 addresses OCI reserves, the /16 to /30 VCN limits, usable addresses per size, and regional versus AD-specific subnets.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/oracle-cloud-vcn-subnet-sizing.html", "dateModified": "2026-11-14", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "Oracle Cloud (OCI) VCN subnet sizing", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/oracle-cloud-vcn-subnet-sizing.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many IP addresses does OCI reserve per subnet?", "acceptedAnswer": {"@type": "Answer", "text": "Three: the first two addresses (network and default gateway) and the last address (broadcast)."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › Oracle Cloud (OCI) VCN subnet sizing</nav>
+  <article>
+    <h1>Oracle Cloud (OCI) VCN subnet sizing</h1>
+    <p class="lede">Oracle Cloud reserves only 3 addresses per subnet, the fewest of the big clouds.</p>
+    <h2>The 3 reserved addresses</h2>
+    <p>In <code>10.3.0.0/24</code>, OCI keeps the first two addresses, <code>10.3.0.0</code> (network) and <code>10.3.0.1</code> (default gateway), and the last, <code>10.3.0.255</code> (broadcast).</p>
+    <h2>Sizes</h2>
+    <p>VCN CIDR blocks can be from <b>/16</b> to <b>/30</b>, and a VCN can have more than one block. The smallest subnet, a /30, leaves a single usable address.</p>
+    <div class="table-wrap"><table><thead><tr><th>Subnet size</th><th class=n>Addresses</th><th class=n>Usable</th></tr></thead><tbody><tr><td class=" m">/16</td><td class="n">65,536</td><td class="n">65,533</td></tr><tr><td class=" m">/20</td><td class="n">4,096</td><td class="n">4,093</td></tr><tr><td class=" m">/22</td><td class="n">1,024</td><td class="n">1,021</td></tr><tr><td class=" m">/23</td><td class="n">512</td><td class="n">509</td></tr><tr><td class=" m">/24</td><td class="n">256</td><td class="n">253</td></tr><tr><td class=" m">/25</td><td class="n">128</td><td class="n">125</td></tr><tr><td class=" m">/26</td><td class="n">64</td><td class="n">61</td></tr><tr><td class=" m">/27</td><td class="n">32</td><td class="n">29</td></tr><tr><td class=" m">/28</td><td class="n">16</td><td class="n">13</td></tr><tr><td class=" m">/29</td><td class="n">8</td><td class="n">5</td></tr><tr><td class=" m">/30</td><td class="n">4</td><td class="n">1</td></tr></tbody></table></div>
+    <h2>Regional or AD-specific subnets</h2>
+    <p>Oracle recommends <b>regional subnets</b>, which span every availability domain in the region, so instances in any AD can use them. AD-specific subnets are the older model.</p>
+    <div class="try"><p>The planner applies OCI’s 3 reserved addresses and /30 minimum, and exports Terraform for oci_core_vcn and oci_core_subnet.</p><a class="cta" href="../#10.3.0.0/16/1.0/eyJjIjoib2NpIn0">Open in the planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

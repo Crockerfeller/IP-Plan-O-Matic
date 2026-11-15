@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Private IP address ranges (RFC 1918) and other special-purpose blocks | IP Plan-O-Matic</title>
+<meta name="description" content="The private IPv4 ranges from RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), CGNAT, link-local, loopback, documentation and multicast blocks, and the IPv6 equivalents, with tips on which to avoid.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/private-ip-address-ranges.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="Private IP address ranges and special-purpose blocks">
+<meta property="og:description" content="The private IPv4 ranges from RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), CGNAT, link-local, loopback, documentation and multicast blocks, and the IPv6 equivalents, with tips on which to avoid.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/private-ip-address-ranges.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "Private IP address ranges and special-purpose blocks", "description": "The private IPv4 ranges from RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), CGNAT, link-local, loopback, documentation and multicast blocks, and the IPv6 equivalents, with tips on which to avoid.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/private-ip-address-ranges.html", "dateModified": "2026-11-14", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "Private IP address ranges and special-purpose blocks", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/private-ip-address-ranges.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What are the private IPv4 address ranges?", "acceptedAnswer": {"@type": "Answer", "text": "RFC 1918 reserves 10.0.0.0/8, 172.16.0.0/12 (172.16.0.0 to 172.31.255.255) and 192.168.0.0/16 for private networks."}}, {"@type": "Question", "name": "Is 100.64.0.0/10 private?", "acceptedAnswer": {"@type": "Answer", "text": "It is shared address space for carrier-grade NAT (RFC 6598). It is not public, but it is meant for ISPs, not for ordinary LANs."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › Private IP address ranges and special-purpose blocks</nav>
+  <article>
+    <h1>Private IP address ranges and special-purpose blocks</h1>
+    <p class="lede">Which IPv4 and IPv6 ranges are private, which are reserved, and which ones cause trouble when networks meet.</p>
+    <h2>IPv4</h2>
+    <div class="table-wrap"><table><thead><tr><th>Range</th><th>What it is</th><th>Notes</th></tr></thead><tbody><tr><td><span class="mono">10.0.0.0/8</span></td><td>Private (RFC 1918)</td><td>The largest private block. Common for enterprises and clouds.</td></tr><tr><td><span class="mono">172.16.0.0/12</span></td><td>Private (RFC 1918)</td><td>172.16.0.0 to 172.31.255.255. Docker’s default bridge uses 172.17.0.0/16 and the AWS default VPC 172.31.0.0/16.</td></tr><tr><td><span class="mono">192.168.0.0/16</span></td><td>Private (RFC 1918)</td><td>Home and small office routers. 192.168.0.0/24 and 192.168.1.0/24 clash with almost every home network on a VPN.</td></tr><tr><td><span class="mono">100.64.0.0/10</span></td><td>Shared address space, CGNAT (RFC 6598)</td><td>Used by ISPs for carrier-grade NAT and by some overlay networks. Not for your LANs.</td></tr><tr><td><span class="mono">127.0.0.0/8</span></td><td>Loopback</td><td>The host itself. 127.0.0.1 is the usual address.</td></tr><tr><td><span class="mono">169.254.0.0/16</span></td><td>Link-local (RFC 3927)</td><td>Self-assigned when DHCP fails. Cloud metadata services also live at 169.254.169.254.</td></tr><tr><td><span class="mono">192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24</span></td><td>Documentation (RFC 5737)</td><td>For examples in docs and training. Never routed.</td></tr><tr><td><span class="mono">198.18.0.0/15</span></td><td>Benchmarking (RFC 2544)</td><td>For network device testing.</td></tr><tr><td><span class="mono">224.0.0.0/4</span></td><td>Multicast</td><td>Group traffic. Not assignable to hosts.</td></tr><tr><td><span class="mono">240.0.0.0/4</span></td><td>Reserved</td><td>Formerly “class E”. Not usable on most systems.</td></tr><tr><td><span class="mono">0.0.0.0/8</span></td><td>“This network”</td><td>0.0.0.0 means “any” or “unknown”.</td></tr></tbody></table></div>
+    <h2>IPv6</h2>
+    <div class="table-wrap"><table><thead><tr><th>Range</th><th>What it is</th><th>Notes</th></tr></thead><tbody><tr><td><span class="mono">fc00::/7</span></td><td>Unique local, ULA (RFC 4193)</td><td>The IPv6 equivalent of private space. Use fd00::/8 with a random 40-bit ID.</td></tr><tr><td><span class="mono">fe80::/10</span></td><td>Link-local</td><td>Every IPv6 interface has one. Used for neighbor discovery and routing protocols.</td></tr><tr><td><span class="mono">::1/128</span></td><td>Loopback</td><td>The host itself.</td></tr><tr><td><span class="mono">2001:db8::/32</span></td><td>Documentation (RFC 3849)</td><td>For examples. Never routed.</td></tr><tr><td><span class="mono">64:ff9b::/96</span></td><td>NAT64 well-known prefix (RFC 6052)</td><td>IPv4 addresses embedded in IPv6 for NAT64.</td></tr><tr><td><span class="mono">ff00::/8</span></td><td>Multicast</td><td>IPv6 has no broadcast; multicast replaces it.</td></tr><tr><td><span class="mono">2000::/3</span></td><td>Global unicast</td><td>Public IPv6 addresses.</td></tr></tbody></table></div>
+    <h2>Choosing ranges that won’t clash later</h2>
+    <ul>
+      <li><b>Avoid 192.168.0.0/24 and 192.168.1.0/24</b> for anything users reach over a VPN: their home router almost certainly uses the same range.</li>
+      <li><b>Avoid 172.17.0.0/16</b> if Docker runs anywhere nearby, and <b>172.31.0.0/16</b> if you will peer with AWS default VPCs.</li>
+      <li><b>Give every site and VPC its own block</b> from one master plan (for example, a /16 per region out of 10.0.0.0/8). Overlaps are painful to fix once VPNs, peering or mergers connect the networks.</li>
+      <li>For IPv6, generate a random ULA /48 instead of picking fd00::/48, so two organizations are very unlikely to collide.</li>
+    </ul>
+    <div class="try"><p>Paste the networks you already have into the overlap checker to see what clashes with a new plan.</p><a class="cta" href="../">Open the overlap checker →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

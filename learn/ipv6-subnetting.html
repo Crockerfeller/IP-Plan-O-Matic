@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPv6 subnetting: /48, /56 and /64, nibble boundaries and ULA | IP Plan-O-Matic</title>
+<meta name="description" content="A practical guide to IPv6 subnetting: what /48, /56 and /64 are for, why you split on nibble (4-bit) boundaries, point-to-point /127s, ip6.arpa reverse DNS, and unique local addresses.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-subnetting.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="IPv6 subnetting: /48, /56, /64 and nibbles">
+<meta property="og:description" content="A practical guide to IPv6 subnetting: what /48, /56 and /64 are for, why you split on nibble (4-bit) boundaries, point-to-point /127s, ip6.arpa reverse DNS, and unique local addresses.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-subnetting.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "IPv6 subnetting: /48, /56, /64 and nibbles", "description": "A practical guide to IPv6 subnetting: what /48, /56 and /64 are for, why you split on nibble (4-bit) boundaries, point-to-point /127s, ip6.arpa reverse DNS, and unique local addresses.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-subnetting.html", "dateModified": "2026-11-14", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "IPv6 subnetting: /48, /56, /64 and nibbles", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-subnetting.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What size IPv6 subnet should a LAN use?", "acceptedAnswer": {"@type": "Answer", "text": "A /64. Stateless address autoconfiguration (SLAAC) requires exactly 64 bits for the interface ID."}}, {"@type": "Question", "name": "How many /64 subnets are in a /48?", "acceptedAnswer": {"@type": "Answer", "text": "65,536. A /48 also holds 256 /56s or 16 /52s."}}, {"@type": "Question", "name": "What is a nibble boundary in IPv6?", "acceptedAnswer": {"@type": "Answer", "text": "A prefix length that is a multiple of 4 (/48, /52, /56, /60, /64). Each hex digit is 4 bits, so these prefixes change whole hex digits and keep addresses and reverse DNS readable."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › IPv6 subnetting: /48, /56, /64 and nibbles</nav>
+  <article>
+    <h1>IPv6 subnetting: /48, /56, /64 and nibbles</h1>
+    <p class="lede">In IPv6 you stop counting hosts. Every LAN gets a /64, and planning is about how many /64s each site gets.</p>
+    <h2>Standard sizes</h2>
+    <div class="table-wrap"><table><thead><tr><th>Prefix</th><th>Typical use</th><th class=n>/64 networks inside</th></tr></thead><tbody><tr><td class=" m">/32</td><td>An ISP or large organization allocation</td><td class="n">4,294,967,296</td></tr><tr><td class=" m">/48</td><td>One site or campus</td><td class="n">65,536</td></tr><tr><td class=" m">/56</td><td>A small site, branch or home connection</td><td class="n">256</td></tr><tr><td class=" m">/60</td><td>A small home or lab allocation</td><td class="n">16</td></tr><tr><td class=" m">/64</td><td>One LAN or VLAN (SLAAC needs exactly /64)</td><td class="n">1</td></tr><tr><td class=" m">/127</td><td>A point-to-point link between routers (RFC 6164)</td><td class="n">—</td></tr><tr><td class=" m">/128</td><td>A single address, such as a loopback</td><td class="n">—</td></tr></tbody></table></div>
+    <h2>Split on nibbles</h2>
+    <p>Each hex digit in an IPv6 address is 4 bits, a “nibble”. Splitting on 4-bit boundaries (/48 → /52 → /56 → /60 → /64) keeps every prefix readable: the subnets of <code>2001:db8:abcd::/48</code> at /52 are <code>2001:db8:abcd:0000::/52</code> through <code>2001:db8:abcd:f000::/52</code>, one hex digit each. It also keeps reverse DNS clean, because each <code>ip6.arpa</code> label is one nibble.</p>
+    <p>A /48 holds 16 /52s, 256 /56s and 65,536 /64s. A common plan gives each building or region a /52 or /56 and each VLAN a /64.</p>
+    <h2>Point-to-point links</h2>
+    <p>Use a <b>/127</b> for router-to-router links (RFC 6164), often taken from a /64 reserved per link so the numbering stays simple.</p>
+    <h2>Unique local addresses (ULA)</h2>
+    <p>For private IPv6, RFC 4193 reserves <code>fc00::/7</code>; in practice you use <code>fd00::/8</code> plus a random 40-bit Global ID, giving you your own /48. Randomness matters: two companies that both pick <code>fd00::/48</code> will clash if they ever connect.</p>
+    <h2>Reverse DNS</h2>
+    <p>Reverse zones live under <code>ip6.arpa</code>, one label per nibble in reverse. <code>2001:db8:abcd::/48</code> becomes <code>d.c.b.a.8.b.d.0.1.0.0.2.ip6.arpa</code>. Prefixes that aren’t on a nibble boundary span several zones.</p>
+    <div class="try"><p>Split a /48 into nibble-aligned prefixes, give each a name and VLAN, or auto-plan “Sites, /56, 12” in one go.</p><a class="cta" href="../#192.168.0.0/24/1.0/eyJ2NiI6eyJwIjoiMjAwMTpkYjg6Oi80OCIsInQiOiJuMDAwMDAwMDAwMDAwMDAwMCJ9fQ">Open the IPv6 planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

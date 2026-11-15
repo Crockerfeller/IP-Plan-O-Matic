@@ -4,4 +4,44 @@
     <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/</loc>
     <lastmod>2026-11-14</lastmod>
   </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/cidr-cheat-sheet.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/how-many-hosts-in-a-subnet.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/vlsm-subnetting.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/private-ip-address-ranges.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/aws-vpc-subnet-sizing.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/azure-vnet-subnet-sizing.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/google-cloud-vpc-subnet-sizing.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/oracle-cloud-vcn-subnet-sizing.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-subnetting.html</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
 </urlset>

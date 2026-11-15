@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How many hosts are in a subnet? /24, /26, /27, /30 and more | IP Plan-O-Matic</title>
+<meta name="description" content="How to work out the number of usable hosts in any IPv4 subnet, with the formula, worked examples from /24 to /32, the /31 and /32 exceptions and the cloud differences.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/how-many-hosts-in-a-subnet.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="How many hosts are in a subnet?">
+<meta property="og:description" content="How to work out the number of usable hosts in any IPv4 subnet, with the formula, worked examples from /24 to /32, the /31 and /32 exceptions and the cloud differences.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/how-many-hosts-in-a-subnet.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "How many hosts are in a subnet?", "description": "How to work out the number of usable hosts in any IPv4 subnet, with the formula, worked examples from /24 to /32, the /31 and /32 exceptions and the cloud differences.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/how-many-hosts-in-a-subnet.html", "dateModified": "2026-11-14", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "How many hosts are in a subnet?", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/how-many-hosts-in-a-subnet.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many usable hosts are in a /24?", "acceptedAnswer": {"@type": "Answer", "text": "A /24 has 256 addresses and 254 usable hosts. In AWS and Azure it has 251 usable addresses, in Google Cloud 252 and in Oracle Cloud 253."}}, {"@type": "Question", "name": "How many usable hosts are in a /30?", "acceptedAnswer": {"@type": "Answer", "text": "A /30 has 4 addresses and 2 usable hosts, which is why it is used for point-to-point links. A /31 (RFC 3021) gives the same 2 usable addresses with no waste."}}, {"@type": "Question", "name": "What is the formula for usable hosts?", "acceptedAnswer": {"@type": "Answer", "text": "Usable hosts = 2^(32 − prefix length) − 2. The two subtracted addresses are the network address and the broadcast address."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › How many hosts are in a subnet?</nav>
+  <article>
+    <h1>How many hosts are in a subnet?</h1>
+    <p class="lede">A subnet with prefix length /n has 2<sup>32−n</sup> addresses. Subtract 2 for the network and broadcast addresses and you have the usable hosts.</p>
+    <h2>The formula</h2>
+    <p><b>Usable hosts = 2<sup>(32 − prefix)</sup> − 2</b>. A /24 has 2<sup>8</sup> = 256 addresses, so 254 usable hosts. A /26 has 64 addresses and 62 hosts. A /30 has 4 addresses and 2 hosts, which is why it was the classic size for a link between two routers.</p>
+    <h2>Worked examples</h2>
+    <div class="table-wrap"><table><thead><tr><th>Subnet</th><th class=n>Addresses</th><th class=n>Usable hosts</th><th>Usable range</th></tr></thead><tbody><tr><td class=" m">10.1.20.0/24</td><td class="n">256</td><td class="n">254</td><td class=" m">10.1.20.1 – 10.1.20.254</td></tr><tr><td class=" m">10.1.20.64/26</td><td class="n">64</td><td class="n">62</td><td class=" m">10.1.20.65 – 10.1.20.126</td></tr><tr><td class=" m">10.1.20.96/27</td><td class="n">32</td><td class="n">30</td><td class=" m">10.1.20.97 – 10.1.20.126</td></tr><tr><td class=" m">10.1.20.8/29</td><td class="n">8</td><td class="n">6</td><td class=" m">10.1.20.9 – 10.1.20.14</td></tr><tr><td class=" m">10.1.20.4/30</td><td class="n">4</td><td class="n">2</td><td class=" m">10.1.20.5 – 10.1.20.6</td></tr><tr><td class=" m">10.1.20.2/31</td><td class="n">2</td><td class="n">2</td><td class=" m">10.1.20.2 – 10.1.20.3</td></tr><tr><td class=" m">10.1.20.1/32</td><td class="n">1</td><td class="n">1</td><td class=" m">10.1.20.1</td></tr></tbody></table></div>
+    <h2>The exceptions: /31 and /32</h2>
+    <p>A <b>/31</b> has only two addresses and no room for a broadcast, so RFC 3021 lets both be used on a point-to-point link. It saves half the addresses of a /30. A <b>/32</b> is a single address, used for loopbacks and host routes.</p>
+    <h2>Clouds use more addresses</h2>
+    <p>Cloud networks reserve extra addresses in every subnet for their router and DNS. A /24 has 251 usable addresses in AWS and Azure, 252 in Google Cloud and 253 in Oracle Cloud. See the <a href="cidr-cheat-sheet.html">CIDR cheat sheet</a> for every size, or the guides for <a href="aws-vpc-subnet-sizing.html">AWS</a>, <a href="azure-vnet-subnet-sizing.html">Azure</a>, <a href="google-cloud-vpc-subnet-sizing.html">Google Cloud</a> and <a href="oracle-cloud-vcn-subnet-sizing.html">Oracle Cloud</a>.</p>
+    <h2>Picking a size from a host count</h2>
+    <p>Find the smallest prefix whose usable hosts cover what you need, plus room to grow. 50 hosts fit in a /26 (62), 100 in a /25 (126), 300 in a /23 (510). The <a href="vlsm-subnetting.html">VLSM guide</a> shows how to do this for a whole list of networks at once.</p>
+    <div class="try"><p>Type the base network into the planner, click Divide until you reach the size you need, and the host count shows on every row.</p><a class="cta" href="../">Open in the planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>
