@@ -209,7 +209,7 @@
   .guide-grid span { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .tabbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
   .tabbar nav.tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; border-bottom: 0; }
-  .tabbar #plansBtn { flex: none; height: 32px; margin-bottom: 4px; }
+  .tabbar #plansBtn, .tabbar #reloadBtn { flex: none; height: 32px; margin-bottom: 4px; }
   .tabbar #themeBtn { flex: none; height: 32px; width: 32px; margin: 0 0 4px -4px; }
   nav.tabs button {
     border: none; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent;
@@ -278,7 +278,10 @@
   button.primary:hover { filter: brightness(1.07); background: var(--accent); }
   button.icon { width: 38px; padding: 0; display: inline-grid; place-items: center; }
   .top-btns { display: flex; gap: 8px; align-items: center; }
-  #plansBtn { display: inline-flex; align-items: center; gap: 6px; }
+  #plansBtn, #reloadBtn { display: inline-flex; align-items: center; gap: 6px; }
+  #reloadBtn.busy svg { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #reloadBtn.busy svg { animation: none; } }
   dialog#plansDlg {
     width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
     border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
@@ -624,8 +627,8 @@
     .actions { margin-left: 0; width: 100%; }
     .actions button { flex: 1 1 calc(50% - 4px); }
     th, td { padding: 8px 10px; }
-    #plansBtn { width: 38px; padding: 0; justify-content: center; }
-    #plansBtn .btn-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    #plansBtn, #reloadBtn { width: 38px; padding: 0; justify-content: center; }
+    #plansBtn .btn-txt, #reloadBtn .btn-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   }
   /* Phone: logo and theme button share one row, so scale the logo (same proportions) to fit */
   @media (max-width: 420px) {
@@ -941,6 +944,10 @@
     <button type="button" role="tab" id="tb-v6" data-tab="v6">IPv6</button>
     <button type="button" role="tab" id="tb-learn" data-tab="learn">Guides</button>
   </nav>
+    <button type="button" id="reloadBtn" class="no-print" title="Reload the latest version of IP Plan-O-Matic, skipping cached copies. Your plan is kept.">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      <span class="btn-txt">Reload</span>
+    </button>
     <button type="button" id="plansBtn" class="no-print" title="Save this plan in your browser, or open one you saved" aria-haspopup="dialog">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
       <span class="btn-txt">Plans</span>
@@ -5401,6 +5408,22 @@
   const OFFICIAL = location.hostname === 'crockerfeller.github.io';
   $('updBtn').hidden = OFFICIAL;
   $('updBtn').addEventListener('click', (e) => { e.preventDefault(); checkUpdates(); });
+
+  // Reload: save the plan now (not 300 ms from now), pick up a newer service worker, then reload. The app page
+  // is fetched network-first, so online this loads the latest version; offline it reloads the cached app.
+  // The plan comes back from the address bar.
+  $('reloadBtn').addEventListener('click', async () => {
+    const btn = $('reloadBtn');
+    btn.disabled = true; btn.classList.add('busy');
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();   // commit a half-typed edit
+    clearTimeout(hashTimer); writeHash();
+    try { await hashWritten; } catch (e) { /* ignore */ }
+    try {
+      const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+      if (reg) await Promise.race([reg.update(), new Promise((r) => setTimeout(r, 3000))]);
+    } catch (e) { /* offline or no service worker */ }
+    location.reload();
+  });
 
   // Tip button: X Money has no public "send to @handle" link, so copy the handle and open the profile.
   for (const el of document.querySelectorAll('.js-xmoney')) el.addEventListener('click', () => {

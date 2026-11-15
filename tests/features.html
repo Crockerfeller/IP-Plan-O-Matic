@@ -756,6 +756,21 @@ T.azureSingle = async () => {
   check('aws single over /16 refused', $('azApply').disabled && out().includes('A VPC can be /16 at most'), out());
   $('azDlg').close();
 };
+T.reloadBtn = async () => {
+  await load('../index.html#10.0.0.0/24');
+  const rb = $('reloadBtn');
+  check('reload button left of Plans', rb && rb.nextElementSibling === $('plansBtn') && rb.title.includes('Your plan is kept'));
+  divideRow(0);
+  const inp = qa('#body tr')[0].querySelector('input');
+  inp.focus(); inp.value = 'Kept'; inp.dispatchEvent(new W.Event('input', { bubbles: true }));
+  let reloaded = false;
+  F.onload = () => { reloaded = true; };
+  rb.click();
+  for (let i = 0; i < 40 && !reloaded; i++) await sleep(100);
+  W = F.contentWindow; D = W.document; await sleep(400);
+  check('reload happened', reloaded);
+  check('plan and unsaved edit survive reload', qa('#body tr').length === 2 && qa('#body tr')[0].querySelector('input').value === 'Kept', snap().rows);
+};
 T.awsHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azCloud', 'aws'); select('#azLayout', 'hub');
