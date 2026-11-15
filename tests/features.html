@@ -167,7 +167,8 @@ T.blocks = async () => {
   select('#exFmt', 'tf-azure'); t = $('exOut').value;
   check('tf-azure two vnets', (t.match(/azurerm_virtual_network" "/g) || []).length === 2, t.slice(0, 900));
   select('#exFmt', 'csv'); t = $('exOut').value;
-  check('csv base network col', t.startsWith('"Base network","Subnet"') && t.includes('"172.16.0.0/16","172.16.0.0/17"'), t.slice(0, 300));
+  check('csv base network col', t.startsWith('"Base network","Network name","Subnet","Group"') && t.includes('"10.0.0.0/22","","10.0.0.0/23",""'), t.slice(0, 300));
+  check('csv network name leads the group', t.includes('"172.16.0.0/16","AWS-VPC","172.16.0.0/17","AWS-VPC"'), t);
   select('#exFmt', 'json'); const js = $('exOut').value;
   const j = JSON.parse(js);
   check('json blocks', j.version === 3 && j.blocks.length === 2 && j.blocks[1].platform === 'aws' && j.subnets.some((x) => x.network === '172.16.0.0/16' && x.hosts === 32763), j.blocks);
