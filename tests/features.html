@@ -567,10 +567,10 @@ T.azureHubSpoke = async () => {
   check('tf: dns resolver delegation', tf.includes('name = "Microsoft.Network/dnsResolvers"'));
   check('tf: peerings both ways', tf.includes('resource "azurerm_virtual_network_peering" "hub_to_spoke_workload"') && tf.includes('resource "azurerm_virtual_network_peering" "spoke_workload_to_hub"'), tf.slice(-1500));
   select('#exFmt', 'csv');
-  check('csv: Azure service column', $('exOut').value.split('\n')[0].includes('"Azure service"') && $('exOut').value.includes('"Azure Bastion"'));
+  check('csv: Cloud service column', $('exOut').value.split('\n')[0].includes('"Cloud service"') && $('exOut').value.includes('"Azure Bastion"'));
   select('#exFmt', 'json');
   const js = JSON.parse($('exOut').value);
-  check('json: azureService', js.subnets.some((x) => x.name === 'AzureBastionSubnet' && x.azureService === 'bastion'));
+  check('json: cloudService', js.subnets.some((x) => x.name === 'AzureBastionSubnet' && x.cloudService === 'bastion'));
   click('#tb-plan');
   click('#undoBtn'); await sleep(50);
   check('undo restores 192.168.0.0/24', chipsB().length === 0 || $('blocks').hidden, $('blocks').textContent);
@@ -578,7 +578,7 @@ T.azureHubSpoke = async () => {
   await load('../index.html' + link);
   check('link round trip', chipsB().length === 2 && snap().rows.some((r) => r.includes('[AzureBastionSubnet]')));
   click('#tb-export'); select('#exFmt', 'json');
-  check('link keeps d', JSON.parse($('exOut').value).subnets.filter((x) => x.azureService).length === 11);
+  check('link keeps d', JSON.parse($('exOut').value).subnets.filter((x) => x.cloudService).length === 11);
   click('#tb-plan');
 
   // Hand-made subnets: a /27 AzureBastionSubnet and a lower-case gatewaysubnet on Azure.
@@ -600,6 +600,136 @@ T.azureHubSpoke = async () => {
   check('tf keeps GatewaySubnet for renamed', tfr.includes('name                 = "GatewaySubnet"'), tfr);
   check('tf renamed delegated subnet keeps delegation', /snet-apps"[\s\S]*?Microsoft\.Web\/serverFarms/.test(tfr), tfr);
   click('#tb-plan');
+};
+T.awsHubSpoke = async () => {
+  await load('../index.html#192.168.0.0/24');
+  select('#platform', 'aws-hs');
+  check('aws dialog opens', $('azDlg').open && $('azTtl').textContent.startsWith('AWS') && !$('azZonesF').hidden && $('platform').value === 'std');
+  const out = () => $('azOut').textContent;
+  check('aws hub /23, spoke /19', out().includes('Hub 10.0.0.0/23') && out().includes('Spoke workload 10.0.32.0/19'), out().slice(0, 400));
+  const want = ['10.0.0.0/28tgw-attach-us-east-1aus-east-1a', '10.0.0.32/28tgw-attach-us-east-1c', '10.0.0.48/28firewall-us-east-1a', '10.0.0.128/28public-nat-us-east-1c',
+    '10.0.32.0/23private-app-us-east-1a', '10.0.38.0/24public-us-east-1a', '10.0.40.0/24public-us-east-1c', '10.0.43.0/24private-data-us-east-1c', '10.0.44.32/28tgw-attach-us-east-1c'];
+  check('aws default layout', want.every((x) => out().includes(x)), want.filter((x) => !out().includes(x)));
+  type('#azZones', 'us-east-1a');
+  check('one AZ: notes, still allowed', out().includes('Public: load balancers (ALB / NLB) needs subnets in at least two Availability Zones') && !$('azApply').disabled, out().slice(0, 400));
+  type('#azZones', 'us-east-1a, us-east-1b, us-east-1c');
+  const spokeCard = qa('#azVnets .az-vnet')[1];
+  spokeCard.querySelector('input[data-svc="aws-eksnodes"]').click();
+  select(spokeCard.querySelector('select[data-svc="aws-eksnodes"]'), '17');
+  check('aws vpc over /16 refused', out().includes('a VPC can be /16 at most') && $('azApply').disabled, out().slice(0, 300));
+  spokeCard.querySelector('input[data-svc="aws-eksnodes"]').click();
+  check('aws back to fitting', !$('azApply').disabled);
+  click('#azApply'); await sleep(50);
+  check('aws applied', chipsB().length === 2 && $('platform').value === 'aws' && chipsB()[1].textContent.startsWith('10.0.32.0/19'), $('blocks').textContent);
+  check('aws rows have zones', snap().rows.some((r) => r.startsWith('10.0.0.0/28') && r.includes('[tgw-attach-us-east-1a]') && r.includes('[us-east-1a]')), snap().rows.slice(0, 3));
+  check('no aws warnings on defaults', !/must be/.test($('warnings').textContent), $('warnings').textContent);
+  click('#tb-export'); select('#exInc', 'all'); select('#exFmt', 'tf-aws');
+  const tf = $('exOut').value;
+  check('tf-aws: transit gateway', tf.includes('resource "aws_ec2_transit_gateway" "main"'), tf.slice(-1500));
+  check('tf-aws: hub attachment with 3 subnets', /resource "aws_ec2_transit_gateway_vpc_attachment" "hub" \{[\s\S]*?subnet_ids         = \[aws_subnet\.[a-z0-9_]+\.id, aws_subnet\.[a-z0-9_]+\.id, aws_subnet\.[a-z0-9_]+\.id\]/.test(tf), tf.slice(-1500));
+  check('tf-aws: spoke attachment', tf.includes('resource "aws_ec2_transit_gateway_vpc_attachment" "spoke_workload"'));
+  check('tf-aws: subnet AZ', tf.includes('availability_zone = "us-east-1b"'));
+  select('#exFmt', 'tf-azure');
+  check('tf-azure has no TGW', !$('exOut').value.includes('transit_gateway'));
+  click('#tb-plan');
+  click('#undoBtn'); await sleep(50);
+  check('aws undo', $('platform').value === 'std' && snap().rows.length === 1);
+  // A load balancer subnet below the ALB minimum is flagged with its own name.
+  const blob = b64u({ c: 'aws', m: { '10.0.0.0/28': { n: 'public-us-east-1a', d: 'aws-pub', z: 'us-east-1a' } } });
+  await load('../index.html#10.0.0.0/24/9.f00/' + blob);
+  check('aws fixture has the /28', snap().rows[0].startsWith('10.0.0.0/28'), snap().rows[0]);
+  check('aws alb /28 warning', $('warnings').textContent.includes('public-us-east-1a must be /27 or larger'), $('warnings').textContent);
+  // Switching template keeps each cloud's choices.
+  select('#platform', 'azure-hs');
+  check('azure template after aws', $('azTtl').textContent.startsWith('Azure') && $('azZonesF').hidden && out().includes('AzureBastionSubnet'));
+  $('azDlg').close();
+};
+T.peering = async () => {
+  const pbtn = () => $('peerBtn') ? $('peerBtn').textContent : '';
+  const boxes = () => qa('#peerPairs input[type=checkbox]');
+  const tf = (f) => { click('#tb-export'); select('#exInc', 'all'); select('#exFmt', f); const t = $('exOut').value; click('#tb-plan'); return t; };
+  // Azure: hub and two spokes from the template.
+  await load('../index.html#192.168.0.0/24');
+  check('no peering button with one network', !$('peerBtn'));
+  select('#platform', 'azure-hs'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
+  check('template sets hub-and-spoke peering', pbtn().includes('Peering (2)'), pbtn());
+  click('#peerBtn');
+  check('wizard opens on hub and spoke', $('peerDlg').open && $('peerMode').value === 'hub' && $('peerHub').value === '10.0.0.0/23');
+  check('wizard pairs', boxes().length === 3 && boxes().filter((c) => c.checked).length === 2 && !boxes()[2].checked, boxes().map((c) => c.checked));
+  check('azure options only', !$('peerAz').hidden && $('peerAws').hidden);
+  select('#peerMode', 'mesh');
+  check('mesh ticks every pair', boxes().every((c) => c.checked));
+  check('mesh: no transitivity note', !$('peerMsg').textContent.includes('transitive'));
+  click('#peerSave'); await sleep(50);
+  check('mesh saved', pbtn().includes('Peering (3)'), pbtn());
+  let t = tf('tf-azure');
+  check('tf-azure mesh peerings', t.includes('"spoke_workload_to_spoke_2"') && t.includes('"spoke_2_to_spoke_workload"') && t.includes('"hub_to_spoke_2"'), t.slice(-2500));
+  check('tf-azure no gateway transit by default', !t.includes('allow_gateway_transit') && t.includes('# use_remote_gateways'));
+  click('#peerBtn');
+  check('wizard remembers mesh', $('peerMode').value === 'mesh');
+  select('#peerMode', 'hub');
+  $('peerGw').click();
+  check('hub has GatewaySubnet: no gateway note', !$('peerMsg').textContent.includes('needs a GatewaySubnet'), $('peerMsg').textContent);
+  check('hub and spoke: transitivity note', $('peerMsg').textContent.includes('isn’t transitive'));
+  click('#peerSave'); await sleep(50);
+  t = tf('tf-azure');
+  check('tf-azure gateway transit', /"hub_to_spoke_workload" \{[^}]*allow_gateway_transit     = true/.test(t) && /"spoke_workload_to_hub" \{[^}]*use_remote_gateways       = true/.test(t), t.slice(-2500));
+  check('tf-azure hub and spoke only', !t.includes('spoke_workload_to_spoke_2'));
+  await W.eval('Promise.resolve()'); await sleep(400);
+  const link = W.location.hash;
+  click('#tb-export'); select('#exFmt', 'json');
+  const js = JSON.parse($('exOut').value);
+  check('json has peering', js.peering && js.peering.pairs.length === 2 && js.peering.options.g === 1, js.peering);
+  click('#tb-plan');
+  // Change the hub's address: its peerings follow it.
+  chipsB()[0].click(); setBase('10.0.2.0/23'); await sleep(50);
+  check('base change keeps peerings', pbtn().includes('Peering (2)') && tf('tf-azure').includes('"hub_to_spoke_workload"'), pbtn());
+  click('#undoBtn'); await sleep(50);
+  // Remove a spoke: its peering goes too; undo brings it back.
+  chipsB()[2].click(); await sleep(20);
+  q('#blocks .chip-x').click(); await sleep(50);
+  check('removing a network drops its peering', pbtn().includes('Peering (1)'), pbtn());
+  click('#undoBtn'); await sleep(50);
+  check('undo restores peering', pbtn().includes('Peering (2)'), pbtn());
+  await load('../index.html' + link);
+  check('link keeps peering and options', pbtn().includes('Peering (2)') && tf('tf-azure').includes('use_remote_gateways       = true'));
+  // JSON import brings peering back.
+  click('#tb-export');
+  $('imText').value = JSON.stringify(js); click('#imRun'); await sleep(50);
+  click('#tb-plan');
+  check('json import restores peering', pbtn().includes('Peering (2)'), pbtn());
+
+  // AWS: Transit Gateway with routes, then VPC peering.
+  await load('../index.html#192.168.0.0/24');
+  select('#platform', 'aws-hs'); click('#azApply'); await sleep(50);
+  t = tf('tf-aws');
+  check('tf-aws tgw routes both ways', /resource "aws_route" "hub_to_spoke_workload" \{[\s\S]*?destination_cidr_block = "10\.0\.32\.0\/19"[\s\S]*?transit_gateway_id     = aws_ec2_transit_gateway\.main\.id[\s\S]*?depends_on             = \[aws_ec2_transit_gateway_vpc_attachment\.hub\]/.test(t) && t.includes('resource "aws_route" "spoke_workload_to_hub"'), t.slice(-1800));
+  click('#peerBtn');
+  check('aws options only', $('peerAz').hidden && !$('peerAws').hidden);
+  select('#peerType', 'pcx'); click('#peerSave'); await sleep(50);
+  t = tf('tf-aws');
+  check('tf-aws vpc peering', t.includes('resource "aws_vpc_peering_connection" "hub_spoke_workload"') && t.includes('vpc_peering_connection_id = aws_vpc_peering_connection.hub_spoke_workload.id') && !t.includes('aws_ec2_transit_gateway'), t.slice(-1500));
+  click('#peerBtn'); $('peerRoutes').click(); click('#peerSave'); await sleep(50);
+  check('tf-aws routes off', !tf('tf-aws').includes('resource "aws_route"'));
+  click('#peerBtn'); select('#peerMode', 'none'); click('#peerSave'); await sleep(50);
+  t = tf('tf-aws');
+  check('no peering: nothing exported', !t.includes('aws_vpc_peering_connection') && !t.includes('aws_ec2_transit_gateway') && pbtn() === '⇄ Peering…', pbtn());
+
+  // AWS VPCs without attachment subnets fall back to their first subnet per zone.
+  await load('../index.html#10.1.0.0/16');
+  select('#platform', 'aws'); addBox('10.2.0.0/16 Other'); select('#platform', 'aws');
+  click('#peerBtn');
+  check('fallback note', $('peerMsg').textContent.includes('has no Transit Gateway attachment subnets'), $('peerMsg').textContent);
+  click('#peerSave'); await sleep(50);
+  t = tf('tf-aws');
+  check('tf-aws fallback attachment', t.includes('attaching its first subnet in each zone') && t.includes('resource "aws_ec2_transit_gateway_vpc_attachment"'), t.slice(-1500));
+
+  // Standard networks can't be peered.
+  await load('../index.html#10.1.0.0/16');
+  addBox('10.2.0.0/16 Other');
+  click('#peerBtn');
+  check('standard: explains and disables', $('peerPairs').textContent.includes('same cloud') && $('peerSave').disabled);
+  $('peerDlg').close();
 };
 T.updateCheck = async () => {
   await load('../index.html#10.0.0.0/24');

@@ -15,4 +15,7 @@ check('plans dialog fits', dr.right <= D.documentElement.clientWidth + 1, dr.rig
 $('plansDlg').close(); select('#platform', 'azure-hs'); await sleep(50);
 const ar = $('azDlg').getBoundingClientRect();
 check('azure dialog fits', ar.right <= D.documentElement.clientWidth + 1 && $('azDlg').scrollWidth <= $('azDlg').clientWidth + 1, { r: ar.right, sw: $('azDlg').scrollWidth, cw: $('azDlg').clientWidth });
+$('azDlg').close(); click('#tb-plan'); click('#peerBtn'); await sleep(50);
+const pr = $('peerDlg').getBoundingClientRect();
+check('peering dialog fits', $('peerDlg').open && pr.right <= D.documentElement.clientWidth + 1 && $('peerDlg').scrollWidth <= $('peerDlg').clientWidth + 1, { r: pr.right, sw: $('peerDlg').scrollWidth, cw: $('peerDlg').clientWidth });
 done();}catch(e){errors.push(e.stack);done();}})();</script>
