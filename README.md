@@ -42,6 +42,8 @@ Network engineers, sysadmins, cloud architects, homelabbers, and CCNA / Network+
 
 It's a single `index.html` with no build step. Open it in a browser. Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`.
 
+A local copy shows **Check for updates** in the footer. It compares your copy with the latest `index.html` on GitHub and offers the new version as a .zip (or run `git pull` in a clone). This works because `.gitattributes` marks `index.html` as `ident`: git stamps the file's blob hash into it on checkout and in GitHub's zip downloads.
+
 ## Support
 
 IP Plan-O-Matic is free. If it saved you time, you can tip:

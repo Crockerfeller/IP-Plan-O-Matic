@@ -531,6 +531,108 @@ T.hardening = async () => {
   check('headroom rounding exact', $('vlsmOut').textContent.includes('10.0.0.0/21'), $('vlsmOut').textContent.slice(0, 300));
   click('#tb-plan');
 };
+T.azureHubSpoke = async () => {
+  await load('../index.html#192.168.0.0/24');
+  select('#platform', 'azure-hs');
+  check('az dialog opens, platform unchanged', $('azDlg').open && $('platform').value === 'std');
+  const out = () => $('azOut').textContent;
+  const hub = ['10.0.0.0/26AzureFirewallSubnet', '10.0.0.64/26AzureBastionSubnet', '10.0.0.128/27GatewaySubnet', '10.0.0.160/28snet-dns-in', '10.0.0.176/28snet-dns-out'];
+  const spoke = ['10.0.16.0/24snet-appgw', '10.0.17.0/24snet-pe', '10.0.18.0/24snet-web', '10.0.19.0/24snet-app', '10.0.20.0/24snet-data', '10.0.21.0/26snet-appsvc'];
+  check('preview hub 10.0.0.0/23 + spoke 10.0.16.0/20', out().includes('Hub 10.0.0.0/23') && out().includes('Spoke workload 10.0.16.0/20'), out().slice(0, 300));
+  check('preview default subnets', [...hub, ...spoke].every((x) => out().includes(x)), out());
+  check('preview free space', out().includes('10.0.0.192/26') && out().includes('10.0.24.0/21'), out());
+  click('#azAddSpoke');
+  check('second spoke on 10.0.32.0/20', out().includes('Spoke 2 10.0.32.0/20'), out().slice(0, 600));
+  type('#azSpace', '10.0.0.0/22');
+  check('too small space', /use at least a \/18 address space/i.test(out()) && $('azApply').disabled, out());
+  type('#azSpace', '10.0.0.0/16');
+  qa('#azVnets .az-vnet')[1].querySelector('button').click();   // remove spoke 1: Spoke 2 is left
+  click('#azAddSpoke');
+  check('new spoke gets an unused name', out().includes('Spoke 2 ') && out().includes('Spoke 3 ') && !/Spoke 2[\s\S]*Spoke 2 /.test(out()), out().slice(0, 900));
+  qa('#azVnets .az-vnet')[2].querySelector('button').click();   // remove Spoke 3
+  qa('#azVnets .az-vnet')[1].querySelector('input[type=text]').value = 'Spoke workload';
+  qa('#azVnets .az-vnet')[1].querySelector('input[type=text]').dispatchEvent(new W.Event('input'));
+  check('spoke removed', !out().includes('Spoke 2') && !out().includes('Spoke 3') && out().includes('Spoke workload 10.0.16.0/20'), out().slice(0, 900));
+  click('#azApply'); await sleep(50);
+  check('applied: two azure blocks', chipsB().length === 2 && chipsB()[0].textContent.startsWith('10.0.0.0/23') && chipsB()[1].textContent.startsWith('10.0.16.0/20') && $('platform').value === 'azure', $('blocks').textContent);
+  const rowsHub = snap().rows;
+  check('hub rows named', rowsHub.length === 7 && rowsHub.some((r) => r.startsWith('10.0.0.64/26') && r.includes('[AzureBastionSubnet]') && r.includes('[used]')), rowsHub);
+  check('no azure warnings on defaults', !/must be|exact name/.test($('warnings').textContent), $('warnings').textContent);
+  await W.eval('Promise.resolve()'); await sleep(400);
+  const link = W.location.hash;
+  click('#tb-export'); select('#exFmt', 'tf-azure');
+  const tf = $('exOut').value;
+  check('tf: exact AzureBastionSubnet', tf.includes('name                 = "AzureBastionSubnet"') && tf.includes('name                 = "GatewaySubnet"'), tf.slice(0, 1500));
+  check('tf: app service delegation', /snet-appsvc"[\s\S]*?service_delegation \{\n      name = "Microsoft\.Web\/serverFarms"/.test(tf), tf);
+  check('tf: dns resolver delegation', tf.includes('name = "Microsoft.Network/dnsResolvers"'));
+  check('tf: peerings both ways', tf.includes('resource "azurerm_virtual_network_peering" "hub_to_spoke_workload"') && tf.includes('resource "azurerm_virtual_network_peering" "spoke_workload_to_hub"'), tf.slice(-1500));
+  select('#exFmt', 'csv');
+  check('csv: Azure service column', $('exOut').value.split('\n')[0].includes('"Azure service"') && $('exOut').value.includes('"Azure Bastion"'));
+  select('#exFmt', 'json');
+  const js = JSON.parse($('exOut').value);
+  check('json: azureService', js.subnets.some((x) => x.name === 'AzureBastionSubnet' && x.azureService === 'bastion'));
+  click('#tb-plan');
+  click('#undoBtn'); await sleep(50);
+  check('undo restores 192.168.0.0/24', chipsB().length === 0 || $('blocks').hidden, $('blocks').textContent);
+  check('undo restores platform', $('platform').value === 'std' && snap().rows.length === 1 && snap().rows[0].startsWith('192.168.0.0/24'));
+  await load('../index.html' + link);
+  check('link round trip', chipsB().length === 2 && snap().rows.some((r) => r.includes('[AzureBastionSubnet]')));
+  click('#tb-export'); select('#exFmt', 'json');
+  check('link keeps d', JSON.parse($('exOut').value).subnets.filter((x) => x.azureService).length === 11);
+  click('#tb-plan');
+
+  // Hand-made subnets: a /27 AzureBastionSubnet and a lower-case gatewaysubnet on Azure.
+  await load('../index.html#10.0.0.0/24');
+  select('#platform', 'azure');
+  addBox('10.0.0.0/27 AzureBastionSubnet');
+  addBox('10.0.0.32/27 gatewaysubnet');
+  const wt = $('warnings').textContent;
+  check('bastion too small warning', wt.includes('AzureBastionSubnet must be /26 or larger'), wt);
+  check('exact name warning', wt.includes('Azure needs the exact name GatewaySubnet, not gatewaysubnet'), wt);
+  select('#platform', 'std');
+  check('no azure warnings on standard', !/must be \/26|exact name/.test($('warnings').textContent));
+  // A template subnet (d = gateway) renamed by hand: still flagged, and Terraform keeps the required name.
+  const blobR = b64u({ c: 'azure', m: { '10.0.0.0/27': { n: 'gw', d: 'gw', s: 'used' }, '10.0.0.64/26': { n: 'apps', d: 'appsvc' } } });
+  await load('../index.html#10.0.0.0/24/7.70/' + blobR);
+  check('renamed template subnet flagged', $('warnings').textContent.includes('Azure needs the exact name GatewaySubnet, not gw'), $('warnings').textContent);
+  click('#tb-export'); select('#exInc', 'all'); select('#exFmt', 'tf-azure');
+  const tfr = $('exOut').value;
+  check('tf keeps GatewaySubnet for renamed', tfr.includes('name                 = "GatewaySubnet"'), tfr);
+  check('tf renamed delegated subnet keeps delegation', /snet-apps"[\s\S]*?Microsoft\.Web\/serverFarms/.test(tfr), tfr);
+  click('#tb-plan');
+};
+T.updateCheck = async () => {
+  await load('../index.html#10.0.0.0/24');
+  check('update link shown off the hosted site', !$('updBtn').hidden);
+  const real = W.fetch.bind(W);
+  let remote = '0'.repeat(40), offline = false;
+  W.fetch = (u, o) => {
+    if (!String(u).startsWith('https://api.github.com/')) return real(u, o);
+    if (offline) return Promise.reject(new TypeError('offline'));
+    const body = String(u).includes('/contents/') ? { sha: remote } : [{ sha: 'c'.repeat(40), commit: { message: 'Add things\n\nmore', committer: { date: '2026-11-20T10:00:00Z' } } }];
+    return Promise.resolve(new W.Response(JSON.stringify(body), { status: 200 }));
+  };
+  dialogs.length = 0; confirmAnswer = false;
+  click('#updBtn'); await sleep(300);
+  const mine = $('updBtn').dataset.local;
+  check('update: local version hashed', /^[0-9a-f]{40}$/.test(mine), mine);
+  check('update: newer version prompt', dialogs.length === 1 && dialogs[0].includes('newer version') && dialogs[0].includes('2026-11-20: “Add things”') && dialogs[0].includes('git pull'), dialogs);
+  remote = mine; dialogs.length = 0;
+  click('#updBtn'); await sleep(300);
+  check('update: up to date', dialogs.length === 0 && $('toast').textContent.includes('You have the latest version (updated 2026-11-20)'), $('toast').textContent);
+  offline = true;
+  click('#updBtn'); await sleep(300);
+  check('update: offline message', $('toast').textContent.includes('Couldn’t reach GitHub'), $('toast').textContent);
+  offline = false; remote = null;
+  const realF = W.fetch;
+  W.fetch = (u, o) => (String(u).startsWith('https://api.github.com/') ? Promise.resolve(new W.Response('{}', { status: 403 })) : real(u, o));
+  click('#updBtn'); await sleep(300);
+  check('update: rate limit message', $('toast').textContent.includes('limiting update checks'), $('toast').textContent);
+  W.fetch = realF;
+  check('update: link text restored', $('updBtn').textContent.includes('Check for updates'));
+  W.fetch = real; confirmAnswer = true;
+  document.title = 'local-blob:' + mine;
+};
 (async () => {
   const only = new URLSearchParams(location.search).get('t');
   for (const [k, fn] of Object.entries(T)) {

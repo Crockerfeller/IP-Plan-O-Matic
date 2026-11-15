@@ -12,4 +12,7 @@ for (const t of ['plan','vlsm','tools','export','v6']) {
 click('#plansBtn'); await sleep(50);
 const dr = $('plansDlg').getBoundingClientRect();
 check('plans dialog fits', dr.right <= D.documentElement.clientWidth + 1, dr.right);
+$('plansDlg').close(); select('#platform', 'azure-hs'); await sleep(50);
+const ar = $('azDlg').getBoundingClientRect();
+check('azure dialog fits', ar.right <= D.documentElement.clientWidth + 1 && $('azDlg').scrollWidth <= $('azDlg').clientWidth + 1, { r: ar.right, sw: $('azDlg').scrollWidth, cw: $('azDlg').clientWidth });
 done();}catch(e){errors.push(e.stack);done();}})();</script>

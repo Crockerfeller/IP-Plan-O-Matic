@@ -297,6 +297,24 @@
   .plans-list td:first-child { min-width: 160px; }
   .plans-list .empty { color: var(--muted); text-align: center; padding: 18px; }
   .dlg-foot { margin-top: 12px; }
+  dialog#azDlg {
+    width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
+  }
+  dialog#azDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  #azDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .az-vnet { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+  .az-vnet-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin-bottom: 8px; }
+  .az-vnet-head h3 { margin: 0 auto 8px 0; font-size: 15px; }
+  .az-svcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 2px 16px; }
+  .az-svc { display: flex; align-items: center; gap: 8px; min-height: 34px; font-size: 14px; }
+  .az-svc label { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .az-svc .nm { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .az-svc select { height: 30px; padding: 0 6px; }
+  .az-svc a { font-size: 12px; color: var(--muted); }
+  #azOut { margin-top: 12px; }
+  #azOut .az-plan { margin-top: 8px; }
+  #azOut h4 { margin: 10px 0 4px; font-size: 14px; }
   .filebtn { display: inline-flex; align-items: center; height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 14px; background: var(--panel); }
   .filebtn input { display: none; }
   button.small { height: 28px; padding: 0 10px; font-size: 13px; }
@@ -664,6 +682,26 @@
     </div>
   </dialog>
 
+  <dialog id="azDlg" aria-labelledby="azTtl">
+    <div class="dlg-head">
+      <h2 id="azTtl">Azure hub-and-spoke with service subnets</h2>
+      <button type="button" class="icon" id="azClose" aria-label="Close">✕</button>
+    </div>
+    <p class="sub">Pick the Azure services you need. Each one gets a subnet of its own, named and sized for it: the hub VNet holds the shared services (gateway, firewall, Bastion, DNS), and each spoke VNet holds workloads. Sizes start at Microsoft’s recommendation; the menus never go below the minimum. Applying replaces the IPv4 plan, and Undo brings it back.</p>
+    <div class="row">
+      <div class="field">
+        <label for="azSpace">Address space for all VNets</label>
+        <input type="text" id="azSpace" spellcheck="false" value="10.0.0.0/16" style="width:170px" title="The hub and spokes are placed inside this range, hub first, each on its own boundary">
+      </div>
+      <button type="button" id="azAddSpoke">Add spoke</button>
+    </div>
+    <div id="azVnets"></div>
+    <div id="azOut" aria-live="polite"></div>
+    <div class="row dlg-foot">
+      <button type="button" class="primary" id="azApply">Apply to plan</button>
+    </div>
+  </dialog>
+
   <main>
   <div class="intro">
     <h1>Free visual subnet calculator &amp; IP address planner</h1>
@@ -717,6 +755,7 @@
             <option value="std">Standard (on-prem)</option>
             <option value="aws">AWS VPC</option>
             <option value="azure">Azure VNet</option>
+            <option value="azure-hs">Azure VNet with service subnets…</option>
             <option value="gcp">Google Cloud VPC</option>
             <option value="oci">Oracle Cloud (OCI) VCN</option>
           </select>
@@ -1068,7 +1107,7 @@
       </div>
       <span class="tip-note">Free forever. If it saved you time please consider a tip:<br>in the X app, <b>Money → Send → @wangooroo</b></span>
     </div>
-    <div class="meta"><a href="learn/">Subnetting guides</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span></div>
+    <div class="meta"><a href="learn/">Subnetting guides</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span><a href="#" id="updBtn" class="no-print" hidden> · Check for updates</a></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1207,6 +1246,40 @@
   };
   const settings = { cloud: 'std', gw: 'first' };
   const divLimit = () => CLOUDS[settings.cloud].min;
+
+  // Azure services that need (or should have) a subnet of their own. fixed: Azure requires this exact subnet name.
+  // min / rec: smallest and recommended prefix length. Sizes checked against Microsoft Learn, November 2026.
+  const LEARN = 'https://learn.microsoft.com/azure/';
+  const AZURE_SVCS = [
+    { id: 'gw',      role: 'hub',   label: 'VPN / ExpressRoute gateway', name: 'GatewaySubnet', fixed: true, min: 29, rec: 27, on: true, doc: 'vpn-gateway/vpn-gateway-about-vpn-gateway-settings#gwsub', tip: '/27 or larger; /26 for 16 ExpressRoute circuits or VPN and ExpressRoute side by side' },
+    { id: 'fw',      role: 'hub',   label: 'Azure Firewall', name: 'AzureFirewallSubnet', fixed: true, min: 26, rec: 26, on: true, doc: 'firewall/firewall-faq' },
+    { id: 'fwmgmt',  role: 'hub',   label: 'Azure Firewall management (Basic SKU, forced tunneling)', name: 'AzureFirewallManagementSubnet', fixed: true, min: 26, rec: 26, on: false, doc: 'firewall/forced-tunneling' },
+    { id: 'bastion', role: 'hub',   label: 'Azure Bastion', name: 'AzureBastionSubnet', fixed: true, min: 26, rec: 26, on: true, doc: 'bastion/configuration-settings#subnet' },
+    { id: 'rs',      role: 'hub',   label: 'Azure Route Server', name: 'RouteServerSubnet', fixed: true, min: 26, rec: 26, on: false, doc: 'route-server/quickstart-create-route-server-portal' },
+    { id: 'dnsin',   role: 'hub',   label: 'DNS Private Resolver inbound', name: 'snet-dns-in', deleg: 'Microsoft.Network/dnsResolvers', min: 28, rec: 28, on: true, doc: 'dns/dns-private-resolver-overview#subnet-restrictions' },
+    { id: 'dnsout',  role: 'hub',   label: 'DNS Private Resolver outbound', name: 'snet-dns-out', deleg: 'Microsoft.Network/dnsResolvers', min: 28, rec: 28, on: true, doc: 'dns/dns-private-resolver-overview#subnet-restrictions' },
+    { id: 'appgw',   role: 'spoke', label: 'Application Gateway v2', name: 'snet-appgw', min: 26, rec: 24, on: true, doc: 'application-gateway/configuration-infrastructure#size-of-the-subnet', tip: 'Only Application Gateways in it. No hard minimum, but /24 is strongly recommended so it can autoscale' },
+    { id: 'pe',      role: 'spoke', label: 'Private endpoints', name: 'snet-pe', min: 28, rec: 24, on: true, doc: 'private-link/private-endpoint-overview', tip: 'Not required, but a subnet of their own keeps NSGs and routes simple' },
+    { id: 'appsvc',  role: 'spoke', label: 'App Service / Functions VNet integration', name: 'snet-appsvc', deleg: 'Microsoft.Web/serverFarms', min: 28, rec: 26, on: true, doc: 'app-service/overview-vnet-integration#subnet-requirements' },
+    { id: 'web',     role: 'spoke', label: 'Workload: web tier', name: 'snet-web', min: 29, rec: 24, on: true },
+    { id: 'app',     role: 'spoke', label: 'Workload: app tier', name: 'snet-app', min: 29, rec: 24, on: true },
+    { id: 'data',    role: 'spoke', label: 'Workload: data tier', name: 'snet-data', min: 29, rec: 24, on: true },
+    { id: 'ase',     role: 'spoke', label: 'App Service Environment v3', name: 'snet-ase', deleg: 'Microsoft.Web/hostingEnvironments', min: 27, rec: 24, on: false, doc: 'app-service/environment/networking#subnet-requirements' },
+    { id: 'apim',    role: 'spoke', label: 'API Management (VNet injection)', name: 'snet-apim', min: 29, rec: 27, on: false, doc: 'api-management/virtual-network-injection-resources' },
+    { id: 'sqlmi',   role: 'spoke', label: 'SQL Managed Instance', name: 'snet-sqlmi', deleg: 'Microsoft.Sql/managedInstances', min: 27, rec: 26, on: false, doc: 'azure-sql/managed-instance/vnet-subnet-determine-size' },
+    { id: 'pgsql',   role: 'spoke', label: 'PostgreSQL Flexible Server', name: 'snet-pgsql', deleg: 'Microsoft.DBforPostgreSQL/flexibleServers', min: 28, rec: 27, on: false, doc: 'postgresql/flexible-server/concepts-networking-private' },
+    { id: 'mysql',   role: 'spoke', label: 'MySQL Flexible Server', name: 'snet-mysql', deleg: 'Microsoft.DBforMySQL/flexibleServers', min: 28, rec: 27, on: false, doc: 'mysql/flexible-server/concepts-networking-vnet' },
+    { id: 'anf',     role: 'spoke', label: 'Azure NetApp Files', name: 'snet-anf', deleg: 'Microsoft.Netapp/volumes', min: 28, rec: 26, on: false, doc: 'azure-netapp-files/azure-netapp-files-delegate-subnet' },
+    { id: 'aca',     role: 'spoke', label: 'Container Apps environment', name: 'snet-aca', deleg: 'Microsoft.App/environments', min: 27, rec: 23, on: false, doc: 'container-apps/custom-virtual-networks', tip: 'Workload profiles need /27 or larger; a consumption-only environment needs /23' },
+    { id: 'aks',     role: 'spoke', label: 'AKS nodes (Azure CNI Overlay)', name: 'snet-aks', min: 28, rec: 22, on: false, doc: 'aks/azure-cni-overlay', tip: 'Size for nodes plus surge during upgrades; pods use the overlay range' },
+    { id: 'dbwhost', role: 'spoke', label: 'Databricks host (public)', name: 'snet-dbw-host', deleg: 'Microsoft.Databricks/workspaces', min: 26, rec: 24, on: false, doc: 'databricks/security/network/classic/vnet-inject' },
+    { id: 'dbwcont', role: 'spoke', label: 'Databricks container (private)', name: 'snet-dbw-container', deleg: 'Microsoft.Databricks/workspaces', min: 26, rec: 24, on: false, doc: 'databricks/security/network/classic/vnet-inject' },
+  ];
+  const dict = (pairs) => Object.assign(Object.create(null), Object.fromEntries(pairs));  // no prototype: "constructor" isn't a key
+  const AZ_BY_ID = dict(AZURE_SVCS.map((s) => [s.id, s]));
+  const AZ_FIXED = dict(AZURE_SVCS.filter((s) => s.fixed).map((s) => [s.name.toLowerCase(), s]));
+  // The Azure service a subnet is dedicated to: its d field, or a required name such as AzureBastionSubnet.
+  const azSvcOf = (m) => (m.d && AZ_BY_ID[m.d]) || (m.n && AZ_FIXED[m.n.toLowerCase()] && AZ_FIXED[m.n.toLowerCase()].name === m.n ? AZ_FIXED[m.n.toLowerCase()] : null);
 
   // Everything about one subnet under the current platform rules.
   const hostInfo = (addr, mask, c = settings.cloud) => {
@@ -1555,6 +1628,7 @@
     if (m.o) c.o = oneLine(m.o);
     const st = normStatus(m.s);
     if (st) c.s = st;
+    if (m.d && AZ_BY_ID[m.d]) c.d = m.d;
     return Object.keys(c).length ? c : null;
   };
   const cleanMetaMap = (o) => {
@@ -1815,9 +1889,17 @@
     const by = { used: 0, reserved: 0, free: 0 };
     const vlans = {};
     let tooSmall = 0, clashes = 0;
+    const azWarn = [];
     for (const r of rows) {
       const info = hostInfo(r.addr, r.mask);
       const m = getMeta(r.key);
+      if (settings.cloud === 'azure' || m.d) {
+        const svc = azSvcOf(m), fx = m.n && AZ_FIXED[m.n.toLowerCase()];
+        if (svc && r.mask > svc.min) azWarn.push(`<span class="tag danger" title="${esc(r.key)}">${esc(svc.name)} must be /${svc.min} or larger (${esc(r.key)} is a /${r.mask})</span>`);
+        // A required name typed with the wrong case, or a template subnet (d) for such a service that was renamed.
+        const need = (fx && fx.name !== m.n) ? fx : (svc && svc.fixed && m.n !== svc.name ? svc : null);
+        if (need) azWarn.push(`<span class="tag warn" title="${esc(r.key)}">Azure needs the exact name ${esc(need.name)}${m.n ? `, not ${esc(m.n)}` : ''} (${esc(r.key)})</span>`);
+      }
       usableTotal += info.hosts;
       by[m.s || 'free'] += size(r.mask);
       if (m.v) (vlans[m.v] = vlans[m.v] || []).push(r.key);
@@ -1846,6 +1928,7 @@
     if (settings.cloud !== 'std' && state.mask > CLOUDS[settings.cloud].min) w.push(`<span class="tag danger">Base is smaller than the ${CLOUDS[settings.cloud].label} minimum of /${CLOUDS[settings.cloud].min}</span>`);
     if (tooSmall) w.push(`<span class="tag danger">${tooSmall} subnet${tooSmall > 1 ? 's are' : ' is'} below the ${CLOUDS[settings.cloud].label} minimum of /${CLOUDS[settings.cloud].min}</span>`);
     for (const [v, list] of Object.entries(vlans)) if (list.length > 1) w.push(`<span class="tag warn" title="${esc(list.join(', '))}">VLAN ${esc(v)} is on ${list.length} subnets</span>`);
+    w.push(...azWarn);
     if (clashes) w.push(`<span class="tag danger">${clashes} subnet${clashes > 1 ? 's overlap' : ' overlaps'} existing networks (see Check &amp; summarize)</span>`);
     $('warnings').innerHTML = w.join('');
   };
@@ -2465,6 +2548,8 @@
   });
 
   $('platform').addEventListener('change', () => {
+    // The template entry opens the Azure dialog; the platform itself only changes when the plan is applied.
+    if ($('platform').value === 'azure-hs') { $('platform').value = settings.cloud; openAz(); return; }
     checkpoint();
     settings.cloud = $('platform').value;
     syncControls();
@@ -2565,13 +2650,14 @@
     { key: 'gateway',  head: ['Gateway'],                       val: (r, i) => [i.gw === null ? '' : ntoa(i.gw)] },
     { key: 'hosts',    head: ['Hosts'],                         val: (r, i) => [i.hosts] },
     { key: 'status',   head: ['Status'],                        val: (r, i, m) => [m.s || 'free'] },
+    { key: 'azsvc',    head: ['Azure service'],                 val: (r, i, m) => [m.d ? AZ_BY_ID[m.d].label : ''] },
     { key: 'note',     head: ['Notes'],                         val: (r, i, m) => [m.o || ''] },
     { key: 'binary',   head: ['Binary'],                        val: (r) => [binText(r.addr)] },
   ];
   // onlyVisible: the Copy CSV button (active base network, shown columns). Otherwise every base network, every column.
   const buildMatrix = (onlyVisible) => {
-    const anyZone = allRows().some((r) => getMeta(r.key).z);
-    const cols = CSV_COLS.filter((c) => (onlyVisible ? visible[c.key] : c.key !== 'zone' || anyZone));
+    const anyZone = allRows().some((r) => getMeta(r.key).z), anyAz = allRows().some((r) => getMeta(r.key).d);
+    const cols = CSV_COLS.filter((c) => (c.key === 'azsvc' ? anyAz : onlyVisible ? visible[c.key] : c.key !== 'zone' || anyZone));
     const multi = !onlyVisible && state.blocks.length > 1;
     const head = (multi ? ['Base network'] : []).concat(cols.flatMap((c) => c.head));
     const data = (onlyVisible ? rows : allRows()).map((r) => {
@@ -2593,6 +2679,27 @@
   // VLSM tab
   // =====================================================================
   let vlsmPlan = null;
+  // Leaves of a tree no bigger than maxMask that aren't occupied.
+  const freeLeavesOf = (root, baseA, baseM, maxMask, occupied) => {
+    const out = [];
+    const walk = (n, a, m) => {
+      if (n.c) { walk(n.c[0], a, m + 1); walk(n.c[1], a + size(m + 1), m + 1); return; }
+      if (m <= maxMask && !occupied(cidrStr(a, m))) out.push({ addr: a, mask: m });
+    };
+    walk(root, baseA, baseM);
+    return out;
+  };
+  // Best fit: reqs in order (largest first), each into the smallest free leaf that holds it, lowest address on ties.
+  // Sets r.addr (null when it doesn't fit), carves the tree and adds each placed subnet to taken.
+  const bestFit = (root, baseA, baseM, reqs, occupied, taken) => {
+    const busy = (k) => taken.has(k) || occupied(k);
+    for (const r of reqs) {
+      let best = null;
+      for (const f of freeLeavesOf(root, baseA, baseM, r.mask, busy)) if (!best || f.mask > best.mask || (f.mask === best.mask && f.addr < best.addr)) best = f;
+      r.addr = best ? best.addr : null;
+      if (best) { carve(root, baseA, baseM, best.addr, r.mask); taken.add(cidrStr(best.addr, r.mask)); }
+    }
+  };
   const cloneTree = (n) => (n.c ? { c: n.c.map(cloneTree) } : { c: null });
   const updateVlsmBase = () => {
     // Default to filling free space when the base network already has planned subnets.
@@ -2678,23 +2785,9 @@
       const m = getMeta(k);
       return !!(m.s || m.n || m.v);
     };
-    const freeLeaves = (maxMask) => {
-      const out = [];
-      const walk = (n, a, m) => {
-        if (n.c) { walk(n.c[0], a, m + 1); walk(n.c[1], a + size(m + 1), m + 1); return; }
-        if (m <= maxMask && !occupied(cidrStr(a, m))) out.push({ addr: a, mask: m });
-      };
-      walk(root, state.network, state.mask);
-      return out;
-    };
-    for (const r of sorted) {
-      let best = null;
-      for (const f of freeLeaves(r.mask)) if (!best || f.mask > best.mask || (f.mask === best.mask && f.addr < best.addr)) best = f;
-      r.addr = best ? best.addr : null;
-      if (best) { carve(root, state.network, state.mask, best.addr, r.mask); taken.add(cidrStr(best.addr, r.mask)); }
-    }
+    bestFit(root, state.network, state.mask, sorted, occupied, taken);
     const placed = sorted.filter((r) => r.addr !== null), failed = sorted.filter((r) => r.addr === null);
-    const free = freeLeaves(32);
+    const free = freeLeavesOf(root, state.network, state.mask, 32, occupied);
     const needTotal = placed.reduce((t, r) => t + size(r.mask), 0);
     vlsmPlan = placed.length ? { placed, root, mode, active: state.active, base: cidrStr(state.network, state.mask), before: stateHash() } : null;
 
@@ -2749,6 +2842,191 @@
     update();
     showTab('plan');
     toast(`Applied ${plan.placed.length} subnets`, UNDO);
+  });
+
+  // =====================================================================
+  // Azure hub-and-spoke template
+  // =====================================================================
+  // az: { hub: { size, svcs: { id: mask | null } }, spokes: [{ name, size, svcs }] }. size is 'auto' or a mask.
+  const azDefaults = (role) => Object.fromEntries(AZURE_SVCS.filter((x) => x.role === role).map((x) => [x.id, x.on ? x.rec : null]));
+  const azNewSpoke = (i) => ({ name: i === 1 ? 'Spoke workload' : `Spoke ${i}`, size: 'auto', svcs: azDefaults('spoke') });
+  let az = null;
+  // Smallest VNet (largest mask) that holds these subnets. Aligned power-of-two blocks packed largest first
+  // always fit when their total fits, so the total decides.
+  const azNeed = (reqs) => {
+    const total = reqs.reduce((t, r) => t + size(r.mask), 0);
+    return total ? 32 - Math.ceil(Math.log2(total)) : null;
+  };
+  const azCompute = () => {
+    const errors = [];
+    const sp = parseCidr($('azSpace').value);
+    if (!sp || !/\//.test($('azSpace').value)) return { errors: ['Enter the address space as a network with a prefix length, like 10.0.0.0/16.'] };
+    const vnets = [{ role: 'hub', label: 'Hub', cfg: az.hub }, ...az.spokes.map((x) => ({ role: 'spoke', label: x.name.trim().slice(0, 40) || 'Spoke', cfg: x }))];
+    for (const v of vnets) {
+      v.reqs = AZURE_SVCS.map((x, idx) => ({ svc: x, idx, mask: v.cfg.svcs[x.id] })).filter((r) => r.svc.role === v.role && r.mask != null)
+        .sort((x, y) => x.mask - y.mask || x.idx - y.idx);
+      const need = azNeed(v.reqs);
+      const auto = v.role === 'hub' ? Math.min(23, need ?? 23) : Math.min(22, need == null ? 22 : need - 1);
+      v.mask = v.cfg.size === 'auto' ? auto : Number(v.cfg.size);
+      if (need != null && v.mask > need) errors.push(`${v.label} needs at least a /${need} for the subnets ticked.`);
+    }
+    if (errors.length) return { errors };
+    // VNets go in order (hub first), each on its own boundary.
+    let cur = sp.addr;
+    for (const v of vnets) { v.addr = Math.ceil(cur / size(v.mask)) * size(v.mask); cur = v.addr + size(v.mask); }
+    if (cur - 1 > lastAddr(sp.addr, sp.mask) || vnets.some((v) => v.mask < sp.mask)) {
+      const span = cur - sp.addr;
+      return { errors: [`The hub and spokes need ${fmt(span)} addresses, more than ${sp.cidr} holds. Use at least a /${32 - Math.ceil(Math.log2(span))} address space, or make the VNets smaller.`] };
+    }
+    for (const v of vnets) {
+      v.root = { c: null };
+      v.taken = new Set();
+      bestFit(v.root, v.addr, v.mask, v.reqs, () => false, v.taken);
+    }
+    return { errors, vnets, sp };
+  };
+  const azPreview = () => {
+    const res = azCompute();
+    $('azApply').disabled = !!res.errors.length;
+    if (res.errors.length) { $('azOut').innerHTML = `<div class="msg show error">${res.errors.map(esc).join('<br>')}</div>`; return res; }
+    let html = '';
+    for (const v of res.vnets) {
+      html += `<h4>${esc(v.label)} <span class="mono">${cidrStr(v.addr, v.mask)}</span></h4>`;
+      if (!v.reqs.length) { html += '<div class="stat-line">No subnets ticked.</div>'; continue; }
+      html += '<div class="table-wrap"><table><thead><tr><th>Subnet</th><th>Name</th><th>For</th><th class="num">Usable</th></tr></thead><tbody>';
+      for (const r of [...v.reqs].sort((x, y) => x.addr - y.addr)) {
+        html += `<tr><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="mono">${esc(r.svc.name)}</td><td>${esc(r.svc.label)}${r.svc.deleg ? ` <span class="tag muted">${esc(r.svc.deleg)}</span>` : ''}</td><td class="num mono">${fmt(hostInfo(r.addr, r.mask, 'azure').hosts)}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+      const free = freeLeavesOf(v.root, v.addr, v.mask, 32, (k) => v.taken.has(k));
+      if (free.length) html += `<div class="stat-line">Left free: ${free.map((f) => `<code>${cidrStr(f.addr, f.mask)}</code>`).join(' ')}</div>`;
+    }
+    $('azOut').innerHTML = `<div class="az-plan">${html}</div>`;
+    return res;
+  };
+  const azSizeSel = (cur, from, to, withAuto) => {
+    const sel = document.createElement('select');
+    if (withAuto) sel.add(new Option('Auto', 'auto'));
+    for (let m = from; m <= to; m++) sel.add(new Option('/' + m, String(m)));
+    sel.value = String(cur);
+    return sel;
+  };
+  const azRender = () => {
+    const wrap = $('azVnets');
+    wrap.innerHTML = '';
+    const card = (title, cfg, role, spokeIdx) => {
+      const box = document.createElement('div');
+      box.className = 'az-vnet';
+      const head = document.createElement('div');
+      head.className = 'az-vnet-head';
+      const h = document.createElement('h3');
+      h.textContent = title;
+      head.appendChild(h);
+      if (role === 'spoke') {
+        const f = document.createElement('div'); f.className = 'field';
+        const id = `azName${spokeIdx}`;
+        f.innerHTML = `<label for="${id}">Spoke name</label>`;
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.id = id; inp.maxLength = 40; inp.spellcheck = false; inp.value = cfg.name; inp.style.width = '170px';
+        inp.addEventListener('input', () => { cfg.name = inp.value; azPreview(); });
+        f.appendChild(inp); head.appendChild(f);
+      }
+      const f2 = document.createElement('div'); f2.className = 'field';
+      const sid = role === 'hub' ? 'azHubSize' : `azSize${spokeIdx}`;
+      f2.innerHTML = `<label for="${sid}">VNet size</label>`;
+      const ss = azSizeSel(cfg.size, 8, 28, true);
+      ss.id = sid;
+      ss.title = role === 'hub' ? 'Auto: a /23, or bigger if the ticked subnets need it' : 'Auto: twice what the ticked subnets need (room to grow), at least a /22';
+      ss.addEventListener('change', () => { cfg.size = ss.value; azPreview(); });
+      f2.appendChild(ss); head.appendChild(f2);
+      if (role === 'spoke' && az.spokes.length > 1) {
+        const rm = document.createElement('button');
+        rm.type = 'button'; rm.className = 'small'; rm.textContent = 'Remove spoke';
+        rm.addEventListener('click', () => { az.spokes.splice(spokeIdx, 1); azRender(); });
+        head.appendChild(rm);
+      }
+      box.appendChild(head);
+      const list = document.createElement('div');
+      list.className = 'az-svcs';
+      for (const x of AZURE_SVCS.filter((y) => y.role === role)) {
+        const row = document.createElement('div');
+        row.className = 'az-svc';
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = cfg.svcs[x.id] != null;
+        cb.dataset.svc = x.id;
+        const txt = document.createElement('span');
+        txt.innerHTML = `${esc(x.label)}<br><span class="nm mono">${esc(x.name)}${x.deleg ? ' · ' + esc(x.deleg) : ''}</span>`;
+        lab.append(cb, txt);
+        lab.title = (x.tip ? x.tip + '. ' : '') + `Minimum /${x.min}, recommended /${x.rec}`;
+        const sel = azSizeSel(cfg.svcs[x.id] ?? x.rec, Math.max(16, x.rec - 3), x.min, false);
+        sel.disabled = !cb.checked;
+        sel.setAttribute('aria-label', `${x.label} subnet size`);
+        sel.dataset.svc = x.id;
+        cb.addEventListener('change', () => { cfg.svcs[x.id] = cb.checked ? Number(sel.value) : null; sel.disabled = !cb.checked; azPreview(); });
+        sel.addEventListener('change', () => { cfg.svcs[x.id] = Number(sel.value); azPreview(); });
+        row.append(lab, sel);
+        if (x.doc) {
+          const a = document.createElement('a');
+          a.href = LEARN + x.doc; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'docs';
+          a.title = `Microsoft Learn: ${x.label} subnet requirements`;
+          row.appendChild(a);
+        } else {
+          const gap = document.createElement('span');   // keeps the size menus lined up
+          gap.textContent = 'docs'; gap.style.visibility = 'hidden'; gap.style.fontSize = '12px'; gap.setAttribute('aria-hidden', 'true');
+          row.appendChild(gap);
+        }
+        list.appendChild(row);
+      }
+      box.appendChild(list);
+      wrap.appendChild(box);
+    };
+    card('Hub VNet (shared services)', az.hub, 'hub');
+    az.spokes.forEach((x, i) => card(`Spoke VNet ${i + 1} (workloads)`, x, 'spoke', i));
+    azPreview();
+  };
+  const openAz = () => {
+    if (!az) {
+      az = { hub: { size: 'auto', svcs: azDefaults('hub') }, spokes: [azNewSpoke(1)] };
+      // Use the current base network as the address space when it's big enough to be one.
+      if (state.blocks.length === 1 && state.mask <= 16) $('azSpace').value = blockCidr(blk());
+    }
+    azRender();
+    const d = $('azDlg');
+    if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+  };
+  $('azSpace').addEventListener('input', azPreview);
+  $('azAddSpoke').addEventListener('click', () => {
+    // Next number whose default name isn't taken (spokes can be removed from the middle).
+    let i = az.spokes.length + 1;
+    while (az.spokes.some((x) => x.name.trim().toLowerCase() === azNewSpoke(i).name.toLowerCase())) i++;
+    az.spokes.push(azNewSpoke(i));
+    azRender();
+  });
+  $('azClose').addEventListener('click', () => $('azDlg').close());
+  $('azDlg').addEventListener('click', (e) => { if (e.target === $('azDlg')) $('azDlg').close(); });
+  $('azApply').addEventListener('click', () => {
+    const res = azPreview();
+    if (res.errors.length) return;
+    if ((state.blocks.length > 1 || state.root.c || Object.keys(state.meta).length) && !confirm('Replace the current IPv4 plan with this hub and spokes?')) return;
+    checkpoint();
+    state.blocks = res.vnets.map((v) => { const b = mkBlock(v.addr, v.mask, 'azure', v.label); b.root = v.root; return b; });
+    state.active = 0;
+    state.meta = {};
+    let n = 0;
+    for (const v of res.vnets) for (const r of v.reqs) {
+      const k = cidrStr(r.addr, r.mask);
+      setMeta(k, 'n', r.svc.name);
+      setMeta(k, 'd', r.svc.id);
+      setMeta(k, 's', 'used');
+      setMeta(k, 'o', (r.svc.doc ? `Dedicated to ${r.svc.label}` : r.svc.label) + (r.svc.deleg ? ` (delegated to ${r.svc.deleg})` : ''));
+      n++;
+    }
+    $('azDlg').close();
+    syncControls();
+    update();
+    const sp = res.vnets.length - 1;
+    toast(`Applied a hub and ${sp} spoke${sp === 1 ? '' : 's'} with ${n} subnets. Switch VNets with the buttons above.`, UNDO);
   });
 
   // =====================================================================
@@ -3203,7 +3481,24 @@
       for (const v of nets) {
         out.push(`resource "azurerm_virtual_network" "${v.id}" {`, `  name                = "vnet-${v.slug}"`, `  address_space       = ["${v.base}"]`, '  location            = var.location', '  resource_group_name = var.resource_group_name', '}', '');
         for (const x of v.items) {
-          out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "snet-${an(x)}"`, '  resource_group_name  = var.resource_group_name', `  virtual_network_name = azurerm_virtual_network.${v.id}.name`, `  address_prefixes     = ["${x.key}"]`, '}', '');
+          // Service subnets keep their name: Azure requires GatewaySubnet, AzureBastionSubnet and friends exactly.
+          const svc = azSvcOf(x.meta);
+          const sname = svc && (svc.fixed || x.meta.n === svc.name) ? svc.name : `snet-${an(x)}`;
+          out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "${hq(sname)}"`, '  resource_group_name  = var.resource_group_name', `  virtual_network_name = azurerm_virtual_network.${v.id}.name`, `  address_prefixes     = ["${x.key}"]`);
+          if (svc && svc.deleg) out.push('', '  delegation {', '    name = "delegation"', '    service_delegation {', `      name = "${svc.deleg}"`, '    }', '  }');
+          out.push('}', '');
+        }
+      }
+      // Hub and spoke: peer every other VNet with the one labeled Hub.
+      const hub = nets.length > 1 && nets.find((v) => /^hub$/i.test(v.b.label || ''));
+      if (hub) {
+        for (const v of nets) {
+          if (v === hub) continue;
+          out.push(`resource "azurerm_virtual_network_peering" "${hub.id}_to_${v.id}" {`, `  name                      = "peer-${hub.slug}-to-${v.slug}"`, '  resource_group_name       = var.resource_group_name',
+            `  virtual_network_name      = azurerm_virtual_network.${hub.id}.name`, `  remote_virtual_network_id = azurerm_virtual_network.${v.id}.id`, '  allow_forwarded_traffic   = true', '  allow_gateway_transit     = true', '}', '');
+          out.push(`resource "azurerm_virtual_network_peering" "${v.id}_to_${hub.id}" {`, `  name                      = "peer-${v.slug}-to-${hub.slug}"`, '  resource_group_name       = var.resource_group_name',
+            `  virtual_network_name      = azurerm_virtual_network.${v.id}.name`, `  remote_virtual_network_id = azurerm_virtual_network.${hub.id}.id`, '  allow_forwarded_traffic   = true',
+            '  # use_remote_gateways     = true   # turn on once the hub’s VPN / ExpressRoute gateway exists', '}', '');
         }
       }
     } else if (kind === 'tf-oci') {
@@ -3442,7 +3737,7 @@
       const m = getMeta(r.key), i = hostInfo(r.addr, r.mask, r.cloud);
       return {
         cidr: r.key, ...(state.blocks.length > 1 ? { network: blockCidr(state.blocks[r.bi]) } : {}),
-        name: m.n || '', vlan: m.v ? Number(m.v) : null, ...(m.z ? { zone: m.z } : {}), status: m.s || 'free', note: m.o || '',
+        name: m.n || '', vlan: m.v ? Number(m.v) : null, ...(m.z ? { zone: m.z } : {}), status: m.s || 'free', note: m.o || '', ...(m.d ? { azureService: m.d } : {}),
         netmask: ntoa(netmask(r.mask)), gateway: i.gw === null ? null : ntoa(i.gw),
         firstUsable: i.uF === null ? null : ntoa(i.uF), lastUsable: i.uL === null ? null : ntoa(i.uL), hosts: i.hosts,
       };
@@ -3487,6 +3782,14 @@
     download(`subnet-plan-${f}.${EXT[f]}`, $('exOut').value, MIME[f] || 'text/plain');
   });
 
+  // An Azure service from an import: its id ("bastion") or its label ("Azure Bastion").
+  const azIdFrom = (v) => {
+    const t = String(v ?? '').trim();
+    if (!t) return '';
+    if (AZ_BY_ID[t]) return t;
+    const hit = AZURE_SVCS.find((x) => x.label.toLowerCase() === t.toLowerCase());
+    return hit ? hit.id : '';
+  };
   const importText = (text) => {
     text = String(text || '').replace(/^﻿/, '').trim();
     if (!text) throw new Error('Nothing to import.');
@@ -3499,7 +3802,7 @@
       if (j.platform && CLOUDS[j.platform]) set = { cloud: j.platform, gw: j.gateway === 'last' ? 'last' : 'first' };
       for (const s of j.subnets || []) {
         const c = parseCidr(s.cidr || s.subnet || '');
-        if (c) entries.push({ ...c, n: s.name, v: s.vlan, o: s.note || s.notes, s: s.status, z: s.zone || s.az });
+        if (c) entries.push({ ...c, n: s.name, v: s.vlan, o: s.note || s.notes, s: s.status, z: s.zone || s.az, d: azIdFrom(s.azureService) });
       }
       if (j.tree) tree = j.tree;
       if (j.ipv6) v6data = j.ipv6;
@@ -3515,10 +3818,11 @@
       const ni = col('name'), vi = col('vlan', 'vlan id', 'vlanid'), oi = col('notes', 'note', 'description'), si = col('status');
       const bi = col('base network', 'block');
       const zi = col('zone', 'az', 'availability zone', 'availability_zone');
+      const di = col('azure service', 'azure_service', 'azureservice');
       const seen = new Map();
       for (const r of recs) {
         const c = parseCidr(r[ci] || '');
-        if (c) entries.push({ ...c, n: r[ni], v: r[vi], o: r[oi], s: r[si], z: zi >= 0 ? r[zi] : '' });
+        if (c) entries.push({ ...c, n: r[ni], v: r[vi], o: r[oi], s: r[si], z: zi >= 0 ? r[zi] : '', d: di >= 0 ? azIdFrom(r[di]) : '' });
         const bc = bi >= 0 && parseCidr(r[bi] || '');
         if (bc && !seen.has(bc.cidr)) seen.set(bc.cidr, { c: bc, cloud: settings.cloud, label: '' });
       }
@@ -4071,6 +4375,62 @@
     try { localStorage.setItem('subnetPlanner.theme', next); } catch (e) { /* ignore */ }
   });
 
+  // ---------- Check for updates: for copies run from a download, a git clone or localhost ----------
+  // .gitattributes marks index.html "ident", so git writes this file's blob hash into BUILD_ID on checkout and in
+  // GitHub's zip downloads. GitHub's API reports the blob hash of the latest index.html: equal hashes, same version.
+  // The keyword is only spelled out once, in BUILD_ID; everywhere else it is built from pieces so git leaves it alone.
+  const BUILD_ID = '$Id$';
+  const REPO = 'Crockerfeller/IP-Plan-O-Matic';
+  const ZIP_URL = `https://github.com/${REPO}/archive/refs/heads/main.zip`;
+  const KW = '\\$' + 'Id';
+  const stampRe = new RegExp(`^${KW}: ([0-9a-f]{40}) \\$$`), stampAnyRe = new RegExp(`${KW}: [0-9a-f]{40} \\$`, 'g');
+  const localBlob = async () => {
+    const m = stampRe.exec(BUILD_ID);
+    if (m) return m[1];
+    // No stamp (a copy git didn't check out): hash this page's own source the way git does. Fails on file:// pages.
+    const res = await fetch(location.href.split('#')[0], { cache: 'no-store' });
+    if (!res.ok) throw new Error('read');
+    const body = new TextEncoder().encode((await res.text()).replace(stampAnyRe, '$' + 'Id$'));
+    const head = new TextEncoder().encode(`blob ${body.length}\0`);
+    const all = new Uint8Array(head.length + body.length);
+    all.set(head); all.set(body, head.length);
+    return [...new Uint8Array(await crypto.subtle.digest('SHA-1', all))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  };
+  const checkUpdates = async () => {
+    const b = $('updBtn');
+    b.textContent = ' · Checking…';
+    try {
+      let mine = null;
+      try { mine = await localBlob(); } catch (e) { /* unknown version */ }
+      const getJson = (u) => fetch(u, { headers: { Accept: 'application/vnd.github+json' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+      // (403 / 429 from GitHub means its hourly limit for anonymous requests is used up.)
+      const [latest, commits] = await Promise.all([
+        getJson(`https://api.github.com/repos/${REPO}/contents/index.html?ref=main`),
+        getJson(`https://api.github.com/repos/${REPO}/commits?path=index.html&per_page=1`).catch(() => []),
+      ]);
+      const c = Array.isArray(commits) && commits[0] && commits[0].commit;
+      const when = c ? ((c.committer && c.committer.date) || '').slice(0, 10) : '';
+      const what = c ? String(c.message || '').split('\n')[0] : '';
+      b.title = mine ? `This copy: ${mine.slice(0, 7)} · latest: ${String(latest.sha).slice(0, 7)}` : 'This copy’s version couldn’t be read';
+      b.dataset.local = mine || '';
+      if (mine && mine === latest.sha) { toast(`You have the latest version${when ? ` (updated ${when})` : ''}.`); return; }
+      const intro = mine ? 'A different, newer version of IP Plan-O-Matic is on GitHub' : 'Couldn’t tell which version this copy is. The latest on GitHub';
+      if (confirm(`${intro}${when ? ` was last changed ${when}: “${what}”` : ''}.\n\nDownload the latest version as a .zip?\n(If you cloned it with git, run “git pull” instead.)`)) {
+        const a = document.createElement('a');
+        a.href = ZIP_URL;
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+    } catch (e) {
+      toast(e === 403 || e === 429 ? 'GitHub is limiting update checks right now. Try again in an hour.' : 'Couldn’t reach GitHub to check for updates. Try again when you’re online.');
+    } finally {
+      b.textContent = ' · Check for updates';
+    }
+  };
+  // The hosted site always serves the latest version, so the link is only for other copies.
+  const OFFICIAL = location.hostname === 'crockerfeller.github.io';
+  $('updBtn').hidden = OFFICIAL;
+  $('updBtn').addEventListener('click', (e) => { e.preventDefault(); checkUpdates(); });
+
   // Tip button: X Money has no public "send to @handle" link, so copy the handle and open the profile.
   for (const el of document.querySelectorAll('.js-xmoney')) el.addEventListener('click', () => {
     copyText('@wangooroo').then((ok) => toast(ok ? 'Copied @wangooroo. In X: Money → Send → paste' : 'Send to @wangooroo in X Money'));
@@ -4113,7 +4473,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localho
 /* Footer version: latest commit on main, from the public GitHub API */
 (() => {
   const el = document.getElementById('ver');
-  if (!el) return;
+  // Only on the hosted site, where the latest commit is the version being served; copies use Check for updates.
+  if (!el || location.hostname !== 'crockerfeller.github.io') return;
   const show = (sha, date) => {
     const a = document.createElement('a');
     a.href = 'https://github.com/Crockerfeller/IP-Plan-O-Matic/commit/' + sha;
