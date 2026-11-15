@@ -48,6 +48,42 @@ T.groups = async () => {
   click('#tb-plan');
 };
 
+T.azNames = async () => {
+  const nameRow = (i, v) => type(qa('#body tr')[i].querySelector('input'), v);
+  await load('../index.html#10.0.0.0/22');
+  select('#platform', 'azure');
+  divideRow(0);
+  nameRow(0, 'GatewaySubnet-hub'); nameRow(1, 'AppGatewaySubnet');
+  let w = $('warnings');
+  check('az names: prefixed required name flagged', w.textContent.includes('Azure needs the exact name GatewaySubnet, not GatewaySubnet-hub'), w.textContent);
+  check('az names: AppGatewaySubnet left alone', !w.textContent.includes('AppGatewaySubnet'), w.textContent);
+  w.querySelector('button[data-act="rename"]').click();
+  check('az names: rename fixes it', qa('#body tr')[0].querySelector('input').value === 'GatewaySubnet' && !$('warnings').textContent.includes('exact name'), $('warnings').textContent);
+  click('#undoBtn');
+  check('az names: rename undoes', qa('#body tr')[0].querySelector('input').value === 'GatewaySubnet-hub');
+
+  await load('../index.html#10.0.0.0/22');
+  select('#platform', 'azure');
+  divideRow(0); divideRow(0); divideRow(2);
+  nameRow(0, 'uksouth-AzureBastionSubnet'); nameRow(1, 'uksouth-app'); nameRow(2, 'westus2-AzureBastionSubnet');
+  w = $('warnings');
+  check('az names: repeated service suggests separate VNets', w.textContent.includes('AzureBastionSubnet ×2') && w.textContent.includes('looks like several VNets') && w.querySelector('button[data-act="split"]'), w.textContent);
+  check('az names: no rename offered when names repeat', !w.querySelector('button[data-act="rename"]'), w.innerHTML);
+  w.querySelector('button[data-act="split"]').click();
+  check('az names: split dialog opens', $('splitDlg').open);
+  select('#splitSize', '23');
+  check('az names: exact-name option shown', !$('splitFixF').hidden && $('splitFixTxt').textContent.includes('2 service subnets') && $('splitFix').checked, $('splitFixTxt').textContent);
+  click('#splitApply'); await sleep(50);
+  check('az names: two VNets made', chipsB().length === 2, $('blocks').textContent);
+  check('az names: exact name after split', qa('#body tr')[0].querySelector('input').value === 'AzureBastionSubnet' && qa('#body tr')[1].querySelector('input').value === 'uksouth-app', snap().rows);
+  check('az names: no warning after split', !$('warnings').textContent.includes('AzureBastionSubnet'), $('warnings').textContent);
+  const tb = qa('#toast button').map((b) => b.textContent);
+  check('az names: toast offers undo and peering', tb.join('|') === 'Undo|Set up peering…', tb);
+  qa('#toast button')[1].click();
+  check('az names: peering dialog opens', $('peerDlg').open);
+  click('#peerClose');
+};
+
 const addBox = (v) => { $('addIn').value = v; $('addForm').requestSubmit(); };
 const chipsB = () => qa('#blocks .net-card');
 const rowFor = (cidr) => qa('#body tr').find((tr) => tr.textContent.startsWith(cidr));

@@ -423,6 +423,7 @@
   .tag.ok { background: var(--ok-weak); color: var(--ok); }
   .tag.warn { background: var(--warn-weak); color: var(--warn); }
   .tag.danger { background: var(--danger-weak); color: var(--danger); }
+  .tag.long { display: inline-block; white-space: normal; border-radius: 10px; padding: 2px 10px; }
   .tag.muted { background: var(--row-hover); color: var(--muted); }
 
   .table-wrap { overflow-x: auto; }
@@ -531,6 +532,8 @@
   }
   td.bar .hint { display: block; font-size: 10px; font-weight: 500; opacity: 0; text-transform: uppercase; letter-spacing: .05em; height: 0; overflow: visible; }
   td.bar.joinable:hover .hint, td.bar.joinable:focus-visible .hint { opacity: .8; }
+  .split-fix { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13px; }
+  .warnings .tag button.small { margin-left: 6px; padding: 1px 8px; font-size: 12px; }
   td.bar .gname { display: block; max-width: 120px; margin: 0 auto; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: inherit; font-size: 11px; }
 
   .help { color: var(--muted); font-size: 13px; padding: 12px 16px; border-top: 1px solid var(--border); }
@@ -848,6 +851,7 @@
       </div>
     </div>
     <div class="split-list" id="splitList"></div>
+    <label class="split-fix" id="splitFixF" hidden><input type="checkbox" id="splitFix" checked> <span id="splitFixTxt"></span></label>
     <div class="msg" id="splitMsg" role="status"></div>
     <div class="row dlg-foot">
       <button type="button" class="primary" id="splitApply">Make separate networks</button>
@@ -1458,6 +1462,10 @@
   const AZ_FIXED = dict(AZURE_SVCS.filter((s) => s.fixed).map((s) => [s.name.toLowerCase(), s]));
   // The cloud service a subnet is dedicated to: its d field, or a required Azure name such as AzureBastionSubnet.
   const svcOf = (m) => (m.d && SVC_BY_ID[m.d]) || (m.n && AZ_FIXED[m.n.toLowerCase()] && AZ_FIXED[m.n.toLowerCase()].name === m.n ? AZ_FIXED[m.n.toLowerCase()] : null);
+  // A required Azure name in any case, alone or as a whole word in a longer name ("uksouth-AzureBastionSubnet",
+  // "GatewaySubnet-hub"). Not inside another word: AppGatewaySubnet is a normal subnet.
+  const AZ_NEAR = Object.keys(AZ_FIXED).map((k) => [new RegExp(`(^|[^a-z0-9])${k}([^a-z0-9]|$)`), AZ_FIXED[k]]);
+  const azNear = (n) => { if (!n) return null; const l = n.toLowerCase(); const hit = AZ_NEAR.find(([re]) => re.test(l)); return hit ? hit[1] : null; };
 
   // Everything about one subnet under the current platform rules.
   const hostInfo = (addr, mask, c = settings.cloud) => {
@@ -1754,11 +1762,11 @@
     const t = $('toast');
     t.textContent = text;
     t.classList.toggle('act', !!action);
-    if (action) {
+    for (const a of action ? [].concat(action) : []) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = action.label;
-      b.addEventListener('click', () => { t.classList.remove('show', 'act'); action.fn(); });
+      b.textContent = a.label;
+      b.addEventListener('click', () => { t.classList.remove('show', 'act'); a.fn(); });
       t.appendChild(b);
     }
     t.classList.add('show');
@@ -2100,22 +2108,35 @@
     const by = { used: 0, reserved: 0, free: 0 };
     const vlans = {};
     let tooSmall = 0, clashes = 0;
-    const azWarn = [];
+    const azWarn = [], azNeed = [], azSeen = {};
     for (const r of rows) {
       const info = hostInfo(r.addr, r.mask);
       const m = getMeta(r.key);
       if (settings.cloud === 'azure' || m.d) {
-        const svc = svcOf(m), fx = m.n && AZ_FIXED[m.n.toLowerCase()];
+        const svc = svcOf(m), fx = azNear(m.n);
         if (svc && !svc.soft && r.mask > svc.min) azWarn.push(`<span class="tag danger" title="${esc(r.key)}">${esc(m.n || svc.name)} must be /${svc.min} or larger (${esc(r.key)} is a /${r.mask})</span>`);
-        // A required name typed with the wrong case, or a template subnet (d) for such a service that was renamed.
+        // A required name with a prefix, suffix or the wrong case, or a template subnet (d) for such a service that was renamed.
         const need = (fx && fx.name !== m.n) ? fx : (svc && svc.fixed && m.n !== svc.name ? svc : null);
-        if (need) azWarn.push(`<span class="tag warn" title="${esc(r.key)}">Azure needs the exact name ${esc(need.name)}${m.n ? `, not ${esc(m.n)}` : ''} (${esc(r.key)})</span>`);
+        const one = fx || (svc && svc.fixed ? svc : null);
+        if (one) (azSeen[one.name] = azSeen[one.name] || []).push(r.key);
+        if (need) azNeed.push({ r, m, need });
       }
       usableTotal += info.hosts;
       by[m.s || 'free'] += size(r.mask);
       if (m.v) (vlans[m.v] = vlans[m.v] || []).push(r.key);
       if (info.warn) tooSmall++;
       if (existing.some((e) => overlaps(e.addr, e.mask, r.addr, r.mask))) clashes++;
+    }
+    // Azure allows one of each of these per VNet. Two or more (uksouth-AzureBastionSubnet, westus2-AzureBastionSubnet)
+    // means several VNets drawn as one: offer to split rather than rename, since renaming would clash.
+    const dupes = Object.entries(azSeen).filter(([, keys]) => keys.length > 1);
+    if (dupes.length && blk().root.c) {
+      const names = dupes.map(([n, keys]) => `${n} ×${keys.length}`).join(', ');
+      azWarn.push(`<span class="tag warn long" title="${esc(dupes.flatMap(([, k]) => k).join(', '))}">Azure allows one of each per VNet (${esc(names)}), so this looks like several VNets drawn as one. <button type="button" class="small" data-act="split">Make separate VNets…</button></span>`);
+    }
+    for (const { r, m, need } of azNeed) {
+      if (azSeen[need.name].length > 1) continue;
+      azWarn.push(`<span class="tag warn long" title="${esc(r.key)}">Azure needs the exact name ${esc(need.name)}${m.n ? `, not ${esc(m.n)}` : ''} (${esc(r.key)}) <button type="button" class="small" data-act="rename" data-key="${esc(r.key)}" data-name="${esc(need.name)}">Rename</button></span>`);
     }
     const total = size(state.mask);
     $('summary').innerHTML =
@@ -2415,6 +2436,7 @@
       if (visible.name) {
         const inp = textInput('', 'n', 'Name', 'Name');
         inp.addEventListener('input', () => { firstEdit(inp); setMeta(key, 'n', inp.value.trim() ? inp.value : ''); writeHashSoon(); });
+        inp.addEventListener('change', () => renderSummary());   // name checks (Azure's required names) in the warnings strip
         inp.addEventListener('change', renderMap);
         cell('', inp);
       }
@@ -3596,6 +3618,20 @@
       c.cb = cb; c.nameIn = name;
       list.appendChild(row);
     });
+    // Service subnets named per region inside one address space get Azure's exact names once each region is its own VNet.
+    const fixes = b.cloud === 'azure' ? splitFixes() : [];
+    $('splitFixF').hidden = !fixes.length;
+    if (fixes.length) $('splitFixTxt').textContent = `Use Azure’s exact names for ${fixes.length} service subnet${fixes.length > 1 ? 's' : ''} (${fixes[0].from} → ${fixes[0].to}${fixes.length > 1 ? ', …' : ''})`;
+  };
+  // Renames that become safe after the split: within each piece, one near-miss per required name, and no exact one already.
+  const splitFixes = () => {
+    const out = [];
+    for (const c of splitCands) {
+      const by = {};
+      for (const k of c.keys) { const n = getMeta(k).n, fx = azNear(n); if (fx) (by[fx.name] = by[fx.name] || []).push({ k, n }); }
+      for (const [to, list] of Object.entries(by)) if (list.length === 1 && list[0].n !== to) out.push({ c, key: list[0].k, from: list[0].n, to });
+    }
+    return out;
   };
   $('splitSize').addEventListener('change', renderSplitList);
   $('splitClose').addEventListener('click', () => $('splitDlg').close());
@@ -3605,6 +3641,7 @@
     const chosen = splitCands.filter((c) => c.cb.checked);
     if (!chosen.length) { showMsg('splitMsg', 'Tick at least one piece to make into a network.', 'error'); return; }
     checkpoint();
+    if (b.cloud === 'azure' && $('splitFix').checked) for (const f of splitFixes()) if (f.c.cb.checked) setMeta(f.key, 'n', f.to);
     const made = chosen.map((c) => {
       const x = mkBlock(c.a, c.m, b.cloud, (c.nameIn.value.trim() || c.nameIn.placeholder).slice(0, 40));
       x.root = c.node;
@@ -3621,7 +3658,20 @@
     $('splitDlg').close();
     syncControls();
     update();
-    toast(`Made ${made.length} ${word === 'network' ? 'network' : word}${made.length === 1 ? '' : 's'} from ${blockCidr(b)}. Connect them with ⇄ Peering.`, UNDO);
+    const canPeer = made.length > 1 && PEER_CLOUDS.includes(b.cloud);
+    toast(`Made ${made.length} ${word === 'network' ? 'network' : word}${made.length === 1 ? '' : 's'} from ${blockCidr(b)}.${canPeer ? ' Peer them next.' : ''}`,
+      canPeer ? [UNDO, { label: 'Set up peering…', fn: () => openPeer() }] : UNDO);
+  });
+  // Buttons inside the warnings strip.
+  $('warnings').addEventListener('click', (e) => {
+    const bt = e.target.closest('button[data-act]');
+    if (!bt) return;
+    if (bt.dataset.act === 'split') openSplitNets();
+    else if (bt.dataset.act === 'rename') {
+      const { key, name } = bt.dataset, old = getMeta(key).n || '';
+      checkpoint(); setMeta(key, 'n', name); update();
+      toast(`Renamed ${old || key} to ${name}`, UNDO);
+    }
   });
 
   // =====================================================================
