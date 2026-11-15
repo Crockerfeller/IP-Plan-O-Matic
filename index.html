@@ -320,6 +320,9 @@
   .blocks .chip-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 6px; }
   .blocks .chip-x:hover { color: var(--danger); background: var(--danger-weak); }
   #addForm .field.grow { flex: 1 1 320px; }
+  .split-cell { display: inline-flex; gap: 4px; align-items: center; }
+  select.split-sel { height: 28px; font-size: 13px; padding: 0 4px; width: 74px; }
+  #splitAllF select { min-width: 150px; }
   .field.grow-sm { flex: 1 1 260px; }
   .field.grow-sm input { width: 100%; }
   #addIn { width: 100%; }
@@ -744,6 +747,11 @@
           <input type="text" id="addIn" spellcheck="false" placeholder="e.g. 10.0.5.0/24 Servers" title="A network inside a base network is carved out as a subnet. One outside every base network becomes a new base network.">
         </div>
         <button type="submit">Add</button>
+        <div class="field" id="splitAllF">
+          <label for="splitAllSel">Split everything into</label>
+          <select id="splitAllSel" title="Divide every subnet bigger than this size into equal subnets of this size. Smaller subnets, and their names and VLANs, stay as they are."></select>
+        </div>
+        <button type="button" id="splitAllBtn">Split</button>
       </form>
       <div class="find-out" id="findOut" aria-live="polite"></div>
       <div class="msg" id="msg" role="status"></div>
@@ -778,7 +786,7 @@
         <div class="legend" id="mapLegend"></div>
       </div>
       <div class="help">
-        <p>Click <b>Divide</b> to split a subnet in half. Click a colored bar on the right to join every subnet it covers back into one. Type straight into Name, VLAN and Notes; set Status to track what is in use. Made a mistake? <b>Undo</b> (Ctrl+Z / ⌘Z) steps back through every change.</p>
+        <p>Click <b>Divide</b> to split a subnet in half, or pick a size from the <b>/N</b> menu beside it to split it into equal subnets in one go. <b>Split everything into</b> does the same for every subnet bigger than the size you choose and leaves smaller, named subnets alone. Click a colored bar on the right to join every subnet it covers back into one. Type straight into Name, VLAN and Notes; set Status to track what is in use. Made a mistake? <b>Undo</b> (Ctrl+Z / ⌘Z) steps back through every change.</p>
         <p>Keyboard: click a row or press <kbd>↓</kbd>, then <kbd>D</kbd> divides, <kbd>J</kbd> joins and <kbd>S</kbd> sets status. <button type="button" class="small" id="keysBtn">All shortcuts (?)</button></p>
         <p>Use <b>Add</b> to carve out a specific subnet like <kbd>10.0.5.0/24 Servers</kbd>. A network outside every base network becomes another base network, so one plan can cover HQ, branches and cloud VPCs, each with its own platform.</p>
         <p>Tip: paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field. The page address updates as you work (names and VLANs included), so a bookmark or copied link saves the whole plan.</p>
@@ -1338,6 +1346,15 @@
     }
     node.c = null;
   };
+  // Split a leaf into equal /n subnets; splitAll does it for every leaf bigger than /n.
+  const splitTo = (node, m, n) => {
+    if (m >= n) return;
+    node.c = [{ c: null }, { c: null }];
+    splitTo(node.c[0], m + 1, n); splitTo(node.c[1], m + 1, n);
+  };
+  const splitAll = (node, m, n) => { if (node.c) node.c.forEach((ch) => splitAll(ch, m + 1, n)); else splitTo(node, m, n); };
+  const leavesAfterSplit = (node, m, n) => (node.c ? leavesAfterSplit(node.c[0], m + 1, n) + leavesAfterSplit(node.c[1], m + 1, n) : (m < n ? 2 ** (n - m) : 1));
+  const MAX_SPLIT = 4096;
   const nodeKeys = () => {
     const s = new Set();
     const walk = (n, a, m) => {
@@ -1869,8 +1886,25 @@
     toast(`Removed ${blockCidr(b)}`, UNDO);
   };
 
+  const fillSplitAll = () => {
+    const sel = $('splitAllSel'), prev = sel.value, lim = divLimit();
+    sel.innerHTML = '';
+    for (let n = state.mask + 1; n <= lim; n++) {
+      const cnt = leavesAfterSplit(state.root, state.mask, n);
+      if (cnt > MAX_SPLIT) break;
+      sel.add(new Option(`/${n}  (${fmt(cnt)} subnets)`, n));
+    }
+    if (!sel.options.length) sel.add(new Option('—', ''));
+    // Keep the user's pick on the same block; otherwise suggest the smallest subnet size already in use.
+    const deepest = Math.max(...collectLeaves().map((r) => r.mask));
+    const want = sel.dataset.blk === blockCidr(blk()) && prev ? prev : String(deepest);
+    if ([...sel.options].some((o) => o.value === want)) sel.value = want;
+    sel.dataset.blk = blockCidr(blk());
+    sel.disabled = $('splitAllBtn').disabled = !sel.options[0].value;
+  };
   const render = () => {
     renderBlocks();
+    fillSplitAll();
     const H = height(state.root);
     rows = collectLeaves();
     const limit = divLimit();
@@ -1955,7 +1989,28 @@
           btn.title = `Split into two /${leaf.mask + 1}s`;
           btn.addEventListener('click', () => { checkpoint(); leaf.node.c = [{ c: null }, { c: null }]; update(); });
         }
-        cell('col-divide', btn);
+        const wrap = document.createElement('span');
+        wrap.className = 'split-cell';
+        wrap.append(btn);
+        if (leaf.mask + 2 <= limit) {
+          const sel = document.createElement('select');
+          sel.className = 'split-sel';
+          sel.title = 'Split into equal subnets of one size';
+          sel.setAttribute('aria-label', `Split ${key} into equal subnets`);
+          sel.add(new Option('/N', ''));
+          for (let n = leaf.mask + 2; n <= Math.min(limit, leaf.mask + 12); n++) sel.add(new Option(`/${n} × ${fmt(2 ** (n - leaf.mask))}`, n));
+          sel.addEventListener('change', () => {
+            const n = +sel.value;
+            if (!n) return;
+            checkpoint();
+            splitTo(leaf.node, leaf.mask, n);
+            selKey = cidrStr(leaf.addr, n);
+            update();
+            toast(`Split ${key} into ${fmt(2 ** (n - leaf.mask))} × /${n}`, UNDO);
+          });
+          wrap.append(sel);
+        }
+        cell('col-divide', wrap);
       }
       if (visible.name) {
         const inp = textInput('', 'n', 'Name', 'Name');
@@ -2449,6 +2504,16 @@
   $('findIp').addEventListener('input', () => runFind(true));
   $('findIp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runFind(true); } });
 
+  $('splitAllBtn').addEventListener('click', () => {
+    const n = +$('splitAllSel').value;
+    if (!n) return;
+    const before = leafCount(state.root), after = leavesAfterSplit(state.root, state.mask, n);
+    if (after === before) { toast(`Every subnet is already /${n} or smaller`); return; }
+    checkpoint();
+    splitAll(state.root, state.mask, n);
+    update();
+    toast(`Split ${blockCidr(blk())} into /${n}s: ${fmt(before)} → ${fmt(after)} subnets`, UNDO);
+  });
   $('resetBtn').addEventListener('click', () => {
     if (!state.root.c) return;
     if (blockMetaKeys().length && !confirm('Join everything back into the base network? Names and VLANs on the joined subnets will be dropped from the link.')) return;

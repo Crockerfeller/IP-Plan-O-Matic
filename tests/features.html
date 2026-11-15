@@ -449,6 +449,38 @@ T.v6export = async () => {
   check('arista ipv6', t.includes('   ipv6 address 2001:db8:0:10::1/64') && t.startsWith('! Generated') && t.includes('ipv6 unicast-routing'), t.slice(0, 500));
 };
 
+T.splitN = async () => {
+  await load('../index.html#10.221.0.0/16/9.f00/eyJjIjoiYXp1cmUiLCJsIjoiQXp1cmUgVm5ldHMiLCJtIjp7IjEwLjIyMS4wLjAvMjAiOnsibiI6Indlc3R1czIifX19');
+  check('user link has 5 rows', snap().rows.length === 5, snap().rows);
+  const opts = qa('#splitAllSel option').map((o) => o.value);
+  check('split-all options /17../29 azure', opts[0] === '17' && opts.includes('20') && !opts.includes('30'), opts);
+  select('#splitAllSel', '20');
+  click('#splitAllBtn');
+  const rs = snap().rows;
+  check('split all → 16 × /20', rs.length === 16 && rs.every((r) => r.includes('/20')), rs);
+  check('split all keeps westus2', rowFor('10.221.0.0/20').querySelector('input').value === 'westus2');
+  check('last /20 is 10.221.240.0', rowFor('10.221.240.0/20') != null);
+  click('#splitAllBtn');
+  check('split all again no-op', snap().rows.length === 16 && $('toast').textContent.includes('already'), $('toast').textContent);
+  click('#undoBtn');
+  check('split all undo', snap().rows.length === 5, snap().rows);
+  // per-row
+  const r = rowFor('10.221.128.0/17');
+  const sel = r.querySelector('select.split-sel');
+  check('row split menu options', sel && [...sel.options].some((o) => o.value === '20' && o.textContent.includes('8')), sel && sel.innerHTML);
+  sel.value = '20'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise((res) => setTimeout(res, 30));
+  const rs2 = snap().rows;
+  check('row split → 4 + 8', rs2.length === 12 && rowFor('10.221.128.0/20') && rowFor('10.221.240.0/20') && rowFor('10.221.64.0/18'), rs2);
+  click('#undoBtn');
+  check('row split undo', snap().rows.length === 5);
+  await load('../index.html#10.0.0.0/8');
+  const o8 = qa('#splitAllSel option').map((o) => o.value);
+  check('split-all capped at 4096', o8[o8.length - 1] === '20', o8);
+  await load('../index.html#10.0.0.1/32');
+  check('/32 no split', $('splitAllBtn').disabled || qa('#splitAllSel option').length === 1);
+};
+
 T.guidesTab = async () => {
   await load('../index.html#10.0.0.0/24');
   click('#tb-learn');

@@ -25,6 +25,7 @@ function setBase(cidr) { const [n, m] = cidr.split('/'); $('network').value = n;
 function divideRow(i) { qa('#body tr')[i].querySelector('.col-divide button').click(); }
 function rowCells(tr) {
   return [...tr.children].map((td) => {
+    if (td.classList.contains('col-divide')) return td.querySelector('button').textContent.trim();
     const i = td.querySelector('input,select');
     return i ? '[' + i.value + ']' : td.textContent.trim();
   }).join(' | ');
