@@ -542,24 +542,34 @@
   .tip-btn:hover { background: var(--text); filter: brightness(1.15); }
   .tip-note { font-size: 12px; }
   .tip-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; }
-  footer.site a.tip-btn.alt { background: transparent; color: var(--text); }
+  footer.site a.tip-btn.alt { background-color: transparent; color: var(--text); }
   footer.site a.tip-btn.alt:hover { background: var(--row-hover); filter: none; }
   .credit, .meta { flex-basis: 100%; text-align: center; }
   .meta { font-size: 12px; }
   .ver { font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
   .ver::before { content: " · "; font-family: inherit; }
   footer.site .ver a { text-decoration: none; }
-  .tip-stack { display: inline-flex; flex-direction: column; align-items: stretch; gap: 6px; }
-  .tip-cap { font-size: 12px; line-height: 1.35; color: var(--muted); text-align: center; max-width: 190px; align-self: center; margin-bottom: 1px; }
-  .tip-h { display: flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--text); background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
-  .tip-h:hover { filter: brightness(1.15); }
-  .tip-h.alt { background: transparent; color: var(--text); }
-  .tip-h.alt:hover { background: var(--row-hover); filter: none; }
+  .tip-stack { display: inline-flex; flex-direction: column; align-items: stretch; gap: 8px; --tip-cap: #0B7A6E; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tip-stack { --tip-cap: #3DD9C4; } }
+  :root[data-theme="dark"] .tip-stack { --tip-cap: #3DD9C4; }
+  .tip-cap { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--tip-cap); text-align: center; align-self: center; margin-bottom: 1px; }
+  /* Raised, slightly glossy pills that press down when clicked */
+  .tip-h, footer.site a.tip-btn {
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, .1));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 0 rgba(0, 0, 0, .25), 0 4px 10px rgba(0, 0, 0, .14);
+    transition: transform .08s ease, box-shadow .08s ease, filter .15s ease;
+  }
+  .tip-h:active, footer.site a.tip-btn:active {
+    transform: translateY(2px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 0 0 rgba(0, 0, 0, .25), 0 1px 3px rgba(0, 0, 0, .18);
+  }
+  .tip-h { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--text); background-color: var(--text); color: var(--bg); font-size: 13.5px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .tip-h:hover { filter: brightness(1.12); }
   /* Brand colors: Venmo blue, Ko-fi coral red */
-  .tip-h.venmo, footer.site a.tip-btn.venmo { background: #008cff; border-color: #008cff; color: #fff; }
-  .tip-h.kofi, footer.site a.tip-btn.kofi { background: #ff5e5b; border-color: #ff5e5b; color: #fff; }
+  .tip-h.venmo, footer.site a.tip-btn.venmo { background-color: #008cff; border-color: #0079dc; color: #fff; }
+  .tip-h.kofi, footer.site a.tip-btn.kofi { background-color: #ff5e5b; border-color: #e94e4b; color: #fff; }
   .tip-h.venmo:hover, .tip-h.kofi:hover, footer.site a.tip-btn.venmo:hover, footer.site a.tip-btn.kofi:hover { filter: brightness(1.08); color: #fff; }
-  @media (min-width: 641px) { header.top .brand { zoom: 1.3; } }
+  @media (min-width: 641px) { header.top .brand { zoom: 1.5; } }
   .tip-foot { display: none; }
   @media (max-width: 640px) {
     .tip-stack { display: none; }
