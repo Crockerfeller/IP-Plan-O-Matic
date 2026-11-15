@@ -746,7 +746,15 @@
       <button type="button" class="icon" id="azClose" aria-label="Close">✕</button>
     </div>
     <p class="sub" id="azSub"></p>
+    <p class="msg show info" id="azReplace" hidden>Applying this replaces the current IPv4 plan. Undo brings it back.</p>
     <div class="row">
+      <div class="field">
+        <label for="azCloud">Cloud</label>
+        <select id="azCloud">
+          <option value="azure">Azure VNets</option>
+          <option value="aws">AWS VPCs</option>
+        </select>
+      </div>
       <div class="field">
         <label for="azSpace">Address space for the hub and spokes</label>
         <input type="text" id="azSpace" spellcheck="false" value="10.0.0.0/16" style="width:170px" title="The hub and spokes are placed inside this range, hub first, each on its own boundary">
@@ -910,13 +918,12 @@
           <select id="platform" title="Changes which addresses are reserved in each subnet">
             <option value="std">Standard (on-prem)</option>
             <option value="aws">AWS VPC</option>
-            <option value="aws-hs">AWS VPC with service subnets…</option>
             <option value="azure">Azure VNet</option>
-            <option value="azure-hs">Azure VNet with service subnets…</option>
             <option value="gcp">Google Cloud VPC</option>
             <option value="oci">Oracle Cloud (OCI) VCN</option>
           </select>
         </div>
+        <button type="button" id="tplBtn" title="Start from an Azure or AWS hub and spokes with service subnets. Applying it replaces the current IPv4 plan.">Hub-and-spoke template…</button>
         <div class="field" id="gwField">
           <label for="gwPos">Gateway</label>
           <select id="gwPos">
@@ -2879,9 +2886,6 @@
   });
 
   $('platform').addEventListener('change', () => {
-    // The template entry opens the Azure dialog; the platform itself only changes when the plan is applied.
-    const pv = $('platform').value;
-    if (pv.endsWith('-hs')) { $('platform').value = settings.cloud; openAz(pv.slice(0, -3)); return; }
     checkpoint();
     settings.cloud = $('platform').value;
     syncControls();
@@ -3354,10 +3358,17 @@
     $('azSub').textContent = tpl.sub;
     $('azSpace').value = tplState[cloud].space;
     $('azZonesF').hidden = !tpl.zones;
+    $('azCloud').value = cloud;
+    $('azReplace').hidden = !planInUse();
     azRender();
     const d = $('azDlg');
+    if (d.open) return;
     if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
   };
+  // Something a template or import would replace: more than one network, any division, or any name or status.
+  const planInUse = () => state.blocks.length > 1 || !!state.root.c || Object.keys(state.meta).length > 0;
+  $('tplBtn').addEventListener('click', () => openAz(settings.cloud === 'aws' ? 'aws' : 'azure'));
+  $('azCloud').addEventListener('change', () => openAz($('azCloud').value));
   $('azSpace').addEventListener('input', () => { tplState[tpl.cloud].space = $('azSpace').value; azPreview(); });
   $('azZones').addEventListener('input', azPreview);
   $('azAddSpoke').addEventListener('click', () => {
@@ -3373,7 +3384,7 @@
   $('azApply').addEventListener('click', () => {
     const res = azPreview();
     if (res.errors.length) return;
-    if ((state.blocks.length > 1 || state.root.c || Object.keys(state.meta).length) && !confirm('Replace the current IPv4 plan with this hub and spokes?')) return;
+    if (planInUse() && !confirm('Replace the current IPv4 plan with this hub and spokes?')) return;
     checkpoint();
     state.blocks = res.vnets.map((v) => { const b = mkBlock(v.addr, v.mask, tpl.cloud, v.label); b.root = v.root; return b; });
     state.active = 0;

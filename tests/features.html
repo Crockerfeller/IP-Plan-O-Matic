@@ -597,7 +597,7 @@ T.hardening = async () => {
 };
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
-  select('#platform', 'azure-hs');
+  click('#tplBtn');
   check('az dialog opens, platform unchanged', $('azDlg').open && $('platform').value === 'std');
   const out = () => $('azOut').textContent;
   const hub = ['10.0.0.0/26AzureFirewallSubnet', '10.0.0.64/26AzureBastionSubnet', '10.0.0.128/27GatewaySubnet', '10.0.0.160/28snet-dns-in', '10.0.0.176/28snet-dns-out'];
@@ -667,7 +667,7 @@ T.azureHubSpoke = async () => {
 };
 T.awsHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
-  select('#platform', 'aws-hs');
+  click('#tplBtn'); select('#azCloud', 'aws');
   check('aws dialog opens', $('azDlg').open && $('azTtl').textContent.startsWith('AWS') && !$('azZonesF').hidden && $('platform').value === 'std');
   const out = () => $('azOut').textContent;
   check('aws hub /23, spoke /19', out().includes('Hub 10.0.0.0/23') && out().includes('Spoke workload 10.0.32.0/19'), out().slice(0, 400));
@@ -703,8 +703,10 @@ T.awsHubSpoke = async () => {
   await load('../index.html#10.0.0.0/24/9.f00/' + blob);
   check('aws fixture has the /28', snap().rows[0].startsWith('10.0.0.0/28'), snap().rows[0]);
   check('aws alb /28 warning', $('warnings').textContent.includes('public-us-east-1a must be /27 or larger'), $('warnings').textContent);
-  // Switching template keeps each cloud's choices.
-  select('#platform', 'azure-hs');
+  // Switching template keeps each cloud's choices. The button opens the current platform's template (AWS here).
+  click('#tplBtn');
+  check('template button follows platform', $('azCloud').value === 'aws' && !$('azReplace').hidden, $('azCloud').value);
+  select('#azCloud', 'azure');
   check('azure template after aws', $('azTtl').textContent.startsWith('Azure') && $('azZonesF').hidden && out().includes('AzureBastionSubnet'));
   $('azDlg').close();
 };
@@ -715,7 +717,7 @@ T.peering = async () => {
   // Azure: hub and two spokes from the template.
   await load('../index.html#192.168.0.0/24');
   check('peering disabled with one network', $('peerBtn').disabled);
-  select('#platform', 'azure-hs'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
+  click('#tplBtn'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
   check('template sets hub-and-spoke peering', pbtn().includes('Peering (2)'), pbtn());
   click('#peerBtn');
   check('wizard opens on hub and spoke', $('peerDlg').open && $('peerMode').value === 'hub' && $('peerHub').value === '10.0.0.0/23');
@@ -765,7 +767,7 @@ T.peering = async () => {
 
   // AWS: Transit Gateway with routes, then VPC peering.
   await load('../index.html#192.168.0.0/24');
-  select('#platform', 'aws-hs'); click('#azApply'); await sleep(50);
+  click('#tplBtn'); select('#azCloud', 'aws'); click('#azApply'); await sleep(50);
   t = tf('tf-aws');
   check('tf-aws tgw routes both ways', /resource "aws_route" "hub_to_spoke_workload" \{[\s\S]*?destination_cidr_block = "10\.0\.32\.0\/19"[\s\S]*?transit_gateway_id     = aws_ec2_transit_gateway\.main\.id[\s\S]*?depends_on             = \[aws_ec2_transit_gateway_vpc_attachment\.hub\]/.test(t) && t.includes('resource "aws_route" "spoke_workload_to_hub"'), t.slice(-1800));
   click('#peerBtn');
@@ -813,7 +815,7 @@ T.networksUi = async () => {
 
   // Template + Add VNet: a new network joins the hub's peering.
   await load('../index.html#192.168.0.0/24');
-  select('#platform', 'azure-hs'); click('#azApply'); await sleep(50);
+  click('#tplBtn'); click('#azApply'); await sleep(50);
   check('hub card marked', chipsB()[0].textContent.includes('★ Hub'));
   click('#netAddBtn'); $('netForm2').requestSubmit(); await sleep(50);
   check('new VNet peered with hub', $('peerBtn').textContent.includes('Peering (2)') && $('toast').textContent.includes('peered it with Hub'), [$('peerBtn').textContent, $('toast').textContent]);
