@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Phone layout tests</title><iframe id="f" style="width:375px;height:800px"></iframe><pre id="out">running</pre>
+<script src="lib.js"></script>
+<script>(async()=>{try{
+await load('../index.html#'+encodeURI(`10.0.0.0/22/3.2/${btoa(JSON.stringify({l:'HQ',b:[['172.16.0.0/16','1.0','aws','Prod VPC']]})).replace(/=+$/,'')}`));
+for (const t of ['plan','vlsm','tools','export','v6']) {
+  click('#tb-'+t); if (t==='v6') $('v6PlanCard').open = true; await sleep(50);
+  const de = D.documentElement;
+  // find widest offender
+  let worst = null; for (const el of D.querySelectorAll('body *')) { const r = el.getBoundingClientRect(); if (r.width && r.right > de.clientWidth + 1 && !el.closest('.table-wrap') && !el.closest('nav.tabs')) { if (!worst || r.right > worst.r) worst = { r: Math.round(r.right), el: el.tagName + '#' + el.id + '.' + el.className }; } }
+  check(`no sideways scroll on ${t}`, de.scrollWidth <= de.clientWidth + 1, { sw: de.scrollWidth, cw: de.clientWidth, worst });
+}
+click('#plansBtn'); await sleep(50);
+const dr = $('plansDlg').getBoundingClientRect();
+check('plans dialog fits', dr.right <= D.documentElement.clientWidth + 1, dr.right);
+done();}catch(e){errors.push(e.stack);done();}})();</script>

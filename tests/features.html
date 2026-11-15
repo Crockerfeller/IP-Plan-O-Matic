@@ -1,0 +1,459 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Feature tests</title><iframe id="f" style="width:1400px;height:900px"></iframe><pre id="out">running</pre>
+<script src="lib.js"></script>
+<script>
+const T = {};
+T.oci = async () => {
+  await load('../index.html#10.0.0.0/28');
+  select('#platform', 'oci');
+  divideRow(0); divideRow(0);
+  const r = qa('#body tr')[0];
+  check('oci /30 one host', /10\.0\.0\.0\/30.*\| 1 \|/.test(rowCells(r)), rowCells(r));
+  check('oci /30 cannot divide', r.querySelector('.col-divide button').disabled);
+  check('oci gateway .1', rowCells(r).includes('10.0.0.1 |'), rowCells(r));
+  type(r.querySelector('input'), '9 Web Tier!');
+  select(r.querySelector('select.status'), 'used');
+  click('#tb-export'); select('#exFmt', 'tf-oci');
+  const t = $('exOut').value;
+  check('tf-oci vcn', t.includes('resource "oci_core_vcn" "main"') && t.includes('cidr_blocks    = ["10.0.0.0/28"]'), t.slice(0, 400));
+  check('tf-oci subnet dns_label', /resource "oci_core_subnet" "n_9_web_tier"[\s\S]*dns_label      = "n9webtier"/.test(t), t);
+  click('#tb-plan'); setBase('10.0.0.0/15'); await sleep(50);
+  check('oci /15 warning', $('warnings').textContent.includes('OCI VCN CIDR blocks must be between /16 and /30'), $('warnings').textContent);
+};
+
+const addBox = (v) => { $('addIn').value = v; $('addForm').requestSubmit(); };
+const chipsB = () => qa('#blocks .chip');
+const rowFor = (cidr) => qa('#body tr').find((tr) => tr.textContent.startsWith(cidr));
+T.blocks = async () => {
+  await load('../index.html#10.0.0.0/22');
+  divideRow(0);
+  type(qa('#body tr')[0].querySelector('input'), 'A');
+  check('strip hidden with one block', $('blocks').hidden);
+  addBox('10.0.3.0/25 Cams');
+  check('add subnet carves', rowFor('10.0.3.0/25') && rowFor('10.0.3.0/25').querySelector('input').value === 'Cams', snap().rows);
+  addBox('10.0.0.0/8');
+  check('containing block refused', $('msg').textContent.includes('contains 10.0.0.0/22'), $('msg').textContent);
+  addBox('172.16.0.0/16 AWS-VPC');
+  check('new block strip', !$('blocks').hidden && chipsB().length === 2 && chipsB()[1].getAttribute('aria-pressed') === 'true', $('blocks').textContent);
+  check('table shows new block', snap().rows.length === 1 && snap().rows[0].startsWith('172.16.0.0/16'), snap().rows);
+  check('label field', $('blockLabel').value === 'AWS-VPC');
+  select('#platform', 'aws');
+  divideRow(0);
+  check('aws hosts in block 2', rowCells(qa('#body tr')[0]).includes('32,763'), rowCells(qa('#body tr')[0]));
+  select(qa('#body tr')[0].querySelector('select.status'), 'used');
+  click(chipsB()[0]);
+  check('block 0 kept', rowFor('10.0.0.0/23') && rowFor('10.0.0.0/23').querySelector('input').value === 'A' && $('platform').value === 'std', snap().rows);
+  // overlap on base edit
+  click(chipsB()[1]);
+  setBase('10.0.0.0/16'); await sleep(30);
+  check('base edit overlap refused', $('msg').textContent.includes('overlaps 10.0.0.0/22') && snap().rows[0].startsWith('172.16.0.0/17'), [$('msg').textContent, snap().rows]);
+  await sleep(400);
+  const h = hash();
+  await load('../index.html#' + encodeURI(h));
+  check('round trip blocks', chipsB().length === 2 && chipsB()[1].textContent.includes('AWS-VPC') && chipsB()[1].textContent.includes('AWS VPC'), $('blocks').textContent);
+  check('round trip active', chipsB()[1].getAttribute('aria-pressed') === 'true' && $('platform').value === 'aws');
+  click(chipsB()[0]);
+  check('round trip names', rowFor('10.0.3.0/25').querySelector('input').value === 'Cams');
+  type('#findIp', '172.16.200.1'); await sleep(20);
+  check('find switches block', chipsB()[1].getAttribute('aria-pressed') === 'true' && $('findOut').textContent.includes('172.16.128.0/17'), $('findOut').textContent);
+  type('#findIp', '');
+  click('#tb-export'); select('#exFmt', 'tf-aws');
+  let t = $('exOut').value;
+  check('tf-aws only aws block', t.includes('resource "aws_vpc" "main"') && t.includes('Name = "AWS-VPC"') && !t.includes('10.0.0.0/22') && t.includes('# Only base networks'), t.slice(0, 600));
+  select('#exFmt', 'tf-azure'); t = $('exOut').value;
+  check('tf-azure two vnets', (t.match(/azurerm_virtual_network" "/g) || []).length === 2, t.slice(0, 900));
+  select('#exFmt', 'csv'); t = $('exOut').value;
+  check('csv base network col', t.startsWith('"Base network","Subnet"') && t.includes('"172.16.0.0/16","172.16.0.0/17"'), t.slice(0, 300));
+  select('#exFmt', 'json'); const js = $('exOut').value;
+  const j = JSON.parse(js);
+  check('json blocks', j.version === 3 && j.blocks.length === 2 && j.blocks[1].platform === 'aws' && j.subnets.some((x) => x.network === '172.16.0.0/16' && x.hosts === 32763), j.blocks);
+  click('#tb-plan');
+  click(q('#blocks .chip-x'));
+  check('remove block', $('blocks').hidden && snap().rows[0].startsWith('10.0.0.0/23'), snap().rows);
+  click('#tb-export');
+  $('imText').value = js; click('#imRun');
+  click('#tb-plan');
+  check('json import restores blocks', chipsB().length === 2 && rowFor('10.0.3.0/25').querySelector('input').value === 'Cams', [$('imMsg').textContent, $('blocks').textContent]);
+  click(chipsB()[1]);
+  check('json import aws block', $('platform').value === 'aws' && snap().rows.length === 2 && rowCells(qa('#body tr')[0]).includes('[used]'), snap().rows);
+  // CSV with base network column round trip
+  click('#tb-export'); select('#exFmt', 'csv'); const csv = $('exOut').value;
+  $('imText').value = csv; click('#imRun'); click('#tb-plan');
+  check('csv import blocks', chipsB().length === 2, [$('imMsg').textContent]);
+};
+
+const key = (k, o = {}) => D.dispatchEvent(new W.KeyboardEvent('keydown', { key: k, ctrlKey: true, bubbles: true, ...o }));
+T.undo = async () => {
+  await load('../index.html#10.0.0.0/24');
+  check('undo disabled at start', $('undoBtn').disabled);
+  divideRow(0); divideRow(0); divideRow(0);
+  const four = snap().rows.length;
+  type(qa('#body tr')[0].querySelector('input'), 'Servers');
+  // simulate typing more characters in the same focus session
+  const inp = qa('#body tr')[0].querySelector('input');
+  inp.focus(); inp.value = 'Servers2'; inp.dispatchEvent(new W.Event('input', { bubbles: true })); inp.value = 'Servers22'; inp.dispatchEvent(new W.Event('input', { bubbles: true })); inp.blur();
+  // join the top-level bar (/24)
+  const bars = qa('#body td.bar.joinable');
+  bars.find((b) => b.textContent.startsWith('/24')).click();
+  check('joined', snap().rows.length === 1);
+  check('join toast has undo', !!q('#toast button'));
+  q('#toast button').click();
+  check('undo join restores rows + name', snap().rows.length === four && qa('#body tr')[0].querySelector('input').value === 'Servers22', snap().rows);
+  click('#undoBtn');
+  check('second edit session undone', qa('#body tr')[0].querySelector('input').value === 'Servers', qa('#body tr')[0].querySelector('input').value);
+  click('#undoBtn');
+  check('first edit session undone', qa('#body tr')[0].querySelector('input').value === '');
+  key('z');
+  check('ctrl+z undoes divide', snap().rows.length === 3, snap().rows.length);
+  key('z', { shiftKey: true });
+  check('ctrl+shift+z redoes', snap().rows.length === 4);
+  // native undo inside an input is left alone
+  const i2 = qa('#body tr')[1].querySelector('input');
+  i2.focus();
+  const ev = new W.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+  i2.dispatchEvent(ev);
+  check('ctrl+z in input not intercepted', !ev.defaultPrevented && snap().rows.length === 4);
+  i2.blur();
+  // multi-block undo
+  addBox('172.16.0.0/16 B');
+  check('block added', chipsB().length === 2);
+  key('z');
+  check('undo add block', $('blocks').hidden && snap().rows.length === 4, $('blocks').textContent);
+  // ipv6
+  click('#tb-v6');
+  qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
+  check('v6 split', qa('#v6Body tr').length === 16);
+  click('#v6Undo');
+  check('v6 undo', qa('#v6Body tr').length === 1);
+  key('y');
+  check('ctrl+y redo v6', qa('#v6Body tr').length === 16);
+  // platform change undo
+  click('#tb-plan');
+  select('#platform', 'azure');
+  key('z');
+  check('undo platform', $('platform').value === 'std');
+};
+
+T.vlsm = async () => {
+  await load('../index.html#10.0.0.0/24');
+  divideRow(0); divideRow(0);           // /26 .0, /26 .64, /25 .128
+  select(qa('#body tr')[1].querySelector('select.status'), 'used'); // .64/26 used
+  click('#tb-vlsm');
+  check('fill is default with existing work', $('vlsmMode').value === 'fill', $('vlsmMode').value);
+  $('vlsmIn').value = 'A, 50\nB, 20\nC, 200'; click('#vlsmRun');
+  const o = $('vlsmOut').textContent;
+  check('best fit A in .0/26', o.includes('A') && /A—5010\.0\.0\.0\/26/.test(o.replace(/\s/g, '')), o);
+  check('B in .128/27', /B—2010\.0\.0\.128\/27/.test(o.replace(/\s/g, '')), o);
+  check('C reported as not fitting', o.includes('Doesn’t fit: C (needs a /24)'), o);
+  check('apply shown', !$('vlsmApply').hidden);
+  click('#vlsmApply');
+  const rs = snap().rows;
+  check('fill keeps used .64', rs.some((r) => r.startsWith('10.0.0.64/26') && r.includes('[used]')), rs);
+  check('fill applied A', rs.some((r) => r.startsWith('10.0.0.0/26') && r.includes('[A]')), rs);
+  check('fill applied B', rs.some((r) => r.startsWith('10.0.0.128/27') && r.includes('[B]')), rs);
+  // stale plan detection
+  click('#tb-vlsm'); $('vlsmIn').value = 'D, 10'; click('#vlsmRun');
+  click('#tb-plan'); divideRow(qa('#body tr').length - 1); click('#tb-vlsm');
+  click('#vlsmApply');
+  check('stale plan refused', $('vlsmMsg').textContent.includes('changed'), $('vlsmMsg').textContent);
+  // replace mode explicit
+  select('#vlsmMode', 'replace'); $('vlsmIn').value = 'Z, 100'; click('#vlsmRun'); click('#vlsmApply');
+  check('replace mode', snap().rows.length === 2 && snap().rows[0].includes('[Z]'), snap().rows);
+};
+
+T.map = async () => {
+  await load('../index.html#10.0.0.0/16');
+  check('map 1 cell for unsplit', qa('#map .mc').length === 1 && q('#map .mc').style.gridRow.includes('span 16'), q('#map .mc') && q('#map .mc').style.cssText);
+  check('scale text', $('mapScale').textContent.includes('/24'), $('mapScale').textContent);
+  divideRow(0); divideRow(0); // /18,/18,/17
+  type(qa('#body tr')[0].querySelector('input'), 'Servers');
+  type(qa('#body tr')[0].querySelector('input.vlan'), '10');
+  select(qa('#body tr')[0].querySelector('select.status'), 'used');
+  const mc = qa('#map .mc');
+  check('map 3 rects', mc.length === 3 && mc[0].classList.contains('used') && mc[0].textContent === 'Servers', mc.map((d) => d.className + ':' + d.textContent));
+  check('rect geometry', mc[0].style.gridColumn.startsWith('1 / span 16') && mc[0].style.gridRow.includes('span 4') && mc[2].style.gridRow.startsWith('9'), mc.map((d) => d.style.cssText));
+  // small subnets inside one square
+  await load('../index.html#192.168.0.0/22');
+  for (let k = 0; k < 9; k++) divideRow(0); // first /24 -> /31s near start
+  const mix = qa('#map .mix');
+  check('mixed cell for sub-/30 subnets', mix.length === 1 && mix[0].children.length > 1, mix.length);
+  select('#mapColor', 'vlan');
+  check('vlan legend empty msg', $('mapLegend').textContent.includes('No VLANs'), $('mapLegend').textContent);
+  type(qa('#body tr')[qa('#body tr').length - 1].querySelector('input.vlan'), '42');
+  check('vlan colored', qa('#map .mc.vl').length === 1 && $('mapLegend').textContent.includes('VLAN 42'), $('mapLegend').textContent);
+  // click scrolls/flashes row
+  qa('#map .mc').at(-1).click();
+  check('click flashes row', qa('#body tr').at(-1).classList.contains('flash'));
+  click('#mapToggle');
+  check('collapse', $('map').hidden && $('mapToggle').getAttribute('aria-expanded') === 'false');
+  click('#mapToggle');
+  select('#mapColor', 'status');
+  // /30 base: 4 cells
+  await load('../index.html#10.9.9.0/30');
+  check('/30 base has 1 rect over 4 cols', $('map').style.getPropertyValue('--cols') === '4', $('map').style.cssText);
+};
+
+T.v6 = async () => {
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-v6');
+  qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
+  let r = qa('#v6Body tr')[2];
+  type(r.querySelector('input'), 'Campus');
+  type(r.querySelector('input.vlan'), '300');
+  select(r.querySelector('select.status'), 'used');
+  type(qa('#v6Body tr')[2].querySelector('input.note'), 'bldg 4');
+  type(qa('#v6Body tr')[3].querySelector('input'), 'OnlyName');
+  check('v6 row used class', qa('#v6Body tr')[2].classList.contains('st-used'));
+  await sleep(400);
+  const blob = await decodeBlob(hash().split('/')[3]);
+  check('names-only stays a string in link', blob.v6.m['2001:db8:0:3000::/52'] === 'OnlyName' && blob.v6.m['2001:db8:0:2000::/52'].v === '300', blob.v6);
+  await load('../index.html#' + encodeURI(hash()));
+  click('#tb-v6');
+  r = qa('#v6Body tr')[2];
+  check('v6 round trip', r.querySelector('input').value === 'Campus' && r.querySelector('input.vlan').value === '300' && r.querySelector('select.status').value === 'used' && r.querySelector('input.note').value === 'bldg 4', rowCells(r));
+  click('#tb-export'); select('#exFmt', 'json');
+  const j = JSON.parse($('exOut').value);
+  check('v6 json names+meta', j.ipv6.names['2001:db8:0:2000::/52'] === 'Campus' && j.ipv6.meta['2001:db8:0:2000::/52'].o === 'bldg 4', j.ipv6);
+  // legacy JSON import (names only)
+  const legacy = { base: '10.0.0.0/24', subnets: [{ cidr: '10.0.0.0/24' }], ipv6: { prefix: '2001:db8::/48', tree: 'n0000000000000000', names: { '2001:db8:0:5000::/52': 'Old' } } };
+  $('imText').value = JSON.stringify(legacy); click('#imRun');
+  click('#tb-v6');
+  check('legacy v6 names import', qa('#v6Body tr')[5].querySelector('input').value === 'Old', rowCells(qa('#v6Body tr')[5]));
+  // auto-plan
+  click('#v6Reset');
+  check('fill default when meta', (click('#tb-plan'), click('#tb-v6'), $('v6PlanMode').value === 'fill'));
+  select('#v6PlanMode', 'replace');
+  $('v6PlanIn').value = 'Sites, /56, 12\nLANs, /64, 3'; click('#v6PlanRun');
+  check('v6 plan placed', $('v6PlanOut').textContent.includes('Places 15 prefixes'), $('v6PlanOut').textContent.slice(0, 300));
+  click('#v6PlanApply');
+  const rows6 = qa('#v6Body tr');
+  const named = rows6.filter((tr) => tr.querySelector('input').value.startsWith('Sites'));
+  check('12 sites /56', named.length === 12 && named.every((tr) => /\/56/.test(tr.textContent)), named.length);
+  check('sites contiguous from start', rows6[0].textContent.startsWith('2001:db8::/56') && rows6[0].querySelector('input').value === 'Sites 1', rowCells(rows6[0]));
+  const lans = rows6.filter((tr) => tr.querySelector('input').value.startsWith('LANs'));
+  check('LANs /64 best fit inside a spare /56', lans.length === 3 && lans[0].textContent.startsWith('2001:db8:0:c00::/64'), lans.map((t) => t.textContent.slice(0, 30)));
+  check('no off-nibble rows', !qa('#v6Body tr').some((t) => t.textContent.includes('off-nibble')));
+  check('v6 apply undo', (click('#v6Undo'), qa('#v6Body tr').length === 1));
+  $('v6PlanIn').value = 'Huge, /40'; click('#v6PlanRun');
+  check('too-big line rejected', $('v6PlanOut').textContent.includes('bigger than'), $('v6PlanOut').textContent);
+};
+
+T.plans = async () => {
+  await load('../index.html#10.1.0.0/16');
+  W.localStorage.removeItem('subnetPlanner.plans');
+  divideRow(0);
+  type(qa('#body tr')[0].querySelector('input'), 'North');
+  await sleep(350);
+  const h1 = hash();
+  click('#plansBtn');
+  check('dialog opens', $('plansDlg').open && $('plansBody').textContent.includes('No saved plans'));
+  $('planName').value = 'Campus'; $('planSaveForm').requestSubmit();
+  check('saved', qa('#plansBody tr').length === 1 && qa('#plansBody tr')[0].textContent.includes('10.1.0.0/16') && $('plansMsg').textContent.includes('Saved'), $('plansBody').textContent);
+  click('#planNew');
+  check('new plan', snap().rows.length === 1 && snap().rows[0].startsWith('192.168.0.0/24') && !$('plansDlg').open, snap().rows);
+  click('#plansBtn');
+  [...qa('#plansBody button')].find((b) => b.textContent === 'Open').click();
+  check('open restores', snap().rows[0].includes('[North]') && !$('plansDlg').open, snap().rows);
+  // rename + duplicate
+  click('#plansBtn');
+  const ni = q('#plansBody input'); ni.value = 'Campus A'; ni.dispatchEvent(new W.Event('change'));
+  [...qa('#plansBody button')].find((b) => b.textContent === 'Duplicate').click();
+  check('rename + duplicate', qa('#plansBody tr').length === 2 && qa('#plansBody input').some((i) => i.value === 'Campus A (copy)'), qa('#plansBody input').map((i) => i.value));
+  // overwrite via Save here after a change
+  $('plansDlg').close();
+  divideRow(1);
+  click('#plansBtn');
+  const row = qa('#plansBody tr').find((tr) => tr.querySelector('input').value === 'Campus A');
+  check('unsaved marker', row.textContent.includes('unsaved changes'), row.textContent);
+  [...row.querySelectorAll('button')].find((b) => b.textContent === 'Save here').click();
+  const stored = JSON.parse(W.localStorage.getItem('subnetPlanner.plans'));
+  check('save here overwrote', stored.find((x) => x.name === 'Campus A').hash !== h1);
+  // delete
+  const dup = qa('#plansBody tr').find((tr) => tr.querySelector('input').value.includes('(copy)'));
+  [...dup.querySelectorAll('button')].find((b) => b.textContent === 'Delete').click();
+  check('delete', qa('#plansBody tr').length === 1);
+  $('plansDlg').close();
+  // autosave restore on bare visit
+  await sleep(350);
+  const cur = hash();
+  await load('../index.html');
+  check('bare visit restores autosave', hash() === cur && snap().rows[0].includes('[North]'), [hash(), cur]);
+  check('restore toast', $('toast').textContent.includes('Restored'), $('toast').textContent);
+  q('#toast button').click();
+  check('start new from toast', snap().rows.length === 1 && snap().rows[0].startsWith('192.168.0.0/24'));
+};
+
+T.links = async () => {
+  await load('../index.html#10.0.0.0/22');
+  for (let i = 0; i < 6; i++) divideRow(i);
+  qa('#body tr').forEach((tr, i) => { type(tr.querySelector('input'), `Building ${i} floor network`); type(tr.querySelector('input.vlan'), String(100 + i)); });
+  await sleep(400);
+  const h = hash(), blob = h.split('/')[3];
+  check('link blob compressed', blob[0] === '~', blob.slice(0, 20));
+  const plain = btoa(unescape(encodeURIComponent(JSON.stringify(await decodeBlob(blob))))).length;
+  check('compressed is much shorter', blob.length < plain * 0.6, [blob.length, plain]);
+  const rowsBefore = snap().rows;
+  await load('../index.html#' + encodeURI(h));
+  check('compressed link round trip', JSON.stringify(snap().rows) === JSON.stringify(rowsBefore), snap().rows.slice(0, 2));
+  // small plans stay plain (and readable by older versions)
+  await load('../index.html#10.0.0.0/24');
+  type(qa('#body tr')[0].querySelector('input'), 'A'); await sleep(400);
+  check('tiny blob stays plain', hash().split('/')[3][0] !== '~', hash());
+  // copy link waits for the compact form
+  check('copy link button exists', !!$('linkBtn'));
+};
+
+const press = (k, o = {}) => D.dispatchEvent(new W.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...o }));
+T.keys = async () => {
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-plan');
+  press('ArrowDown');
+  check('down selects first row', qa('#body tr')[0].classList.contains('sel'));
+  press('d'); press('d');
+  check('D divides twice', snap().rows.length === 3 && qa('#body tr.sel')[0].dataset.key === '10.0.0.0/26', [snap().rows.length, q('#body tr.sel') && q('#body tr.sel').dataset.key]);
+  press('ArrowDown');
+  check('down moves', q('#body tr.sel').dataset.key === '10.0.0.64/26');
+  press('s');
+  check('S sets in use', rowFor('10.0.0.64/26').querySelector('select.status').value === 'used');
+  press('j');
+  check('J joins with sibling', snap().rows.length === 2 && q('#body tr.sel').dataset.key === '10.0.0.0/25', snap().rows);
+  press('Enter');
+  check('Enter focuses name', D.activeElement && D.activeElement.classList.contains('cell-input'));
+  const inp = D.activeElement; inp.value = 'Core'; inp.dispatchEvent(new W.Event('input', { bubbles: true }));
+  inp.dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  check('Esc leaves input, row stays selected', D.activeElement !== inp && q('#body tr.sel').dataset.key === '10.0.0.0/25');
+  press('d');
+  check('typing D outside inputs still works', snap().rows.length === 3);
+  inp.focus; // no-op
+  const name = rowFor('10.0.0.0/26').querySelector('input'); name.focus();
+  const ev = new W.KeyboardEvent('keydown', { key: 'd', bubbles: true, cancelable: true }); name.dispatchEvent(ev);
+  check('D inside input ignored', snap().rows.length === 3 && !ev.defaultPrevented);
+  name.blur();
+  press('?');
+  check('? opens shortcuts', $('keysDlg').open);
+  click('#keysClose');
+  press('j'); // on 10.0.0.0/26 (focusin selected it)
+  check('J after focus-select', snap().rows.length === 2, snap().rows);
+  key('z');
+  check('undo after key join', snap().rows.length === 3);
+};
+
+T.zones = async () => {
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-vlsm'); click('#vlsmCloudEx');
+  check('cloud example sets base /16 aws', $('vlsmBase').textContent === '10.20.0.0/16' && $('vlsmPlat').textContent === 'AWS VPC', [$('vlsmBase').textContent, $('vlsmPlat').textContent]);
+  select('#vlsmMode', 'replace'); click('#vlsmRun');
+  const trs = qa('#vlsmOut tbody tr').map((tr) => [...tr.children].map((td) => td.textContent));
+  check('9 subnets, one per tier per zone', trs.length === 9 && trs.filter((t) => t[2] === 'us-east-1b').length === 3, trs.map((t) => t.slice(0, 5)));
+  check('private /20s first and contiguous', trs.slice(0, 3).every((t, i) => t[0] === `Private app us-east-1${'abc'[i]}` && t[4] === `10.20.${i * 16}.0/20`), trs.slice(0, 3));
+  click('#vlsmApply');
+  check('zone column shown with values', !!q('#body input.zone') && q('#body input.zone').value === 'us-east-1a', q('#body input.zone') && q('#body input.zone').value);
+  click('#tb-export'); select('#exFmt', 'tf-aws');
+  let t = $('exOut').value;
+  check('terraform availability_zone', t.includes('availability_zone = "us-east-1c"') && !t.includes('# availability_zone'), t.slice(0, 900));
+  select('#exFmt', 'csv'); t = $('exOut').value;
+  check('csv has Zone column', t.split('\n')[0].includes('"Zone"') && t.includes('"us-east-1b"'), t.split('\n')[0]);
+  select('#exFmt', 'json'); const j = JSON.parse($('exOut').value);
+  check('json zone', j.subnets.some((x) => x.zone === 'us-east-1a'));
+  // CSV round trip keeps zones
+  select('#exFmt', 'csv'); $('imText').value = $('exOut').value; click('#imRun');
+  click('#tb-plan');
+  check('csv import keeps zones', qa('#body input.zone').filter((i) => i.value).length === 9, qa('#body input.zone').map((i) => i.value));
+};
+
+T.exports2 = async () => {
+  const A = (await (await fetch('baseline-old.json')).json()).scenarios.A.hash;
+  await load('../index.html#' + encodeURI(A));
+  click('#tb-export');
+  const gen = (f) => { select('#exFmt', f); return $('exOut').value; };
+  let t = gen('arista');
+  check('arista', t.includes('interface Vlan10') && t.includes('   ip address 10.0.0.1/24') && t.includes('ip helper-address <DHCP_SERVER>'), t.slice(0, 500));
+  t = gen('fortigate');
+  check('fortigate', t.includes('edit "vlan10"') && t.includes('set ip 10.0.0.1 255.255.255.0') && t.includes('set vlanid 10') && t.includes('config system dhcp server') && t.includes('set start-ip 10.0.0.2'), t.slice(0, 900));
+  t = gen('panos');
+  check('panos', t.includes('units <PARENT_IF>.10 tag 10') && t.includes('ip 10.0.0.1/24') && t.includes('ip-pool 10.0.0.2-10.0.0.254'), t.slice(0, 700));
+  t = gen('pfsense');
+  const xml = new W.DOMParser().parseFromString('<root>' + t.replace(/^<\?xml[^>]*\?>/, '') + '</root>', 'application/xml');
+  check('pfsense xml well-formed', !xml.querySelector('parsererror') && xml.querySelectorAll('vlan').length === 2 && xml.querySelector('opt1 ipaddr').textContent === '10.0.0.1', t.slice(0, 900));
+  t = gen('ansible');
+  check('ansible yaml', t.startsWith('---') && t.includes('  - name: "Servers"') && t.includes('    vlan: 10') && t.includes('  - name: "Wifi'), t.slice(0, 600));
+  t = gen('md');
+  check('markdown', t.split('\n')[0] === '| Subnet | Name | VLAN | Gateway | Usable range | Hosts | Status | Notes |' && t.includes('| 10.0.0.0/24 | Servers | 10 |'), t.slice(0, 400));
+  t = gen('html');
+  const ht = new W.DOMParser().parseFromString(t, 'text/html');
+  check('html table', ht.querySelectorAll('tbody tr').length >= 3 && ht.querySelector('td').textContent === '10.0.0.0/24', t.slice(0, 300));
+  // xlsx: capture the Blob handed to download()
+  let blob = null;
+  const orig = W.URL.createObjectURL; W.URL.createObjectURL = (b) => { blob = b; return 'blob:x'; };
+  select('#exFmt', 'xlsx'); click('#exDl'); W.URL.createObjectURL = orig;
+  check('xlsx preview is tsv', $('exOut').value.split('\n')[0].startsWith('Subnet\tName\tVLAN'), $('exOut').value.slice(0, 80));
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  check('xlsx blob made', buf.length > 1000 && buf[0] === 0x50 && buf[1] === 0x4b, buf.length);
+};
+
+T.v6tools = async () => {
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-tools');
+  type('#infoIn', '2001:db8:abcd:12::5');
+  const kv = () => Object.fromEntries(qa('#infoOut dt').map((dt) => [dt.textContent, dt.nextElementSibling.textContent]));
+  let k = kv();
+  check('v6 info address', k.Expanded === '2001:0db8:abcd:0012:0000:0000:0000:0005' && k.Prefix.includes('2001:db8:abcd:12::5/128') && k.Prefix.includes('2001:db8:abcd:12::/64'), k);
+  type('#infoIn', '2001:db8:abcd::/48');
+  k = kv();
+  check('v6 reverse zone /48', k['Reverse DNS'] === 'd.c.b.a.8.b.d.0.1.0.0.2.ip6.arpa' && k.Size.startsWith('65,536 × /64'), k['Reverse DNS']);
+  type('#infoIn', '2001:db8::/30');
+  check('v6 reverse non-nibble', kv()['Reverse DNS'].startsWith('Spans 4 zones at /32'), kv()['Reverse DNS']);
+  type('#infoIn', 'fd12:3456:789a::/48');
+  check('v6 ULA tag', kv().Type.includes('Unique local'), kv().Type);
+  // summarize IPv6
+  $('sumIn').value = '2001:db8:0:0::/64\n2001:db8:0:1::/64\n2001:db8:0:2::/63\n10.0.0.0/25\n10.0.0.128/25';
+  click('#sumRun');
+  const codes = qa('#sumOut code').map((c) => c.textContent);
+  check('mixed summarize', codes.includes('10.0.0.0/24') && codes.includes('2001:db8::/62'), codes);
+  $('sumIn').value = '2001:db8::/64, 2001:db8:0:2::/64';
+  click('#sumRun');
+  const c2 = qa('#sumOut code').map((c) => c.textContent);
+  check('v6-only summarize with gap', c2.join(' ') === '2001:db8::/64 2001:db8:0:2::/64 2001:db8::/62', c2);
+  // overlap v6 vs plan (/48 default split n16)
+  click('#tb-v6'); qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
+  type(qa('#v6Body tr')[1].querySelector('input'), 'Campus');
+  click('#tb-tools');
+  $('ovIn').value = '2001:db8:0:1234::/64 Partner\n2001:db8:ffff::/48 Other\n2001:db8:0:1200::/56 Overlapping partner\n10.9.0.0/16 v4';
+  click('#ovRun');
+  const t = $('ovOut').textContent;
+  check('v6 overlap found', t.includes('2 of 3 IPv6 prefixes clash') && t.includes('is inside 2001:db8:0:1000::/52 (Campus)'), t.slice(0, 900));
+  check('v6 pair overlap', t.includes('2001:db8:0:1234::/64 (Partner) is inside 2001:db8:0:1200::/56'), t);
+  check('v4 still checked', t.includes('None of the 1 networks clash'), t.slice(0, 200));
+  click('#tb-v6');
+  check('v6 clash row marked', qa('#v6Body tr.clash').length === 1);
+};
+
+T.v6export = async () => {
+  const A = (await (await fetch('baseline-old.json')).json()).scenarios.A.hash;
+  await load('../index.html#' + encodeURI(A));
+  click('#tb-v6');
+  $('v6Net').value = '2001:db8:0:10::/60'; $('v6Form').requestSubmit();
+  qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
+  type(qa('#v6Body tr')[0].querySelector('input.vlan'), '10');
+  type(qa('#v6Body tr')[1].querySelector('input'), 'Lab'); type(qa('#v6Body tr')[1].querySelector('input.vlan'), '77');
+  type(qa('#v6Body tr')[2].querySelector('input'), 'Mgmt');
+  click('#tb-export');
+  const gen = (f) => { select('#exFmt', f); return $('exOut').value; };
+  let t = gen('cisco');
+  check('cisco v6 on vlan10', /interface Vlan10\n description Servers\n ip address 10\.0\.0\.1 255\.255\.255\.0\n ipv6 address 2001:db8:0:10::1\/64\n no shutdown/.test(t) && t.includes('ipv6 unicast-routing'), t.slice(0, 700));
+  check('cisco v6 leftovers', t.includes('interface Vlan77\n description Lab\n ipv6 address 2001:db8:0:11::1/64') && t.includes('interface <INTERFACE>\n description Mgmt\n ipv6 address 2001:db8:0:12::1/64'), t.slice(-500));
+  t = gen('junos');
+  check('junos inet6 + RA', t.includes('set interfaces irb unit 10 family inet6 address 2001:db8:0:10::1/64') && t.includes('set protocols router-advertisement interface irb.10') && t.includes('set vlans LAB vlan-id 77'), t.slice(0, 1200));
+  t = gen('mikrotik');
+  check('mikrotik ipv6', t.includes('/ipv6 address add address=2001:db8:0:10::1/64 interface=vlan10 advertise=yes') && t.includes('/interface vlan add interface=bridge name=vlan77'), t.slice(-600));
+  t = gen('arista');
+  check('arista ipv6', t.includes('   ipv6 address 2001:db8:0:10::1/64') && t.startsWith('! Generated') && t.includes('ipv6 unicast-routing'), t.slice(0, 500));
+};
+(async () => {
+  const only = new URLSearchParams(location.search).get('t');
+  for (const [k, fn] of Object.entries(T)) {
+    if (only && !only.split(',').includes(k)) continue;
+    try { await fn(); } catch (e) { failures++; results.push(`FAIL ${k} threw ${e.stack}`); }
+  }
+  done();
+})();
+</script>

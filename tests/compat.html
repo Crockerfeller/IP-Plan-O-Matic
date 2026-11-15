@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Compatibility tests</title><iframe id="f" style="width:1400px;height:900px"></iframe><pre id="out">running</pre>
+<script src="lib.js"></script>
+<script>
+(async () => {
+  try {
+    const base = await (await fetch('baseline-old.json')).json();
+    for (const [k, sc] of Object.entries(base.scenarios)) {
+      await load('../index.html#' + encodeURI(sc.hash));
+      const s = snap();
+      check(`${k} rows`, JSON.stringify(s.rows) === JSON.stringify(sc.snap.rows), { got: s.rows.slice(0, 3), want: sc.snap.rows.slice(0, 3) });
+      // new IPv6 tables have VLAN / Status / Notes after Name: drop those three cells before comparing
+      const v6n = s.v6.map((r) => { const x = r.split(' | '); return x.length >= 9 ? [...x.slice(0, 2), ...x.slice(5)].join(' | ') : r; });
+      check(`${k} v6`, JSON.stringify(v6n) === JSON.stringify(sc.snap.v6), { got: v6n.slice(0, 3), want: sc.snap.v6.slice(0, 3) });
+      check(`${k} warnings`, s.warnings === sc.snap.warnings, { got: s.warnings, want: sc.snap.warnings });
+      if (k === 'A') {
+        for (const [f, want] of Object.entries(base.exports)) {
+          click('#tb-export'); select('#exFmt', f); await sleep(20);
+          const got = $('exOut').value;
+          // JSON may gain fields; compare the old keys only
+          if (f === 'json') {
+            const g = JSON.parse(got), w = JSON.parse(want);
+            const ok = ['base', 'platform', 'gateway', 'tree'].every((x) => JSON.stringify(g[x]) === JSON.stringify(w[x])) &&
+              JSON.stringify(g.subnets.map((s) => [s.cidr, s.name, s.vlan, s.status, s.note, s.hosts, s.gateway])) === JSON.stringify(w.subnets.map((s) => [s.cidr, s.name, s.vlan, s.status, s.note, s.hosts, s.gateway]));
+            check('export json', ok, { got: got.slice(0, 400) });
+          } else check(`export ${f}`, got === want, { got: got.slice(0, 300), want: want.slice(0, 300) });
+        }
+      }
+    }
+    // VLSM replace mode == old output
+    await load('../index.html#10.10.0.0/22');
+    click('#tb-vlsm'); click('#vlsmExample'); click('#vlsmRun');
+    const tbl = (t) => t.replace(/^.*?Usable range/s, '');
+    check('vlsm table', tbl($('vlsmOut').textContent) === tbl(base.vlsm), { got: $('vlsmOut').textContent.slice(0, 400), want: base.vlsm.slice(0, 400) });
+    click('#vlsmApply'); await sleep(400);
+    check('vlsm applied rows', JSON.stringify(snap().rows) === JSON.stringify(base.scenarios.V.snap.rows), { got: snap().rows.slice(0, 4) });
+    done();
+  } catch (e) { errors.push('HARNESS ' + e.stack); done(); }
+})();
+</script>

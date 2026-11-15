@@ -1,0 +1,64 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Accuracy tests</title>
+<iframe id="f" style="width:1400px;height:900px"></iframe><pre id="out">running</pre>
+<script src="lib.js"></script>
+<script>
+// Compares IP Plan-O-Matic with answers computed by Python's ipaddress module (tests/make_accuracy_cases.py).
+(async () => { try {
+  const data = await (await fetch('accuracy-cases.json')).json();
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-tools');
+  const kv = () => Object.fromEntries([...D.querySelectorAll('#infoOut dt')].map((dt) => [dt.textContent, dt.nextElementSibling.textContent]));
+  let bad = 0;
+  for (const c of data.cases) {
+    type('#infoIn', c.inp);
+    const k = kv();
+    const ok = k.Network === c.net && k.Netmask === c.mask && k.Wildcard === c.wild && k.Range.startsWith(`${c.lo} – ${c.hi}`) &&
+      (k.Usable.startsWith(`${c.first} – ${c.last}`) || (c.hosts === 1 && k.Usable.startsWith(c.first))) &&
+      k.Usable.includes(`(${c.hosts.toLocaleString('en-US')} host`);
+    if (!ok && bad++ < 5) results.push('MISMATCH ' + JSON.stringify({ c, k }));
+  }
+  check(`IPv4 address math matches Python ipaddress on ${data.cases.length} random networks`, bad === 0, bad);
+  let ibad = 0;
+  for (const c of data.info6) {
+    type('#infoIn', c.inp);
+    const k = kv();
+    const ok = k.Range === `${c.first} – ${c.last}` && k.Expanded === c.expanded;
+    if (!ok && ibad++ < 5) results.push('MISMATCH6 ' + JSON.stringify({ c, k }));
+  }
+  check(`IPv6 prefix ranges match Python ipaddress on ${data.info6.length} random prefixes`, ibad === 0, ibad);
+  for (const [key, label] of [['sums', 'IPv4'], ['sums6', 'IPv6']]) {
+    let sbad = 0;
+    for (const s of data[key]) {
+      $('sumIn').value = s.inp.join('\n'); click('#sumRun');
+      const got = [...D.querySelectorAll('#sumOut .codebox')[0].querySelectorAll('code')].map((c) => c.textContent).sort();
+      if (JSON.stringify(got) !== JSON.stringify(s.out) && sbad++ < 3) results.push('SUM MISMATCH ' + JSON.stringify({ s, got }));
+    }
+    check(`${label} route summarization matches Python collapse_addresses on ${data[key].length} random lists`, sbad === 0, sbad);
+  }
+  // Usable hosts per platform for /24, /27 and /28
+  const exp = { std: [254, 30, 14], aws: [251, 27, 11], azure: [251, 27, 11], gcp: [252, 28, 12], oci: [253, 29, 13] };
+  for (const [cl, want] of Object.entries(exp)) {
+    await load('../index.html#10.0.0.0/24'); click('#tb-plan'); select('#platform', cl);
+    const hostsOf = () => Number(rowCells(qa('#body tr')[0]).split(' | ').find((x) => /^[\d,]+$/.test(x)).replace(/,/g, ''));
+    const a = hostsOf(); divideRow(0); divideRow(0); divideRow(0); const b = hostsOf(); divideRow(0); const c = hostsOf();
+    check(`${cl}: usable hosts in /24, /27, /28 = ${want.join(', ')}`, a === want[0] && b === want[1] && c === want[2], [a, b, c]);
+  }
+  // VLSM: random plans must be aligned, inside the base network, and never overlap
+  await load('../index.html#10.20.0.0/20'); click('#tb-vlsm');
+  let vbad = 0;
+  for (let t = 0; t < 40; t++) {
+    const n = 2 + Math.floor(Math.random() * 10);
+    $('vlsmIn').value = Array.from({ length: n }, (_, i) => `N${i}, ${1 + Math.floor(Math.random() * 600)}`).join('\n');
+    $('vlsmZones').value = '';
+    select('#vlsmMode', 'replace'); click('#vlsmRun');
+    const iv = [...D.querySelectorAll('#vlsmOut tbody tr')].map((tr) => tr.children[3].textContent).map((c) => {
+      const [ip, m] = c.split('/'); const a = ip.split('.').reduce((x, o) => x * 256 + +o, 0);
+      return [a, a + 2 ** (32 - m) - 1, a % 2 ** (32 - m) === 0];
+    }).sort((x, y) => x[0] - y[0]);
+    const lo = 10 * 2 ** 24 + 20 * 2 ** 16, hi = lo + 4095;
+    if (iv.some((x, i) => !x[2] || x[0] < lo || x[1] > hi || (i && x[0] <= iv[i - 1][1]))) vbad++;
+  }
+  check('VLSM: 40 random plans are aligned, inside the base network and never overlap', vbad === 0, vbad);
+  done();
+} catch (e) { errors.push(e.stack); done(); } })();
+</script>

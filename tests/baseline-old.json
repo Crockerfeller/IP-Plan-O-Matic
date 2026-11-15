@@ -1,0 +1,122 @@
+{
+ "failures": 0,
+ "results": [],
+ "errors": [],
+ "scenarios": {
+  "A": {
+   "hash": "10.0.0.0/22/7.31/eyJtIjp7IjEwLjAuMC4wLzI0Ijp7Im4iOiJTZXJ2ZXJzIiwidiI6IjEwIiwicyI6InVzZWQifSwiMTAuMC4xLjAvMjQiOnsibiI6IldpZmkgXCJndWVzdFwiIiwicyI6InJlc2VydmVkIn0sIjEwLjAuMi4wLzI0Ijp7InYiOiIyMCIsInMiOiJ1c2VkIn19fQ",
+   "snap": {
+    "rows": [
+     "10.0.0.0/24 | Divide | [Servers] | [10] | 10.0.0.1 – 10.0.0.254 | 10.0.0.1 | 254 | [used] | /24 | /23join | /22join",
+     "10.0.1.0/24 | Divide | [Wifi \"guest\"] | [] | 10.0.1.1 – 10.0.1.254 | 10.0.1.1 | 254 | [reserved] | /24",
+     "10.0.2.0/24 | Divide | [] | [20] | 10.0.2.1 – 10.0.2.254 | 10.0.2.1 | 254 | [used] | /24 | /23join",
+     "10.0.3.0/24 | Divide | [] | [] | 10.0.3.1 – 10.0.3.254 | 10.0.3.1 | 254 | [free] | /24"
+    ],
+    "summary": "Base network 10.0.0.0/22Netmask 255.255.252.0Subnets 4Total addresses 1,024Usable hosts 1,016Platform Standard",
+    "warnings": "Private (RFC 1918)",
+    "v6": [
+     "2001:db8::/48 | [] | 2001:db8:: – 2001:db8:0:ffff:ffff:ffff:ffff:ffff | 65,536 × /64 | ÷2÷16 | "
+    ]
+   }
+  },
+  "B": {
+   "hash": "10.0.0.0/22/7.31/eyJjIjoiYXdzIiwibSI6eyIxMC4wLjAuMC8yNCI6eyJuIjoiU2VydmVycyIsInYiOiIxMCIsInMiOiJ1c2VkIn0sIjEwLjAuMS4wLzI0Ijp7Im4iOiJXaWZpIFwiZ3Vlc3RcIiIsInMiOiJyZXNlcnZlZCJ9LCIxMC4wLjIuMC8yNCI6eyJ2IjoiMjAiLCJzIjoidXNlZCJ9fX0",
+   "snap": {
+    "rows": [
+     "10.0.0.0/24 | Divide | [Servers] | [10] | 10.0.0.4 – 10.0.0.254 | 10.0.0.1 | 251 | [used] | /24 | /23join | /22join",
+     "10.0.1.0/24 | Divide | [Wifi \"guest\"] | [] | 10.0.1.4 – 10.0.1.254 | 10.0.1.1 | 251 | [reserved] | /24",
+     "10.0.2.0/24 | Divide | [] | [20] | 10.0.2.4 – 10.0.2.254 | 10.0.2.1 | 251 | [used] | /24 | /23join",
+     "10.0.3.0/24 | Divide | [] | [] | 10.0.3.4 – 10.0.3.254 | 10.0.3.1 | 251 | [free] | /24"
+    ],
+    "summary": "Base network 10.0.0.0/22Netmask 255.255.252.0Subnets 4Total addresses 1,024Usable hosts 1,004Platform AWS VPC",
+    "warnings": "Private (RFC 1918)",
+    "v6": [
+     "2001:db8::/48 | [] | 2001:db8:: – 2001:db8:0:ffff:ffff:ffff:ffff:ffff | 65,536 × /64 | ÷2÷16 | "
+    ]
+   }
+  },
+  "C": {
+   "hash": "192.168.1.0/24/7.31/eyJnIjoibGFzdCJ9",
+   "snap": {
+    "rows": [
+     "192.168.1.0/26 | Divide | [] | [] | 192.168.1.1 – 192.168.1.62 | 192.168.1.62 | 62 | [free] | /26 | /25join | /24join",
+     "192.168.1.64/26 | Divide | [] | [] | 192.168.1.65 – 192.168.1.126 | 192.168.1.126 | 62 | [free] | /26",
+     "192.168.1.128/26 | Divide | [] | [] | 192.168.1.129 – 192.168.1.190 | 192.168.1.190 | 62 | [free] | /26 | /25join",
+     "192.168.1.192/26 | Divide | [] | [] | 192.168.1.193 – 192.168.1.254 | 192.168.1.254 | 62 | [free] | /26"
+    ],
+    "summary": "Base network 192.168.1.0/24Netmask 255.255.255.0Subnets 4Total addresses 256Usable hosts 248Platform Standard",
+    "warnings": "Private (RFC 1918)",
+    "v6": [
+     "2001:db8::/48 | [] | 2001:db8:: – 2001:db8:0:ffff:ffff:ffff:ffff:ffff | 65,536 × /64 | ÷2÷16 | "
+    ]
+   }
+  },
+  "D": {
+   "hash": "192.168.1.0/24/7.31/eyJnIjoibGFzdCIsInY2Ijp7InAiOiIyMDAxOmRiODo6LzQ4IiwidCI6Im4xMDAwMDAwMDAwMDAwMDAwMDAiLCJtIjp7IjIwMDE6ZGI4OjovNTMiOiJDb3JlIiwiMjAwMTpkYjg6MDoyMDAwOjovNTIiOiJTaXRlIEIifX19",
+   "snap": {
+    "rows": [
+     "192.168.1.0/26 | Divide | [] | [] | 192.168.1.1 – 192.168.1.62 | 192.168.1.62 | 62 | [free] | /26 | /25join | /24join",
+     "192.168.1.64/26 | Divide | [] | [] | 192.168.1.65 – 192.168.1.126 | 192.168.1.126 | 62 | [free] | /26",
+     "192.168.1.128/26 | Divide | [] | [] | 192.168.1.129 – 192.168.1.190 | 192.168.1.190 | 62 | [free] | /26 | /25join",
+     "192.168.1.192/26 | Divide | [] | [] | 192.168.1.193 – 192.168.1.254 | 192.168.1.254 | 62 | [free] | /26"
+    ],
+    "summary": "Base network 192.168.1.0/24Netmask 255.255.255.0Subnets 4Total addresses 256Usable hosts 248Platform Standard",
+    "warnings": "Private (RFC 1918)",
+    "v6": [
+     "2001:db8::/53off-nibble | [Core] | 2001:db8:: – 2001:db8:0:7ff:ffff:ffff:ffff:ffff | 2,048 × /64 | ÷2÷16 | Join → /52",
+     "2001:db8:0:800::/53off-nibble | [] | 2001:db8:0:800:: – 2001:db8:0:fff:ffff:ffff:ffff:ffff | 2,048 × /64 | ÷2÷16 | ",
+     "2001:db8:0:1000::/52 | [] | 2001:db8:0:1000:: – 2001:db8:0:1fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:2000::/52 | [Site B] | 2001:db8:0:2000:: – 2001:db8:0:2fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:3000::/52 | [] | 2001:db8:0:3000:: – 2001:db8:0:3fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:4000::/52 | [] | 2001:db8:0:4000:: – 2001:db8:0:4fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:5000::/52 | [] | 2001:db8:0:5000:: – 2001:db8:0:5fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:6000::/52 | [] | 2001:db8:0:6000:: – 2001:db8:0:6fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:7000::/52 | [] | 2001:db8:0:7000:: – 2001:db8:0:7fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:8000::/52 | [] | 2001:db8:0:8000:: – 2001:db8:0:8fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:9000::/52 | [] | 2001:db8:0:9000:: – 2001:db8:0:9fff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:a000::/52 | [] | 2001:db8:0:a000:: – 2001:db8:0:afff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:b000::/52 | [] | 2001:db8:0:b000:: – 2001:db8:0:bfff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:c000::/52 | [] | 2001:db8:0:c000:: – 2001:db8:0:cfff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:d000::/52 | [] | 2001:db8:0:d000:: – 2001:db8:0:dfff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:e000::/52 | [] | 2001:db8:0:e000:: – 2001:db8:0:efff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | ",
+     "2001:db8:0:f000::/52 | [] | 2001:db8:0:f000:: – 2001:db8:0:ffff:ffff:ffff:ffff:ffff | 4,096 × /64 | ÷2÷16 | "
+    ]
+   }
+  },
+  "V": {
+   "hash": "10.10.0.0/22/23.b2fa10/eyJtIjp7IjEwLjEwLjAuMC8yNCI6eyJuIjoiU2VydmVycyIsInYiOiIxMCIsInMiOiJ1c2VkIiwibyI6Ik5lZWRzIDIwMCBob3N0cyJ9LCIxMC4xMC4xLjAvMjUiOnsibiI6IlN0YWZmIFdpLUZpIiwidiI6IjIwIiwicyI6InVzZWQiLCJvIjoiTmVlZHMgMTIwIGhvc3RzIn0sIjEwLjEwLjEuMTI4LzI2Ijp7Im4iOiJHdWVzdCBXaS1GaSIsInYiOiIzMCIsInMiOiJ1c2VkIiwibyI6Ik5lZWRzIDYwIGhvc3RzIn0sIjEwLjEwLjEuMTkyLzI2Ijp7Im4iOiJWb0lQIiwidiI6IjQwIiwicyI6InVzZWQiLCJvIjoiTmVlZHMgNTAgaG9zdHMifSwiMTAuMTAuMi4wLzI3Ijp7Im4iOiJQcmludGVycyIsInYiOiI1MCIsInMiOiJ1c2VkIiwibyI6Ik5lZWRzIDIwIGhvc3RzIn0sIjEwLjEwLjIuMzIvMjgiOnsibiI6Ik1hbmFnZW1lbnQiLCJ2IjoiOTkiLCJzIjoidXNlZCIsIm8iOiJOZWVkcyAxMCBob3N0cyJ9LCIxMC4xMC4yLjQ4LzMwIjp7Im4iOiJVcGxpbmsgdG8gSVNQIiwicyI6InVzZWQiLCJvIjoiTmVlZHMgMiBob3N0cyJ9fX0",
+   "snap": {
+    "rows": [
+     "10.10.0.0/24 | Divide | [Servers] | [10] | 10.10.0.1 – 10.10.0.254 | 10.10.0.1 | 254 | [used] | /24 | /23join | /22join",
+     "10.10.1.0/25 | Divide | [Staff Wi-Fi] | [20] | 10.10.1.1 – 10.10.1.126 | 10.10.1.1 | 126 | [used] | /25 | /24join",
+     "10.10.1.128/26 | Divide | [Guest Wi-Fi] | [30] | 10.10.1.129 – 10.10.1.190 | 10.10.1.129 | 62 | [used] | /26 | /25join",
+     "10.10.1.192/26 | Divide | [VoIP] | [40] | 10.10.1.193 – 10.10.1.254 | 10.10.1.193 | 62 | [used] | /26",
+     "10.10.2.0/27 | Divide | [Printers] | [50] | 10.10.2.1 – 10.10.2.30 | 10.10.2.1 | 30 | [used] | /27 | /26join | /25join | /24join | /23join",
+     "10.10.2.32/28 | Divide | [Management] | [99] | 10.10.2.33 – 10.10.2.46 | 10.10.2.33 | 14 | [used] | /28 | /27join",
+     "10.10.2.48/30 | Divide | [Uplink to ISP] | [] | 10.10.2.49 – 10.10.2.50 | 10.10.2.49 | 2 | [used] | /30 | /29join | /28join",
+     "10.10.2.52/30 | Divide | [] | [] | 10.10.2.53 – 10.10.2.54 | 10.10.2.53 | 2 | [free] | /30",
+     "10.10.2.56/29 | Divide | [] | [] | 10.10.2.57 – 10.10.2.62 | 10.10.2.57 | 6 | [free] | /29",
+     "10.10.2.64/26 | Divide | [] | [] | 10.10.2.65 – 10.10.2.126 | 10.10.2.65 | 62 | [free] | /26",
+     "10.10.2.128/25 | Divide | [] | [] | 10.10.2.129 – 10.10.2.254 | 10.10.2.129 | 126 | [free] | /25",
+     "10.10.3.0/24 | Divide | [] | [] | 10.10.3.1 – 10.10.3.254 | 10.10.3.1 | 254 | [free] | /24"
+    ],
+    "summary": "Base network 10.10.0.0/22Netmask 255.255.252.0Subnets 12Total addresses 1,024Usable hosts 1,000Platform Standard",
+    "warnings": "Private (RFC 1918)",
+    "v6": [
+     "2001:db8::/48 | [] | 2001:db8:: – 2001:db8:0:ffff:ffff:ffff:ffff:ffff | 65,536 × /64 | ÷2÷16 | "
+    ]
+   }
+  }
+ },
+ "exports": {
+  "cisco": "! Generated by IP Plan-O-Matic. Review before applying.\n! Replace <INTERFACE> and <DNS_SERVER> placeholders.\n!\n! ===== 10.0.0.0/24  Servers\nvlan 10\n name Servers\n!\ninterface Vlan10\n description Servers\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\nip dhcp excluded-address 10.0.0.1\nip dhcp pool SERVERS\n network 10.0.0.0 255.255.255.0\n default-router 10.0.0.1\n dns-server <DNS_SERVER>\n!\n! ===== 10.0.1.0/24  Wifi \"guest\"\ninterface <INTERFACE>\n description Wifi \"guest\"\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\nip dhcp excluded-address 10.0.1.1\nip dhcp pool WIFI_GUEST\n network 10.0.1.0 255.255.255.0\n default-router 10.0.1.1\n dns-server <DNS_SERVER>\n!\n! ===== 10.0.2.0/24\nvlan 20\n name VLAN20\n!\ninterface Vlan20\n description 10.0.2.0/24\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nip dhcp excluded-address 10.0.2.1\nip dhcp pool VLAN20\n network 10.0.2.0 255.255.255.0\n default-router 10.0.2.1\n dns-server <DNS_SERVER>\n!",
+  "junos": "# Generated by IP Plan-O-Matic. Review before applying.\n# Replace <INTERFACE> placeholders. Paste in configuration mode.\n\n# ===== 10.0.0.0/24  Servers\nset vlans SERVERS vlan-id 10\nset vlans SERVERS l3-interface irb.10\nset interfaces irb unit 10 description \"Servers\"\nset interfaces irb unit 10 family inet address 10.0.0.1/24\nset access address-assignment pool SERVERS family inet network 10.0.0.0/24\nset access address-assignment pool SERVERS family inet range R1 low 10.0.0.2\nset access address-assignment pool SERVERS family inet range R1 high 10.0.0.254\nset access address-assignment pool SERVERS family inet dhcp-attributes router 10.0.0.1\nset system services dhcp-local-server group LAN interface irb.10\n\n# ===== 10.0.1.0/24  Wifi \"guest\"\nset interfaces <INTERFACE> unit 0 description \"Wifi \\\"guest\\\"\"\nset interfaces <INTERFACE> unit 0 family inet address 10.0.1.1/24\nset access address-assignment pool WIFI_GUEST family inet network 10.0.1.0/24\nset access address-assignment pool WIFI_GUEST family inet range R1 low 10.0.1.2\nset access address-assignment pool WIFI_GUEST family inet range R1 high 10.0.1.254\nset access address-assignment pool WIFI_GUEST family inet dhcp-attributes router 10.0.1.1\nset system services dhcp-local-server group LAN interface <INTERFACE>.0\n\n# ===== 10.0.2.0/24\nset vlans VLAN20 vlan-id 20\nset vlans VLAN20 l3-interface irb.20\nset interfaces irb unit 20 description \"10.0.2.0/24\"\nset interfaces irb unit 20 family inet address 10.0.2.1/24\nset access address-assignment pool VLAN20 family inet network 10.0.2.0/24\nset access address-assignment pool VLAN20 family inet range R1 low 10.0.2.2\nset access address-assignment pool VLAN20 family inet range R1 high 10.0.2.254\nset access address-assignment pool VLAN20 family inet dhcp-attributes router 10.0.2.1\nset system services dhcp-local-server group LAN interface irb.20\n",
+  "mikrotik": "# Generated by IP Plan-O-Matic. Review before applying.\n# Assumes a VLAN-aware bridge called \"bridge\". Replace <INTERFACE> placeholders.\n\n# ===== 10.0.0.0/24  Servers\n/interface vlan add interface=bridge name=vlan10 vlan-id=10 comment=\"Servers\"\n/ip address add address=10.0.0.1/24 interface=vlan10 comment=\"Servers\"\n/ip pool add name=pool-servers ranges=10.0.0.2-10.0.0.254\n/ip dhcp-server add name=dhcp-servers interface=vlan10 address-pool=pool-servers\n/ip dhcp-server network add address=10.0.0.0/24 gateway=10.0.0.1 comment=\"Servers\"\n\n# ===== 10.0.1.0/24  Wifi \"guest\"\n/ip address add address=10.0.1.1/24 interface=<INTERFACE> comment=\"Wifi \\\"guest\\\"\"\n/ip pool add name=pool-wifi-guest ranges=10.0.1.2-10.0.1.254\n/ip dhcp-server add name=dhcp-wifi-guest interface=<INTERFACE> address-pool=pool-wifi-guest\n/ip dhcp-server network add address=10.0.1.0/24 gateway=10.0.1.1 comment=\"Wifi \\\"guest\\\"\"\n\n# ===== 10.0.2.0/24\n/interface vlan add interface=bridge name=vlan20 vlan-id=20 comment=\"10.0.2.0/24\"\n/ip address add address=10.0.2.1/24 interface=vlan20 comment=\"10.0.2.0/24\"\n/ip pool add name=pool-vlan20 ranges=10.0.2.2-10.0.2.254\n/ip dhcp-server add name=dhcp-vlan20 interface=vlan20 address-pool=pool-vlan20\n/ip dhcp-server network add address=10.0.2.0/24 gateway=10.0.2.1 comment=\"10.0.2.0/24\"\n",
+  "tf-aws": "# Generated by IP Plan-O-Matic. Review before applying.\n# Tip: set Platform to AWS VPC on the Plan tab so host counts and minimum sizes match.\n\nresource \"aws_vpc\" \"main\" {\n  cidr_block           = \"10.0.0.0/22\"\n  enable_dns_support   = true\n  enable_dns_hostnames = true\n  tags = {\n    Name = \"main\"\n  }\n}\n\nresource \"aws_subnet\" \"servers\" {\n  vpc_id     = aws_vpc.main.id\n  cidr_block = \"10.0.0.0/24\"\n  # availability_zone = \"us-east-1a\"\n  tags = {\n    Name = \"Servers\"\n  }\n}\n\nresource \"aws_subnet\" \"wifi_guest\" {\n  vpc_id     = aws_vpc.main.id\n  cidr_block = \"10.0.1.0/24\"\n  # availability_zone = \"us-east-1a\"\n  tags = {\n    Name = \"Wifi \\\"guest\\\"\"\n  }\n}\n\nresource \"aws_subnet\" \"vlan20\" {\n  vpc_id     = aws_vpc.main.id\n  cidr_block = \"10.0.2.0/24\"\n  # availability_zone = \"us-east-1a\"\n  tags = {\n    Name = \"10.0.2.0/24\"\n  }\n}\n",
+  "tf-azure": "# Generated by IP Plan-O-Matic. Review before applying.\n# Tip: set Platform to Azure VNet on the Plan tab so host counts and minimum sizes match.\n\nvariable \"resource_group_name\" {\n  type = string\n}\n\nvariable \"location\" {\n  type = string\n}\n\nresource \"azurerm_virtual_network\" \"main\" {\n  name                = \"vnet-main\"\n  address_space       = [\"10.0.0.0/22\"]\n  location            = var.location\n  resource_group_name = var.resource_group_name\n}\n\nresource \"azurerm_subnet\" \"servers\" {\n  name                 = \"snet-servers\"\n  resource_group_name  = var.resource_group_name\n  virtual_network_name = azurerm_virtual_network.main.name\n  address_prefixes     = [\"10.0.0.0/24\"]\n}\n\nresource \"azurerm_subnet\" \"wifi_guest\" {\n  name                 = \"snet-wifi-guest\"\n  resource_group_name  = var.resource_group_name\n  virtual_network_name = azurerm_virtual_network.main.name\n  address_prefixes     = [\"10.0.1.0/24\"]\n}\n\nresource \"azurerm_subnet\" \"vlan20\" {\n  name                 = \"snet-vlan20\"\n  resource_group_name  = var.resource_group_name\n  virtual_network_name = azurerm_virtual_network.main.name\n  address_prefixes     = [\"10.0.2.0/24\"]\n}\n",
+  "tf-gcp": "# Generated by IP Plan-O-Matic. Review before applying.\n# Tip: set Platform to Google Cloud VPC on the Plan tab so host counts and minimum sizes match.\n\nvariable \"region\" {\n  type = string\n}\n\nresource \"google_compute_network\" \"main\" {\n  name                    = \"vpc-main\"\n  auto_create_subnetworks = false\n}\n\nresource \"google_compute_subnetwork\" \"servers\" {\n  name          = \"servers\"\n  ip_cidr_range = \"10.0.0.0/24\"\n  region        = var.region\n  network       = google_compute_network.main.id\n  description   = \"Servers\"\n}\n\nresource \"google_compute_subnetwork\" \"wifi_guest\" {\n  name          = \"wifi-guest\"\n  ip_cidr_range = \"10.0.1.0/24\"\n  region        = var.region\n  network       = google_compute_network.main.id\n  description   = \"Wifi \\\"guest\\\"\"\n}\n\nresource \"google_compute_subnetwork\" \"vlan20\" {\n  name          = \"vlan20\"\n  ip_cidr_range = \"10.0.2.0/24\"\n  region        = var.region\n  network       = google_compute_network.main.id\n}\n",
+  "csv": "\"Subnet\",\"Name\",\"VLAN\",\"Netmask\",\"Wildcard\",\"First address\",\"Last address\",\"First usable\",\"Last usable\",\"Gateway\",\"Hosts\",\"Status\",\"Notes\",\"Binary\"\n\"10.0.0.0/24\",\"Servers\",\"10\",\"255.255.255.0\",\"0.0.0.255\",\"10.0.0.0\",\"10.0.0.255\",\"10.0.0.1\",\"10.0.0.254\",\"10.0.0.1\",\"254\",\"used\",\"\",\"00001010.00000000.00000000.00000000\"\n\"10.0.1.0/24\",\"Wifi \"\"guest\"\"\",\"\",\"255.255.255.0\",\"0.0.0.255\",\"10.0.1.0\",\"10.0.1.255\",\"10.0.1.1\",\"10.0.1.254\",\"10.0.1.1\",\"254\",\"reserved\",\"\",\"00001010.00000000.00000001.00000000\"\n\"10.0.2.0/24\",\"\",\"20\",\"255.255.255.0\",\"0.0.0.255\",\"10.0.2.0\",\"10.0.2.255\",\"10.0.2.1\",\"10.0.2.254\",\"10.0.2.1\",\"254\",\"used\",\"\",\"00001010.00000000.00000010.00000000\"\n\"10.0.3.0/24\",\"\",\"\",\"255.255.255.0\",\"0.0.0.255\",\"10.0.3.0\",\"10.0.3.255\",\"10.0.3.1\",\"10.0.3.254\",\"10.0.3.1\",\"254\",\"free\",\"\",\"00001010.00000000.00000011.00000000\"",
+  "json": "{\n  \"format\": \"subnet-planner\",\n  \"version\": 2,\n  \"base\": \"10.0.0.0/22\",\n  \"platform\": \"std\",\n  \"gateway\": \"first\",\n  \"tree\": \"7.31\",\n  \"subnets\": [\n    {\n      \"cidr\": \"10.0.0.0/24\",\n      \"name\": \"Servers\",\n      \"vlan\": 10,\n      \"status\": \"used\",\n      \"note\": \"\",\n      \"netmask\": \"255.255.255.0\",\n      \"gateway\": \"10.0.0.1\",\n      \"firstUsable\": \"10.0.0.1\",\n      \"lastUsable\": \"10.0.0.254\",\n      \"hosts\": 254\n    },\n    {\n      \"cidr\": \"10.0.1.0/24\",\n      \"name\": \"Wifi \\\"guest\\\"\",\n      \"vlan\": null,\n      \"status\": \"reserved\",\n      \"note\": \"\",\n      \"netmask\": \"255.255.255.0\",\n      \"gateway\": \"10.0.1.1\",\n      \"firstUsable\": \"10.0.1.1\",\n      \"lastUsable\": \"10.0.1.254\",\n      \"hosts\": 254\n    },\n    {\n      \"cidr\": \"10.0.2.0/24\",\n      \"name\": \"\",\n      \"vlan\": 20,\n      \"status\": \"used\",\n      \"note\": \"\",\n      \"netmask\": \"255.255.255.0\",\n      \"gateway\": \"10.0.2.1\",\n      \"firstUsable\": \"10.0.2.1\",\n      \"lastUsable\": \"10.0.2.254\",\n      \"hosts\": 254\n    },\n    {\n      \"cidr\": \"10.0.3.0/24\",\n      \"name\": \"\",\n      \"vlan\": null,\n      \"status\": \"free\",\n      \"note\": \"\",\n      \"netmask\": \"255.255.255.0\",\n      \"gateway\": \"10.0.3.1\",\n      \"firstUsable\": \"10.0.3.1\",\n      \"lastUsable\": \"10.0.3.254\",\n      \"hosts\": 254\n    }\n  ],\n  \"ipv6\": {\n    \"prefix\": \"2001:db8::/48\",\n    \"tree\": \"0\",\n    \"names\": {}\n  }\n}"
+ },
+ "vlsm": "Uses 564 of 1,024 addresses (55.1%).NameVLANNeedsSubnetUsableSpareUsable rangeServers1020010.10.0.0/242545410.10.0.1 – 10.10.0.254Staff Wi-Fi2012010.10.1.0/25126610.10.1.1 – 10.10.1.126Guest Wi-Fi306010.10.1.128/2662210.10.1.129 – 10.10.1.190VoIP405010.10.1.192/26621210.10.1.193 – 10.10.1.254Printers502010.10.2.0/27301010.10.2.1 – 10.10.2.30Management991010.10.2.32/2814410.10.2.33 – 10.10.2.46Uplink to ISP—210.10.2.48/302010.10.2.49 – 10.10.2.50Left free10.10.2.52/3010.10.2.56/2910.10.2.64/2610.10.2.128/2510.10.3.0/24"
+}
