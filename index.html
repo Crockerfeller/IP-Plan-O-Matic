@@ -1543,6 +1543,25 @@
     if (t === 'reserved') return 'reserved';
     return '';
   };
+  // Subnet details that arrive from a link, a saved plan or an import: keep only known fields, valid VLANs and
+  // statuses, and turn control characters (newlines, tabs) into spaces so they can't add lines to exported configs.
+  const oneLine = (v) => String(v).replace(/[\u0000-\u001f\u007f]+/g, ' ');
+  const cleanMeta = (v) => {
+    const m = typeof v === 'string' ? { n: v } : (v && typeof v === 'object' ? v : {});
+    const c = {};
+    if (m.n) c.n = oneLine(m.n);
+    if (m.v != null && m.v !== '' && validVlan(m.v)) c.v = String(+m.v);
+    if (m.z) c.z = oneLine(m.z).trim();
+    if (m.o) c.o = oneLine(m.o);
+    const st = normStatus(m.s);
+    if (st) c.s = st;
+    return Object.keys(c).length ? c : null;
+  };
+  const cleanMetaMap = (o) => {
+    const out = {};
+    if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { const c = cleanMeta(v); if (c) out[k] = c; }
+    return out;
+  };
 
   // =====================================================================
   // URL state:  #net/mask/tree[/base64url(JSON extras)]
@@ -1582,18 +1601,8 @@
     if (!p) return;
     v6.net = p.net; v6.mask = p.mask;
     try { v6.root = o.t ? v6TreeParse(String(o.t), p.mask) : { c: null }; } catch (e) { v6.root = { c: null }; }
-    v6.meta = {};
-    if (o.m && typeof o.m === 'object') for (const [k, v] of Object.entries(o.m)) {
-      // Older links store just a name string per prefix.
-      const m = typeof v === 'string' ? { n: v } : (v && typeof v === 'object' ? v : {});
-      const clean = {};
-      if (m.n) clean.n = String(m.n);
-      if (m.v != null && validVlan(m.v)) clean.v = String(+m.v);
-      if (m.o) clean.o = String(m.o);
-      const st = normStatus(m.s);
-      if (st) clean.s = st;
-      if (Object.keys(clean).length) v6.meta[k] = clean;
-    }
+    // Older links store just a name string per prefix; cleanMeta accepts both.
+    v6.meta = cleanMetaMap(o.m);
   };
   const extras = () => {
     const keys = nodeKeys();
@@ -1704,13 +1713,15 @@
     state.blocks = blocks;
     state.active = Number.isInteger(x.a) && x.a > 0 && x.a < blocks.length ? x.a : 0;
     settings.gw = x.g === 'last' ? 'last' : 'first';
-    state.meta = (x.m && typeof x.m === 'object') ? { ...x.m } : {};
+    state.meta = cleanMetaMap(x.m);
     v6Load(x.v6 || { p: V6_DEFAULT });
     return true;
   };
+  // The address-bar hash, decoded. A stray % (e.g. a mangled link) would make decodeURIComponent throw.
+  const hashText = () => { const h = location.hash.replace(/^#/, ''); try { return decodeURIComponent(h); } catch (e) { return h; } };
   // Async because compact links have to be decompressed first.
   const loadFromLocation = async () => {
-    const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+    const raw = hashText();
     if (!raw) return loadFromHash('', new URLSearchParams(location.search));
     let h;
     try { h = await fromUrlHash(raw); }
@@ -2567,7 +2578,7 @@
       const i = hostInfo(r.addr, r.mask, r.cloud), m = getMeta(r.key);
       return (multi ? [blockCidr(state.blocks[r.bi])] : []).concat(cols.flatMap((c) => c.val(r, i, m)));
     });
-    return { head, rows: data, ncols: cols.length };
+    return { head, rows: data, ncols: head.length };
   };
   const buildCsv = (onlyVisible) => {
     const m = buildMatrix(onlyVisible);
@@ -2646,7 +2657,7 @@
     const headroom = Math.max(0, Number($('vlsmHead').value) || 0);
     const minM = settings.cloud === 'std' ? Number($('vlsmSmall').value) : CLOUDS[settings.cloud].min;
     for (const r of reqs) {
-      r.need = Math.ceil(r.hosts * (1 + headroom / 100));
+      r.need = Math.ceil((r.hosts * (100 + headroom)) / 100);   // not hosts * 1.1: 100 * 1.1 is 110.00000000000001
       r.mask = null;
       for (let m = minM; m >= state.mask; m--) if (hostInfo(0, m).hosts >= r.need) { r.mask = m; break; }
     }
@@ -3545,13 +3556,8 @@
     state.active = 0;
     state.meta = {};
     for (const e of inside) {
-      const k = e.cidr;
-      if (e.n) setMeta(k, 'n', String(e.n));
-      if (e.v != null && validVlan(e.v)) setMeta(k, 'v', String(+e.v));
-      if (e.z) setMeta(k, 'z', String(e.z).trim().slice(0, 40));
-      if (e.o) setMeta(k, 'o', String(e.o));
-      const st = normStatus(e.s);
-      if (st) setMeta(k, 's', st);
+      const c = cleanMeta(e);
+      if (c) state.meta[e.cidr] = { ...getMeta(e.cidr), ...c };
     }
     if (v6data) {
       const t = v6data.tree ? String(v6data.tree) : '0';
@@ -4074,7 +4080,7 @@
   // Boot
   // =====================================================================
   window.addEventListener('hashchange', async () => {
-    const h = decodeURIComponent(location.hash.replace(/^#/, ''));
+    const h = hashText();
     if (h && h !== lastHash) {
       const before = stateHash();
       if (await loadFromLocation()) { if (undoStack[undoStack.length - 1] !== before) undoStack.push(before); redoStack.length = 0; updUndo(); syncControls(); render(); renderV6(); }

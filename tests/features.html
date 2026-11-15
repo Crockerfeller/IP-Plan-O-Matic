@@ -489,6 +489,48 @@ T.guidesTab = async () => {
   check('every guide link resolves', res.every((s) => s === 200), res);
   click('#tb-plan');
 };
+// Data from links and imports can't add lines to router configs; small regressions found in review.
+const b64u = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+T.hardening = async () => {
+  const blob = b64u({ m: { '10.0.0.0/24': { n: 'LAN\nusername evil privilege 15 secret x', v: '10\nip route 0.0.0.0 0.0.0.0 6.6.6.6', s: 'bogus' } } });
+  await load('../index.html#10.0.0.0/24/1.0/' + blob);
+  const r0 = qa('#body tr')[0];
+  check('link name newline flattened', r0.querySelector('input').value === 'LAN username evil privilege 15 secret x', r0.querySelector('input').value);
+  check('link bad vlan dropped', r0.querySelector('input.vlan').value === '', r0.querySelector('input.vlan').value);
+  check('link bad status dropped', r0.querySelector('select.status').value === 'free');
+  click('#tb-export'); select('#exInc', 'all');
+  for (const f of ['cisco', 'junos', 'mikrotik', 'arista', 'tf-aws']) {
+    select('#exFmt', f);
+    check(`${f}: no injected line from link`, !/^(username|ip route)/m.test($('exOut').value), $('exOut').value);
+  }
+  $('imText').value = 'Subnet,Name,VLAN,Notes\n10.1.0.0/24,"Office\nenable secret 0 pwned",20,"a\nb"\n';
+  click('#imRun'); await sleep(50);
+  select('#exFmt', 'cisco');
+  check('import: no injected line', !/^enable secret/m.test($('exOut').value) && $('exOut').value.includes('description Office enable secret 0 pwned'), $('exOut').value);
+  select('#exFmt', 'tf-aws');
+  check('import: note stays on one line', $('exOut').value.includes('Notes = "a b"'), $('exOut').value);
+  click('#tb-plan');
+
+  await load('../index.html#192.168.0.0/24/1.0');
+  let copied = '';
+  W.navigator.clipboard.writeText = async (t) => { copied = t; };
+  click('#csvBtn'); await sleep(50);
+  const nHead = copied.split('\n')[0].split(',').length;
+  check('copy csv counts csv columns', nHead > 0 && $('toast').textContent.includes(`(${nHead} columns)`), [$('toast').textContent, copied.split('\n')[0]]);
+
+  await load('../index.html#%E0');
+  await sleep(200);
+  check('stray % in link still boots', D.documentElement.dataset.ready === '1' && qa('#body tr').length > 0);
+
+  // 1860 hosts + 10% = 2046 exactly, which a /21 holds (float math made it 2047 and picked a /20).
+  await load('../index.html#10.0.0.0/16');
+  click('#tb-vlsm');
+  $('vlsmIn').value = 'Big, 1860';
+  $('vlsmHead').value = '10';
+  click('#vlsmRun');
+  check('headroom rounding exact', $('vlsmOut').textContent.includes('10.0.0.0/21'), $('vlsmOut').textContent.slice(0, 300));
+  click('#tb-plan');
+};
 (async () => {
   const only = new URLSearchParams(location.search).get('t');
   for (const [k, fn] of Object.entries(T)) {
