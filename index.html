@@ -306,6 +306,8 @@
   .blocks .chip-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 6px; }
   .blocks .chip-x:hover { color: var(--danger); background: var(--danger-weak); }
   #addForm .field.grow { flex: 1 1 320px; }
+  .field.grow-sm { flex: 1 1 260px; }
+  .field.grow-sm input { width: 100%; }
   #addIn { width: 100%; }
   .chips .lbl { margin-right: 4px; }
   .chip {
@@ -405,6 +407,7 @@
   .cell-input:hover { border-color: var(--border) !important; }
   .cell-input:focus { background: var(--bg) !important; border-color: var(--accent) !important; }
   .cell-input::placeholder { color: var(--muted); opacity: .5; }
+  .cell-input.zone { width: 110px; }
   .cell-input.vlan { width: 70px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important; }
   .cell-input.note { width: 220px; }
   select.status { height: 26px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 0 6px; border-color: transparent; background: var(--row-hover); color: var(--muted); }
@@ -737,6 +740,10 @@
           <label for="vlsmHead">Growth headroom %</label>
           <input type="number" id="vlsmHead" value="0" min="0" max="1000" style="width:110px">
         </div>
+        <div class="field grow-sm">
+          <label for="vlsmZones">Repeat per zone (optional)</label>
+          <input type="text" id="vlsmZones" spellcheck="false" placeholder="e.g. us-east-1a, us-east-1b, us-east-1c" title="Each line is planned once per zone, so every tier gets one subnet in each availability zone">
+        </div>
         <div class="field" id="vlsmSmallF">
           <label for="vlsmSmall">Smallest subnet</label>
           <select id="vlsmSmall">
@@ -754,6 +761,7 @@
         </div>
         <button type="button" class="primary" id="vlsmRun">Plan it</button>
         <button type="button" id="vlsmExample">Load example</button>
+        <button type="button" id="vlsmCloudEx" title="Public, private and database tiers across three AWS availability zones">Cloud AZ example</button>
         <button type="button" id="vlsmApply" hidden>Apply to planner</button>
       </div>
       <div class="msg" id="vlsmMsg" style="margin-top:10px"></div>
@@ -1155,6 +1163,7 @@
     { key: 'divide',   label: 'Divide', locked: true },
     { key: 'name',     label: 'Name' },
     { key: 'vlan',     label: 'VLAN' },
+    { key: 'zone',     label: 'Zone' },
     { key: 'netmask',  label: 'Netmask' },
     { key: 'wildcard', label: 'Wildcard' },
     { key: 'range',    label: 'Address range' },
@@ -1167,7 +1176,7 @@
     { key: 'join',     label: 'Join' },
   ];
   const visible = {
-    subnet: true, name: true, vlan: true, netmask: false, wildcard: false, range: false, usable: true,
+    subnet: true, name: true, vlan: true, zone: false, netmask: false, wildcard: false, range: false, usable: true,
     gateway: true, hosts: true, status: true, note: false, binary: false, divide: true, join: true,
   };
   try {
@@ -1868,6 +1877,12 @@
         inp.addEventListener('change', () => { renderSummary(); renderMap(); });
         cell('', inp);
       }
+      if (visible.zone) {
+        const inp = textInput('zone', 'z', '—', 'Availability zone');
+        inp.title = 'Availability zone or site, e.g. us-east-1a';
+        inp.addEventListener('input', () => { firstEdit(inp); setMeta(key, 'z', inp.value.trim() ? inp.value.trim() : ''); writeHashSoon(); });
+        cell('', inp);
+      }
       if (visible.netmask) cell('mono', ntoa(netmask(leaf.mask)));
       if (visible.wildcard) cell('mono', ntoa(wildcard(leaf.mask)));
       if (visible.range) cell('mono', `${ntoa(leaf.addr)} – ${ntoa(info.last)}`);
@@ -2032,7 +2047,7 @@
   };
   const leafTitle = (r) => {
     const m = getMeta(r.key);
-    return [r.key, m.n, m.v ? `VLAN ${m.v}` : '', m.s === 'used' ? 'In use' : m.s === 'reserved' ? 'Reserved' : 'Free', `${fmt(size(r.mask))} addresses`].filter(Boolean).join(' · ');
+    return [r.key, m.n, m.v ? `VLAN ${m.v}` : '', m.z || '', m.s === 'used' ? 'In use' : m.s === 'reserved' ? 'Reserved' : 'Free', `${fmt(size(r.mask))} addresses`].filter(Boolean).join(' · ');
   };
   const renderMap = () => {
     const map = $('map'), wrap = $('mapWrap');
@@ -2134,6 +2149,13 @@
     $('v6Net').value = v6Key(v6.net, v6.mask);
   };
 
+  const showColumn = (key) => {
+    visible[key] = true;
+    const label = (COLS.find((c) => c.key === key) || {}).label;
+    const chip = [...document.querySelectorAll('#chips .chip')].find((c) => c.textContent === label);
+    if (chip) chip.setAttribute('aria-pressed', 'true');
+    try { localStorage.setItem('subnetPlanner.cols', JSON.stringify(visible)); } catch (e) { /* ignore */ }
+  };
   // ---------- Column chips ----------
   const chips = $('chips');
   for (const col of COLS) {
@@ -2359,6 +2381,7 @@
     { key: 'subnet',   head: ['Subnet'],                        val: (r) => [r.key] },
     { key: 'name',     head: ['Name'],                          val: (r, i, m) => [m.n || ''] },
     { key: 'vlan',     head: ['VLAN'],                          val: (r, i, m) => [m.v || ''] },
+    { key: 'zone',     head: ['Zone'],                          val: (r, i, m) => [m.z || ''] },
     { key: 'netmask',  head: ['Netmask'],                       val: (r) => [ntoa(netmask(r.mask))] },
     { key: 'wildcard', head: ['Wildcard'],                      val: (r) => [ntoa(wildcard(r.mask))] },
     { key: 'range',    head: ['First address', 'Last address'], val: (r, i) => [ntoa(r.addr), ntoa(i.last)] },
@@ -2371,7 +2394,8 @@
   ];
   // onlyVisible: the Copy CSV button (active base network, shown columns). Otherwise every base network, every column.
   const buildCsv = (onlyVisible) => {
-    const cols = CSV_COLS.filter((c) => !onlyVisible || visible[c.key]);
+    const anyZone = allRows().some((r) => getMeta(r.key).z);
+    const cols = CSV_COLS.filter((c) => (onlyVisible ? visible[c.key] : c.key !== 'zone' || anyZone));
     const multi = !onlyVisible && state.blocks.length > 1;
     const lines = [(multi ? ['Base network'] : []).concat(cols.flatMap((c) => c.head)).map(csvQ).join(',')];
     for (const r of onlyVisible ? rows : allRows()) {
@@ -2400,6 +2424,20 @@
     $('vlsmSmallF').hidden = settings.cloud !== 'std';
   };
   $('vlsmMode').addEventListener('change', () => { $('vlsmMode').dataset.touched = '1'; });
+  $('vlsmCloudEx').addEventListener('click', () => {
+    $('vlsmIn').value = 'Public, 250\nPrivate app, 4000\nDatabase, 120';
+    $('vlsmZones').value = 'us-east-1a, us-east-1b, us-east-1c';
+    if (settings.cloud !== 'aws' || state.mask > 16) {
+      if (!blockClash(aton('10.20.0.0'), 16, state.active)) {
+        checkpoint();
+        clearBlockMeta();
+        state.network = aton('10.20.0.0'); state.mask = 16; state.root = { c: null };
+        settings.cloud = 'aws';
+        syncControls(); update(); updateVlsmBase();
+        toast('Base network set to 10.20.0.0/16 on AWS for the example', UNDO);
+      }
+    }
+  });
   $('vlsmExample').addEventListener('click', () => {
     $('vlsmIn').value = 'Servers, 200, 10\nStaff Wi-Fi, 120, 20\nGuest Wi-Fi, 60, 30\nVoIP, 50, 40\nPrinters, 20, 50\nManagement, 10, 99\nUplink to ISP, 2';
     if (state.mask > 22 && !blockClash(aton('10.10.0.0'), 22, state.active)) {
@@ -2429,6 +2467,12 @@
       reqs.push({ name: (name || '').trim() || `Subnet ${reqs.length + 1}`, hosts: h, vlan: vlan ? String(+vlan) : '', idx: i });
     });
     if (!reqs.length) { out.innerHTML = `<div class="msg show error">${esc(errors[0] || 'Add at least one line, like “Sales, 50”.')}</div>`; return; }
+    // Zones: plan every line once per availability zone ("Private us-east-1a", "Private us-east-1b", ...).
+    const zones = [...new Set($('vlsmZones').value.split(/[\s,;]+/).map((z) => z.trim()).filter(Boolean))].slice(0, 16);
+    if (zones.length) {
+      const base = reqs.splice(0);
+      for (const r of base) zones.forEach((z, zi) => reqs.push({ ...r, name: `${r.name} ${z}`, zone: z, idx: r.idx * 16 + zi }));
+    }
 
     const headroom = Math.max(0, Number($('vlsmHead').value) || 0);
     const minM = settings.cloud === 'std' ? Number($('vlsmSmall').value) : CLOUDS[settings.cloud].min;
@@ -2484,10 +2528,11 @@
       html += mode === 'fill'
         ? `<div class="stat-line">Places <b>${placed.length}</b> subnet${placed.length > 1 ? 's' : ''} using <b>${fmt(needTotal)}</b> addresses in free space. Existing subnets are kept.</div>`
         : `<div class="stat-line">Uses <b>${fmt(needTotal)}</b> of ${fmt(size(state.mask))} addresses (<b>${((needTotal / size(state.mask)) * 100).toFixed(1)}%</b>)${headroom ? `, with ${headroom}% growth headroom` : ''}.</div>`;
-      html += '<div class="table-wrap"><table><thead><tr><th>Name</th><th>VLAN</th><th class="num">Needs</th><th>Subnet</th><th class="num">Usable</th><th class="num">Spare</th><th>Usable range</th></tr></thead><tbody>';
+      html += `<div class="table-wrap"><table><thead><tr><th>Name</th><th>VLAN</th>${zones.length ? '<th>Zone</th>' : ''}<th class="num">Needs</th>`;
+      html += '<th>Subnet</th><th class="num">Usable</th><th class="num">Spare</th><th>Usable range</th></tr></thead><tbody>';
       for (const r of placed) {
         const i = hostInfo(r.addr, r.mask);
-        html += `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.vlan || '—')}</td><td class="num mono">${fmt(r.hosts)}</td><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="num mono">${fmt(i.hosts)}</td><td class="num mono">${fmt(i.hosts - r.hosts)}</td><td class="mono">${i.uF === null ? '—' : `${ntoa(i.uF)} – ${ntoa(i.uL)}`}</td></tr>`;
+        html += `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.vlan || '—')}</td>${zones.length ? `<td class="mono">${esc(r.zone)}</td>` : ''}<td class="num mono">${fmt(r.hosts)}</td><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="num mono">${fmt(i.hosts)}</td><td class="num mono">${fmt(i.hosts - r.hosts)}</td><td class="mono">${i.uF === null ? '—' : `${ntoa(i.uF)} – ${ntoa(i.uL)}`}</td></tr>`;
       }
       html += '</tbody></table></div>';
       html += free.length
@@ -2514,11 +2559,13 @@
       const k = cidrStr(r.addr, r.mask);
       setMeta(k, 'n', r.name);
       setMeta(k, 'v', r.vlan);
+      setMeta(k, 'z', r.zone || '');
       setMeta(k, 's', 'used');
       setMeta(k, 'o', `Needs ${r.hosts} hosts`);
     }
     vlsmPlan = null;
     $('vlsmApply').hidden = true;
+    if (plan.placed.some((r) => r.zone) && !visible.zone) showColumn('zone');
     update();
     showTab('plan');
     toast(`Applied ${plan.placed.length} subnets`, UNDO);
@@ -2787,7 +2834,7 @@
       for (const v of nets) {
         out.push(`resource "aws_vpc" "${v.id}" {`, `  cidr_block           = "${v.base}"`, '  enable_dns_support   = true', '  enable_dns_hostnames = true', '  tags = {', `    Name = "${hq(v.name)}"`, '  }', '}', '');
         for (const x of v.items) {
-          out.push(`resource "aws_subnet" "${nm(x)}" {`, `  vpc_id     = aws_vpc.${v.id}.id`, `  cidr_block = "${x.key}"`, '  # availability_zone = "us-east-1a"', '  tags = {', `    Name = "${hq(x.meta.n || x.key)}"`);
+          out.push(`resource "aws_subnet" "${nm(x)}" {`, `  vpc_id     = aws_vpc.${v.id}.id`, `  cidr_block = "${x.key}"`, x.meta.z ? `  availability_zone = "${hq(x.meta.z)}"` : '  # availability_zone = "us-east-1a"', '  tags = {', `    Name = "${hq(x.meta.n || x.key)}"`);
           if (x.meta.o) out.push(`    Notes = "${hq(x.meta.o)}"`);
           out.push('  }', '}', '');
         }
@@ -2837,7 +2884,7 @@
       const m = getMeta(r.key), i = hostInfo(r.addr, r.mask, r.cloud);
       return {
         cidr: r.key, ...(state.blocks.length > 1 ? { network: blockCidr(state.blocks[r.bi]) } : {}),
-        name: m.n || '', vlan: m.v ? Number(m.v) : null, status: m.s || 'free', note: m.o || '',
+        name: m.n || '', vlan: m.v ? Number(m.v) : null, ...(m.z ? { zone: m.z } : {}), status: m.s || 'free', note: m.o || '',
         netmask: ntoa(netmask(r.mask)), gateway: i.gw === null ? null : ntoa(i.gw),
         firstUsable: i.uF === null ? null : ntoa(i.uF), lastUsable: i.uL === null ? null : ntoa(i.uL), hosts: i.hosts,
       };
@@ -2886,7 +2933,7 @@
       if (j.platform && CLOUDS[j.platform]) set = { cloud: j.platform, gw: j.gateway === 'last' ? 'last' : 'first' };
       for (const s of j.subnets || []) {
         const c = parseCidr(s.cidr || s.subnet || '');
-        if (c) entries.push({ ...c, n: s.name, v: s.vlan, o: s.note || s.notes, s: s.status });
+        if (c) entries.push({ ...c, n: s.name, v: s.vlan, o: s.note || s.notes, s: s.status, z: s.zone || s.az });
       }
       if (j.tree) tree = j.tree;
       if (j.ipv6) v6data = j.ipv6;
@@ -2901,10 +2948,11 @@
       if (ci < 0) throw new Error('The CSV needs a “Subnet” column with values like 10.0.0.0/24.');
       const ni = col('name'), vi = col('vlan', 'vlan id', 'vlanid'), oi = col('notes', 'note', 'description'), si = col('status');
       const bi = col('base network', 'block');
+      const zi = col('zone', 'az', 'availability zone', 'availability_zone');
       const seen = new Map();
       for (const r of recs) {
         const c = parseCidr(r[ci] || '');
-        if (c) entries.push({ ...c, n: r[ni], v: r[vi], o: r[oi], s: r[si] });
+        if (c) entries.push({ ...c, n: r[ni], v: r[vi], o: r[oi], s: r[si], z: zi >= 0 ? r[zi] : '' });
         const bc = bi >= 0 && parseCidr(r[bi] || '');
         if (bc && !seen.has(bc.cidr)) seen.set(bc.cidr, { c: bc, cloud: settings.cloud, label: '' });
       }
@@ -2945,6 +2993,7 @@
       const k = e.cidr;
       if (e.n) setMeta(k, 'n', String(e.n));
       if (e.v != null && validVlan(e.v)) setMeta(k, 'v', String(+e.v));
+      if (e.z) setMeta(k, 'z', String(e.z).trim().slice(0, 40));
       if (e.o) setMeta(k, 'o', String(e.o));
       const st = normStatus(e.s);
       if (st) setMeta(k, 's', st);
