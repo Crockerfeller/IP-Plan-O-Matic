@@ -448,6 +448,15 @@ T.v6export = async () => {
   t = gen('arista');
   check('arista ipv6', t.includes('   ipv6 address 2001:db8:0:10::1/64') && t.startsWith('! Generated') && t.includes('ipv6 unicast-routing'), t.slice(0, 500));
 };
+
+T.guidesTab = async () => {
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-learn');
+  check('guides tab shows cards', !$('tab-learn').hidden && qa('#tab-learn .guide-grid a').length === 9, qa('#tab-learn .guide-grid a').length);
+  const res = await Promise.all(qa('#tab-learn .guide-grid a').map((a) => fetch(a.href).then((r) => r.status)));
+  check('every guide link resolves', res.every((s) => s === 200), res);
+  click('#tb-plan');
+};
 (async () => {
   const only = new URLSearchParams(location.search).get('t');
   for (const [k, fn] of Object.entries(T)) {

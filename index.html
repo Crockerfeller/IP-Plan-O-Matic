@@ -201,6 +201,12 @@
   .brand-tag{font:400 11px/0.8 'JetBrains Mono',monospace;color:var(--mid);white-space:nowrap}
 
   nav.tabs { display: flex; gap: 2px; overflow-x: auto; margin-bottom: 16px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+  .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin: 4px 0 0; padding: 0; list-style: none; }
+  .guide-grid li { border: 1px solid var(--border); border-radius: 10px; }
+  .guide-grid a { display: block; height: 100%; padding: 14px 16px; text-decoration: none; color: var(--text); border-radius: 10px; }
+  .guide-grid a:hover { background: var(--row-hover); }
+  .guide-grid b { display: block; color: var(--accent); font-size: 15px; margin-bottom: 4px; }
+  .guide-grid span { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .tabbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
   .tabbar nav.tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; border-bottom: 0; }
   .tabbar #plansBtn { flex: none; height: 32px; margin-bottom: 4px; }
@@ -659,6 +665,7 @@
     <button type="button" role="tab" id="tb-tools" data-tab="tools">Check &amp; summarize</button>
     <button type="button" role="tab" id="tb-export" data-tab="export">Export &amp; import</button>
     <button type="button" role="tab" id="tb-v6" data-tab="v6">IPv6</button>
+    <button type="button" role="tab" id="tb-learn" data-tab="learn">Guides</button>
   </nav>
     <button type="button" id="plansBtn" class="no-print" title="Save this plan in your browser, or open one you saved" aria-haspopup="dialog">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
@@ -950,6 +957,28 @@
         <p>Type a name, VLAN and notes on any prefix, and set its status. They are saved in the link and included in CSV and JSON exports.</p>
         <p><b>÷2</b> halves a prefix. <b>÷16</b> splits on the next nibble (4 bits), which keeps prefixes readable and makes reverse DNS delegation clean, so it’s the usual choice. A <b>/64</b> is the standard size for one LAN or VLAN (SLAAC needs it); point-to-point links often use /127.</p>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= GUIDES ================= -->
+  <section id="tab-learn" role="tabpanel" aria-labelledby="tb-learn" hidden>
+    <div class="card pad">
+      <h2>Subnetting guides</h2>
+      <p class="sub">Short, practical references. Every number in them is computed, not typed by hand, and each guide can open a matching plan in the planner.</p>
+      <ul class="guide-grid">
+<!-- guides:start -->
+        <li><a href="learn/cidr-cheat-sheet.html"><b>CIDR cheat sheet (IPv4 /0 to /32)</b><span>Every IPv4 prefix length from /0 to /32 with its netmask, wildcard mask, total addresses and usable hosts, plus usable addresses in AWS, Azure, Google Cloud and Oracle Cloud subnets.</span></a></li>
+        <li><a href="learn/how-many-hosts-in-a-subnet.html"><b>How many hosts are in a subnet?</b><span>How to work out the number of usable hosts in any IPv4 subnet, with the formula, worked examples from /24 to /32, the /31 and /32 exceptions and the cloud differences.</span></a></li>
+        <li><a href="learn/vlsm-subnetting.html"><b>VLSM subnetting, explained with an example</b><span>Variable Length Subnet Masking (VLSM) explained step by step: size each subnet from its host count, place them largest first, and see a worked example that packs seven networks into a /22.</span></a></li>
+        <li><a href="learn/private-ip-address-ranges.html"><b>Private IP address ranges and special-purpose blocks</b><span>The private IPv4 ranges from RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), CGNAT, link-local, loopback, documentation and multicast blocks, and the IPv6 equivalents, with tips on which to avoid.</span></a></li>
+        <li><a href="learn/aws-vpc-subnet-sizing.html"><b>AWS VPC subnet sizing</b><span>How to size AWS VPC subnets: the 5 addresses AWS reserves in every subnet, the /16 to /28 limits, usable addresses per size, and a three-AZ public/private/database layout.</span></a></li>
+        <li><a href="learn/azure-vnet-subnet-sizing.html"><b>Azure VNet subnet sizing</b><span>How to size Azure virtual network subnets: the 5 addresses Azure reserves, the /29 minimum, usable addresses per size, and the sizes for GatewaySubnet, Azure Bastion and Azure Firewall.</span></a></li>
+        <li><a href="learn/google-cloud-vpc-subnet-sizing.html"><b>Google Cloud VPC subnet sizing</b><span>How to size Google Cloud VPC subnets: the 4 addresses Google reserves, the /29 minimum, auto mode versus custom mode, expanding a subnet, and secondary ranges for GKE.</span></a></li>
+        <li><a href="learn/oracle-cloud-vcn-subnet-sizing.html"><b>Oracle Cloud (OCI) VCN subnet sizing</b><span>How to size Oracle Cloud Infrastructure VCN subnets: the 3 addresses OCI reserves, the /16 to /30 VCN limits, usable addresses per size, and regional versus AD-specific subnets.</span></a></li>
+        <li><a href="learn/ipv6-subnetting.html"><b>IPv6 subnetting: /48, /56, /64 and nibbles</b><span>A practical guide to IPv6 subnetting: what /48, /56 and /64 are for, why you split on nibble (4-bit) boundaries, point-to-point /127s, ip6.arpa reverse DNS, and unique local addresses.</span></a></li>
+<!-- guides:end -->
+      </ul>
+      <p class="sub" style="margin:14px 0 0"><a href="learn/">Open the guides page →</a></p>
     </div>
   </section>
 
@@ -3918,7 +3947,7 @@
   // =====================================================================
   // Tabs and theme
   // =====================================================================
-  const TABS = ['plan', 'vlsm', 'tools', 'export', 'v6'];
+  const TABS = ['plan', 'vlsm', 'tools', 'export', 'v6', 'learn'];
   const showTab = (t) => {
     if (!TABS.includes(t)) t = 'plan';
     for (const x of TABS) {

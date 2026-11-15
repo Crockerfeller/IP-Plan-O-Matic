@@ -6,7 +6,8 @@ so the guides can't drift from the real subnet math. Run from the repo root:
 
     python3 tools/build_learn.py
 
-It rewrites learn/*.html, learn/learn.css and sitemap.xml.
+It rewrites learn/*.html, learn/learn.css, sitemap.xml and the guide cards on the
+app's Guides tab (between the guides:start / guides:end markers in index.html).
 """
 import base64
 import datetime
@@ -516,6 +517,15 @@ page('index', 'Subnetting guides: CIDR, VLSM, IPv6 and cloud subnet sizing',
     <ul class="grid">{items}</ul>
     {try_box('Ready to plan? The free planner splits, joins, auto-sizes and exports your network.', app())}
 ''', h1='Subnetting guides')
+
+# ---------------------------------------------------------------- Guides tab in the app
+app_html = ROOT / 'index.html'
+src = app_html.read_text()
+start, end = '<!-- guides:start -->', '<!-- guides:end -->'
+if start in src and end in src:
+    cards = ''.join(f'        <li><a href="learn/{s}.html"><b>{esc(t)}</b><span>{esc(d)}</span></a></li>\n' for s, t, d in PAGES)
+    src = src[:src.index(start) + len(start)] + '\n' + cards + src[src.index(end):]
+    app_html.write_text(src)
 
 # ---------------------------------------------------------------- Sitemap
 urls = [SITE, SITE + 'learn/'] + [SITE + f'learn/{s}.html' for s, _, _ in PAGES]
