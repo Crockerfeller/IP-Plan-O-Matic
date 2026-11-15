@@ -531,6 +531,16 @@
   .ver { font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
   .ver::before { content: " · "; font-family: inherit; }
   footer.site .ver a { text-decoration: none; }
+  .tip-stack { display: flex; flex-direction: column; gap: 3px; width: 92px; }
+  .tip-stack .tip-s { display: flex; align-items: center; justify-content: center; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 12px; font-weight: 600; text-decoration: none; line-height: 1; }
+  .tip-stack .tip-s:hover { background: var(--row-hover); }
+  .tip-stack .tip-s.main { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .tip-stack .tip-s.main:hover { filter: brightness(1.15); }
+  .tip-foot { display: none; }
+  @media (max-width: 640px) {
+    .tip-stack { display: none; }
+    .tip-foot { display: flex; }
+  }
   .tip-note b { color: var(--text); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
   @media print {
@@ -568,6 +578,11 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
         <span class="btn-txt">Plans</span>
       </button>
+      <nav class="tip-stack" aria-label="Tip the developer">
+        <a class="tip-s" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo</a>
+        <a class="tip-s main js-xmoney" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Tip @wangooroo on X Money (copies the handle and opens X)">X Money</a>
+        <a class="tip-s" href="https://ko-fi.com/crockerfeller" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi">Ko-fi</a>
+      </nav>
       <button class="icon" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       </button>
@@ -936,6 +951,9 @@
       <li><b>Export:</b> Cisco IOS / IOS-XE, Juniper Junos, MikroTik RouterOS, Terraform for AWS, Azure, Google Cloud and Oracle Cloud, CSV and JSON, with optional DHCP pools.</li>
     </ul>
 
+    <h3>Guides</h3>
+    <p>Short, accurate references: the <a href="learn/cidr-cheat-sheet.html">CIDR cheat sheet</a>, <a href="learn/how-many-hosts-in-a-subnet.html">how many hosts are in a subnet</a>, <a href="learn/vlsm-subnetting.html">VLSM explained</a>, <a href="learn/private-ip-address-ranges.html">private IP ranges</a>, <a href="learn/ipv6-subnetting.html">IPv6 subnetting</a>, and subnet sizing for <a href="learn/aws-vpc-subnet-sizing.html">AWS</a>, <a href="learn/azure-vnet-subnet-sizing.html">Azure</a>, <a href="learn/google-cloud-vpc-subnet-sizing.html">Google Cloud</a> and <a href="learn/oracle-cloud-vcn-subnet-sizing.html">Oracle Cloud</a>. <a href="learn/">All guides →</a></p>
+
     <h3>Frequently asked questions</h3>
     <details>
       <summary>How many usable hosts are in a subnet?</summary>
@@ -966,15 +984,15 @@
 
   <footer class="site">
     <div class="credit">IP Plan-O-Matic by Huddacaster, a subsidiary of Crockerfeller Industries © 2026</div>
-    <div class="tip">
+    <div class="tip tip-foot">
       <div class="tip-btns">
-        <a class="tip-btn" id="tipBtn" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
+        <a class="tip-btn js-xmoney" href="https://x.com/wangooroo" target="_blank" rel="noopener me" title="Copies @wangooroo and opens X">💸 Tip me on X Money</a>
         <a class="tip-btn alt" href="https://venmo.com/u/Crockerfeller" target="_blank" rel="noopener" title="Tip @Crockerfeller on Venmo">Venmo @Crockerfeller</a>
         <a class="tip-btn alt" href="https://ko-fi.com/crockerfeller" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi">☕ Buy me a coffee</a>
       </div>
       <span class="tip-note">Free forever. If it saved you time please consider a tip:<br>in the X app, <b>Money → Send → @wangooroo</b></span>
     </div>
-    <div class="meta"><a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span></div>
+    <div class="meta"><a href="learn/">Subnetting guides</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -3915,7 +3933,7 @@
   });
 
   // Tip button: X Money has no public "send to @handle" link, so copy the handle and open the profile.
-  $('tipBtn').addEventListener('click', () => {
+  for (const el of document.querySelectorAll('.js-xmoney')) el.addEventListener('click', () => {
     copyText('@wangooroo').then((ok) => toast(ok ? 'Copied @wangooroo. In X: Money → Send → paste' : 'Send to @wangooroo in X Money'));
   });
 
