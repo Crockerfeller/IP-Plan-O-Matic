@@ -1,6 +1,6 @@
 /* IP Plan-O-Matic service worker: makes the app work offline.
    Bump CACHE whenever the list of files below changes. */
-const CACHE = 'ipom-v1';
+const CACHE = 'ipom-v2';
 const FONT_CACHE = 'ipom-fonts-v1';
 const SHELL = [
   './',
@@ -45,12 +45,16 @@ self.addEventListener('fetch', (e) => {
   // Anything else off-site (the GitHub API for the footer version) goes straight to the network.
   if (url.origin !== self.location.origin) return;
 
-  // The page itself: network first so a new deploy shows up right away, cached copy when offline.
+  // Pages: network first so a new deploy shows up right away, cached copy when offline.
+  // Only the app page itself is stored as the offline app; other pages (the guides) are cached under their own URL.
   if (req.mode === 'navigate') {
+    const scope = new URL(self.registration.scope);
+    const isApp = url.pathname === scope.pathname || url.pathname === scope.pathname + 'index.html';
+    const key = isApp ? './index.html' : url.origin + url.pathname;
     e.respondWith(fetch(req).then((res) => {
-      if (res.ok) putIn(CACHE, './index.html', res.clone());
+      if (res.ok) putIn(CACHE, key, res.clone());
       return res;
-    }).catch(() => caches.match('./index.html').then((hit) => hit || caches.match('./'))));
+    }).catch(() => caches.match(key).then((hit) => hit || caches.match('./index.html'))));
     return;
   }
 
