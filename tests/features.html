@@ -84,6 +84,19 @@ T.azNames = async () => {
   click('#peerClose');
 };
 
+T.exportMenu = async () => {
+  await load('../index.html#10.0.0.0/24');
+  check('export menu starts closed', $('exMenu').hidden && $('exMenuBtn').getAttribute('aria-expanded') === 'false');
+  click('#exMenuBtn');
+  check('export menu opens', !$('exMenu').hidden && $('exMenuBtn').getAttribute('aria-expanded') === 'true');
+  click('#body');
+  check('outside click closes menu', $('exMenu').hidden);
+  click('#exMenuBtn'); click('#exMoreBtn');
+  check('more formats goes to export tab', $('exMenu').hidden && !$('tab-export').hidden);
+  click('#tb-plan');
+  check('help is short, rest folded', qa('#tab-plan .help > p').length === 2 && q('#tab-plan .help details.more-help') && !q('#tab-plan .help details.more-help').open);
+};
+
 const addBox = (v) => { $('addIn').value = v; $('addForm').requestSubmit(); };
 const chipsB = () => qa('#blocks .net-card');
 const rowFor = (cidr) => qa('#body tr').find((tr) => tr.textContent.startsWith(cidr));

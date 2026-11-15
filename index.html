@@ -539,6 +539,13 @@
   .help { color: var(--muted); font-size: 13px; padding: 12px 16px; border-top: 1px solid var(--border); }
   .help p { margin: 0 0 6px; }
   .help p:last-child { margin: 0; }
+  .help .more-help summary { cursor: pointer; color: var(--text); font-weight: 500; margin: 4px 0; }
+  .help .more-help[open] summary { margin-bottom: 6px; }
+  .menu { position: relative; }
+  .menu-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+  .menu-pop[hidden] { display: none; }
+  .menu-pop.left { right: auto; left: 0; }
+  .menu-pop button { border: 0; text-align: left; height: 34px; }
   kbd { font-family: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
 
   .result { margin-top: 12px; display: grid; gap: 10px; font-size: 13px; }
@@ -940,8 +947,14 @@
           <button type="button" id="redoBtn" title="Redo (Ctrl+Shift+Z / ⇧⌘Z)" disabled>Redo</button>
           <button type="button" id="resetBtn" title="Join everything back into the base network">Reset</button>
           <button type="button" id="linkBtn" title="Copy a link that restores this whole plan">Copy link</button>
-          <button type="button" id="csvBtn" title="Copy the columns shown below as CSV">Copy CSV</button>
-          <button type="button" id="printBtn" title="Print or save as PDF">Print</button>
+          <div class="menu no-print">
+            <button type="button" id="exMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="exMenu">Export ▾</button>
+            <div class="menu-pop" id="exMenu" role="menu" hidden>
+              <button type="button" role="menuitem" id="csvBtn" title="Copy the columns shown below as CSV">Copy CSV</button>
+              <button type="button" role="menuitem" id="printBtn" title="Print or save as PDF">Print or save as PDF</button>
+              <button type="button" role="menuitem" id="exMoreBtn" title="Terraform, Cisco, Juniper, MikroTik, JSON and more">More formats…</button>
+            </div>
+          </div>
         </div>
       </form>
       <form class="row" id="addForm" autocomplete="off">
@@ -989,10 +1002,16 @@
         <div class="legend" id="mapLegend"></div>
       </div>
       <div class="help">
-        <p>Click <b>Divide</b> to split a subnet in half, or pick a size from the <b>/N</b> menu beside it to split it into equal subnets in one go. <b>Split everything into</b> does the same for every subnet bigger than the size you choose and leaves smaller, named subnets alone. Click a colored bar on the right to join every subnet it covers back into one. Type straight into Name, VLAN and Notes; set Status to track what is in use. Made a mistake? <b>Undo</b> (Ctrl+Z / ⌘Z) steps back through every change.</p>
-        <p>Keyboard: click a row or press <kbd>↓</kbd>, then <kbd>D</kbd> divides, <kbd>J</kbd> joins and <kbd>S</kbd> sets status. <button type="button" class="small" id="keysBtn">All shortcuts (?)</button></p>
-        <p>Use <b>Add</b> to carve out a specific subnet like <kbd>10.0.5.0/24 Servers</kbd>. A network outside every base network becomes another base network, so one plan can cover HQ, branches and cloud VPCs, each with its own platform.</p>
-        <p>Tip: paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field. The page address updates as you work (names and VLANs included), so a bookmark or copied link saves the whole plan.</p>
+        <p><b>Divide</b> splits a subnet in half. The <b>/N</b> menu beside it splits it into equal subnets of that size. A colored bar on the right joins every subnet it covers back into one.</p>
+        <p>Type straight into Name, VLAN and Notes. <b>Undo</b> (Ctrl+Z / ⌘Z) steps back through every change, and the page address keeps the whole plan, so a bookmark or copied link saves it. <button type="button" class="small" id="keysBtn">All shortcuts (?)</button></p>
+        <details class="more-help">
+          <summary>More tips</summary>
+          <p><b>Split everything into</b> divides every subnet bigger than the size you choose and leaves smaller, named subnets alone. Set Status to track what is in use.</p>
+          <p>Keyboard: click a row or press <kbd>↓</kbd>, then <kbd>D</kbd> divides, <kbd>J</kbd> joins and <kbd>S</kbd> sets status.</p>
+          <p>Use <b>Add</b> to carve out a specific subnet like <kbd>10.0.5.0/24 Servers</kbd>. A network outside every base network becomes another base network, so one plan can cover HQ, branches and cloud VPCs, each with its own platform.</p>
+          <p>Name a subnet before dividing it and the name stays on its colored bar as a group (westus2 /20), and in CSV and Terraform exports.</p>
+          <p>Paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field.</p>
+        </details>
       </div>
     </div>
   </section>
@@ -2972,6 +2991,23 @@
     toast((await copyText(location.href)) ? 'Link copied' : 'Couldn’t copy. Use the address bar.');
   });
   $('printBtn').addEventListener('click', () => window.print());
+  // Export menu: Copy CSV, Print, and a way to the Export tab's other formats.
+  const exMenu = (open) => {
+    $('exMenu').hidden = !open;
+    $('exMenuBtn').setAttribute('aria-expanded', String(open));
+    // Open toward the side with room: right-aligned under a button at the right, left-aligned on a phone.
+    if (open) $('exMenu').classList.toggle('left', $('exMenuBtn').getBoundingClientRect().right < $('exMenu').offsetWidth + 16);
+  };
+  $('exMenuBtn').addEventListener('click', (e) => { e.stopPropagation(); exMenu($('exMenu').hidden); if (!$('exMenu').hidden) $('csvBtn').focus(); });
+  $('exMenu').addEventListener('click', () => exMenu(false));
+  $('exMenu').addEventListener('keydown', (e) => {
+    e.stopPropagation();   // arrows and Escape here aren't the table's shortcuts
+    const items = [...$('exMenu').querySelectorAll('button')], i = items.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); exMenu(false); $('exMenuBtn').focus(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
+  });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.menu')) exMenu(false); });
+  $('exMoreBtn').addEventListener('click', () => $('tb-export').click());
 
   // CSV columns, keyed to the table columns they come from.
   const CSV_COLS = [
