@@ -794,7 +794,7 @@ T.buildNotice = async () => {
   // The server has the same build: still not green.
   serve(v);
   W.dispatchEvent(new W.Event('online')); await sleep(50);
-  check('same build: not green', asked && asked[0].endsWith('/version.json') && asked[1] === 'no-store' && !rb.classList.contains('ready'), asked);
+  check('same build: not green', asked && /\/version\.json\?t=\d+$/.test(asked[0]) && asked[1] === 'no-store' && !rb.classList.contains('ready'), asked);
   // Junk in version.json is ignored.
   serve({ sha: 'nope' });
   W.dispatchEvent(new W.Event('online')); await sleep(50);
@@ -1064,7 +1064,7 @@ T.updateCheck = async () => {
   };
   dialogs.length = 0; confirmAnswer = false;
   click('#updBtn'); await sleep(300);
-  check('update: asks the hosted site', asked === SITE + 'version.json', asked);
+  check('update: asks the hosted site, past its CDN cache', asked && asked.startsWith(SITE + 'version.json?t='), asked);
   check('update: newer version prompt', dialogs.length === 1 && dialogs[0].includes('build 0000000 from 2026-12-01') && dialogs[0].includes(`You have build ${v.sha.slice(0, 7)} from ${v.date}`) && dialogs[0].includes('.zip'), dialogs);
   remote = v; dialogs.length = 0;
   click('#updBtn'); await sleep(300);

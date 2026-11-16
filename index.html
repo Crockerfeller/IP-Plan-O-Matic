@@ -5407,10 +5407,12 @@
     rb.title = newBuild ? `A newer build (${short(newBuild.sha)}, ${newBuild.date}) is available. Reload to use it. Your plan is kept.` : RELOAD_TITLE;
   };
 
-  // version.json is a few dozen bytes. cache: 'no-store' skips the browser cache, and sw.js passes such requests
-  // straight to the network.
+  // version.json is a few dozen bytes. cache: 'no-store' skips the browser cache (and sw.js passes such requests
+  // straight to the network); the throwaway ?t= skips GitHub's CDN, which may otherwise keep it for 10 minutes.
   const getVersion = async (base) => {
-    const res = await fetch(new URL('version.json', base), { cache: 'no-store' });
+    const url = new URL('version.json', base);
+    url.searchParams.set('t', Date.now());
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(String(res.status));
     const v = await res.json();
     if (!v || !/^[0-9a-f]{40}$/.test(v.sha)) throw new Error('bad version.json');
@@ -5418,8 +5420,8 @@
   };
 
   // Newer build on the server this page came from: check every 30 minutes while the tab is visible, when it comes
-  // back into view (at most every 5 minutes) and when the browser comes back online.
-  const CHECK_EVERY = 30 * 60e3, RECHECK_ON_RETURN = 5 * 60e3;
+  // back into view (at most once a minute) and when the browser comes back online.
+  const CHECK_EVERY = 30 * 60e3, RECHECK_ON_RETURN = 60e3;
   let lastCheck = 0, checking = false;
   const checkBuild = async () => {
     if (newBuild || checking) return;
