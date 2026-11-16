@@ -637,6 +637,72 @@ T.hardening = async () => {
   check('headroom rounding exact', $('vlsmOut').textContent.includes('10.0.0.0/21'), $('vlsmOut').textContent.slice(0, 300));
   click('#tb-plan');
 };
+T.exports3 = async () => {
+  const gen = (f) => { click('#tb-export'); select('#exInc', 'all'); select('#exFmt', f); const t = $('exOut').value, m = $('exMsg').textContent; click('#tb-plan'); return [t, m]; };
+  // Azure hub and two spokes with gateway transit.
+  await load('../index.html#192.168.0.0/24');
+  click('#tplBtn'); select('#azLayout', 'hub'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
+  click('#peerBtn'); $('peerGw').click(); click('#peerSave'); await sleep(50);
+  let [t, m] = gen('az-ps');
+  check('az-ps: settings and helpers', t.includes("$ResourceGroup = 'rg-network'") && t.includes('$DryRun        = $false') && t.includes('function Add-Subnet(') && t.includes('if ($LASTEXITCODE -ne 0) { throw'), t.slice(0, 1500));
+  check('az-ps: vnets and service subnets', t.includes("Add-Vnet 'vnet-hub' '10.0.0.0/23'") && t.includes("Add-Subnet 'vnet-hub' 'GatewaySubnet' '10.0.0.128/27'") && t.includes("Add-Subnet 'vnet-spoke-workload' 'snet-appsvc' '10.0.21.0/26' 'Microsoft.Web/serverFarms'"), t);
+  check('az-ps: peering both ways with gateway transit', t.includes("Add-Peering 'vnet-hub' 'peer-hub-to-spoke-workload' 'vnet-spoke-workload' @('--allow-forwarded-traffic', '--allow-gateway-transit')") && t.includes("Add-Peering 'vnet-spoke-workload' 'peer-spoke-workload-to-hub' 'vnet-hub' @('--allow-forwarded-traffic', '--use-remote-gateways')"), t.slice(-1200));
+  check('az-ps: peerings after all vnets', t.lastIndexOf("\nAdd-Vnet '") < t.indexOf("\nAdd-Peering '") && t.indexOf("\nAdd-Peering '") > 0);
+  check('az-ps: group comment only when it differs', !t.includes('# Group: Hub'), t.slice(1500, 2500));
+  check('az-ps: how-to message', m.includes('Azure Cloud Shell'), m);
+  [t] = gen('bicep');
+  check('bicep: vnet with inline subnets', t.includes("resource vnet_hub 'Microsoft.Network/virtualNetworks@2024-05-01' = {") && /name: 'AzureBastionSubnet'\n\s+properties: \{\n\s+addressPrefix: '10\.0\.0\.64\/26'/.test(t), t.slice(0, 1500));
+  check('bicep: delegation', t.includes("serviceName: 'Microsoft.Network/dnsResolvers'"));
+  check('bicep: peering uses remote gateway after the hub side', /resource peer_spoke_workload_to_hub [^\n]+\n  parent: vnet_spoke_workload[\s\S]*?useRemoteGateways: true[\s\S]*?dependsOn: \[\n    peer_hub_to_spoke_workload\n  \]/.test(t), t.slice(-2500));
+  [t, m] = gen('netbox');
+  check('netbox: containers and prefixes', t.startsWith('"prefix","status","vlan","description","comments"') && t.includes('"10.0.0.0/23","container","","Hub"') && t.includes('"10.0.0.64/26","active","","AzureBastionSubnet"'), t.slice(0, 600));
+  check('netbox: import hint', m.includes('IPAM → Prefixes → Import'), m);
+  [t, m] = gen('netbox-vlans');
+  check('netbox vlans: none in plan', t === '"vid","name","status"' && m.includes('no VLANs'), [t, m]);
+  [t] = gen('phpipam');
+  check('phpipam: section, subnet, mask, master', t.includes('"IP Plan-O-Matic","10.0.0.64","26","AzureBastionSubnet","","10.0.0.0/23"'), t.slice(0, 500));
+  // VLANs, and an undivided network: one row, not a container plus a prefix.
+  await load('../index.html#10.0.0.0/24');
+  divideRow(0);
+  const r = qa('#body tr');
+  r[0].querySelector('input').value = 'Users'; r[0].querySelector('input').dispatchEvent(new W.Event('input', { bubbles: true }));
+  r[0].querySelector('input.vlan').value = '20'; r[0].querySelector('input.vlan').dispatchEvent(new W.Event('input', { bubbles: true }));
+  r[0].querySelector('select.status').value = 'used'; r[0].querySelector('select.status').dispatchEvent(new W.Event('change', { bubbles: true }));
+  await sleep(50);
+  [t] = gen('netbox');
+  check('netbox: vlan and statuses', t.includes('"10.0.0.0/25","active","20","Users"') && t.includes('"10.0.0.128/25","reserved",""') && t.includes('"10.0.0.0/24","container"'), t);
+  [t] = gen('netbox-vlans');
+  check('netbox vlans: listed', t === '"vid","name","status"\n"20","Users","active"', t);
+  await load('../index.html#10.0.0.0/24');
+  [t] = gen('netbox');
+  check('netbox: undivided network is one row', t.split('\n').length === 2 && t.includes('"10.0.0.0/24","reserved"'), t);
+  [t] = gen('phpipam');
+  check('phpipam: undivided network is one row', t.split('\n').length === 2 && t.endsWith(',""'), t);
+  // AWS: Transit Gateway with routes, then VPC peering.
+  await load('../index.html#192.168.0.0/24');
+  click('#tplBtn'); select('#azCloud', 'aws'); select('#azLayout', 'hub'); click('#azApply'); await sleep(50);
+  [t] = gen('cfn-aws');
+  check('cfn: header and vpcs', t.includes("AWSTemplateFormatVersion: '2010-09-09'") && /  VpcHub:\n    Type: AWS::EC2::VPC\n    Properties:\n      CidrBlock: 10\.0\.0\.0\/\d+/.test(t), t.slice(0, 800));
+  check('cfn: subnets with zones and tags', /Type: AWS::EC2::Subnet\n    Properties:\n      VpcId: !Ref VpcHub\n      CidrBlock: [\d./]+\n      AvailabilityZone: "us-east-1a"/.test(t), t.slice(0, 1500));
+  check('cfn: transit gateway and attachments', t.includes('  TransitGateway:\n    Type: AWS::EC2::TransitGateway') && t.includes('Type: AWS::EC2::TransitGatewayAttachment') && t.includes('      TransitGatewayId: !Ref TransitGateway'));
+  check('cfn: routes wait for the attachment, via own route table', /Type: AWS::EC2::Route\n    DependsOn: TgwAttachHub\n    Properties:\n      RouteTableId: !Ref RouteTableHub/.test(t) && t.includes('Type: AWS::EC2::SubnetRouteTableAssociation'), t.slice(-2500));
+  check('cfn: outputs', t.includes('Outputs:\n  VpcHubId:\n    Value: !Ref VpcHub'));
+  click('#peerBtn'); select('#peerType', 'pcx'); click('#peerSave'); await sleep(50);
+  [t] = gen('cfn-aws');
+  check('cfn: vpc peering with routes', t.includes('Type: AWS::EC2::VPCPeeringConnection') && /VpcPeeringConnectionId: !Ref Peering\w+/.test(t) && !t.includes('TransitGateway'), t.slice(-1500));
+  // Downloads get the right file types.
+  const saved = [];
+  const orig = W.URL.createObjectURL;
+  W.URL.createObjectURL = (b) => { saved.push(b.type); return 'blob:x'; };
+  click('#tb-export');
+  const names = [];
+  const origClick = W.HTMLAnchorElement.prototype.click;
+  W.HTMLAnchorElement.prototype.click = function () { names.push(this.download); };
+  for (const f of ['az-ps', 'bicep', 'cfn-aws', 'netbox', 'phpipam']) { select('#exFmt', f); click('#exDl'); }
+  W.HTMLAnchorElement.prototype.click = origClick; W.URL.createObjectURL = orig;
+  check('downloads: file names', names.join(' ') === 'subnet-plan-az-ps.ps1 subnet-plan-bicep.bicep subnet-plan-cfn-aws.yaml subnet-plan-netbox.csv subnet-plan-phpipam.csv', names);
+  click('#tb-plan');
+};
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azLayout', 'hub');
