@@ -759,7 +759,7 @@ T.azureSingle = async () => {
 T.reloadBtn = async () => {
   await load('../index.html#10.0.0.0/24');
   const rb = $('reloadBtn');
-  check('reload button left of Plans', rb && rb.parentElement.nextElementSibling === $('plansBtn') && rb.title.includes('Your plan is kept'));
+  check('reload button left of Plans', rb && rb.parentElement.nextElementSibling === $('plansBtn') && rb.title.includes('Your plan is kept') && rb.textContent.trim() === 'Reload app');
   divideRow(0);
   const inp = qa('#body tr')[0].querySelector('input');
   inp.focus(); inp.value = 'Kept'; inp.dispatchEvent(new W.Event('input', { bubbles: true }));
@@ -802,7 +802,8 @@ T.buildNotice = async () => {
   // A newer build appears.
   serve({ sha: 'abcdef0'.padEnd(40, '1'), date: '2026-12-01' });
   W.dispatchEvent(new W.Event('online')); await sleep(50);
-  check('newer build: button green', rb.classList.contains('ready') && bn.classList.contains('ready') && rb.title.includes('abcdef0, 2026-12-01') && bn.title.includes('abcdef0'), [rb.className, rb.title]);
+  check('newer build: button green', rb.classList.contains('ready') && bn.classList.contains('ready') && rb.title.includes('Build abcdef0 (2026-12-01) is ready') && bn.title.includes('abcdef0'), [rb.className, rb.title]);
+  check('newer build: says Update app, with the update icon', rb.textContent.trim() === 'Update app' && W.getComputedStyle(rb.querySelector('.ico-update')).display !== 'none' && W.getComputedStyle(rb.querySelector('.ico-reload')).display === 'none', rb.textContent);
   check('build number still shows the loaded build', bn.textContent === 'Build ' + mine, bn.textContent);
   W.fetch = () => Promise.reject(new TypeError('offline'));
   W.dispatchEvent(new W.Event('online')); await sleep(50);
@@ -813,7 +814,7 @@ T.buildNotice = async () => {
   rb.click();
   await Promise.race([new Promise((res) => { F.onload = res; }), sleep(5000)]);
   W = F.contentWindow; D = W.document; await sleep(300);
-  check('after reload: not green, build shown', !W.__beforeReload && !$('reloadBtn').classList.contains('ready') && $('buildNo').textContent === 'Build ' + mine);
+  check('after reload: not green, build shown', !W.__beforeReload && !$('reloadBtn').classList.contains('ready') && $('reloadBtn').textContent.trim() === 'Reload app' && $('buildNo').textContent === 'Build ' + mine);
 };
 T.baseOnLeave = async () => {
   await load('../index.html#192.168.0.0/24');
