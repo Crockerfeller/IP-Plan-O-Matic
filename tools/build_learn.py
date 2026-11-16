@@ -32,8 +32,8 @@ def b64(obj):
     return base64.urlsafe_b64encode(json.dumps(obj, separators=(',', ':')).encode()).decode().rstrip('=')
 
 
-def app(hash_=''):
-    return '../' + ('#' + hash_ if hash_ else '')
+def app(hash_='', tab=''):
+    return '../' + (f'?tab={tab}' if tab else '') + ('#' + hash_ if hash_ else '')
 
 
 def cloud_plan(base, cloud):
@@ -120,6 +120,12 @@ tr.hi td { background: var(--accent-weak); }
 .grid li { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .grid a { font-weight: 600; text-decoration: none; }
 .grid p { margin: 4px 0 0; font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 16px 0; padding: 0; list-style: none; }
+.sizes a { display: block; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; text-decoration: none; }
+.sizes a:hover { background: var(--accent-weak); }
+.sizes b { display: block; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.sizes span { font-size: 12px; color: var(--muted); }
+.pager { margin-top: 20px; }
 footer { margin-top: 28px; font-size: 13px; color: var(--muted); text-align: center; }
 footer a { color: var(--muted); }
 footer p { max-width: none; }
@@ -135,7 +141,7 @@ LOGO = '''<svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="1
 PAGES = []  # (slug, title, description) for the hub and sitemap
 
 
-def page(slug, title, description, body, h1=None, faq=None):
+def page(slug, title, description, body, h1=None, faq=None, listed=True):
     url = SITE + 'learn/' + ('' if slug == 'index' else slug + '.html')
     crumbs = [('IP Plan-O-Matic', SITE), ('Guides', SITE + 'learn/')]
     if slug != 'index':
@@ -200,12 +206,12 @@ def page(slug, title, description, body, h1=None, faq=None):
 </html>
 '''
     (LEARN / ('index.html' if slug == 'index' else slug + '.html')).write_text(doc)
-    if slug != 'index':
+    if slug != 'index' and listed:
         PAGES.append((slug, h1 or title, description))
 
 
 def table(head, rows, num_cols=(), mono_cols=(), hi=None):
-    th = ''.join(f'<th{" class=n" if i in num_cols else ""}>{esc(h)}</th>' for i, h in enumerate(head))
+    th = ''.join(f'<th{" class=n" if i in num_cols else ""}>{esc(h)}</th>' for i, h in enumerate(head or []))
     out = []
     for r in rows:
         cls = ' class="hi"' if hi and hi(r) else ''
@@ -213,7 +219,8 @@ def table(head, rows, num_cols=(), mono_cols=(), hi=None):
             f'<td class="{"n" if i in num_cols else ""}{" m" if i in mono_cols else ""}">{v}</td>'.replace(' class=""', '')
             for i, v in enumerate(r))
         out.append(f'<tr{cls}>{tds}</tr>')
-    return f'<div class="table-wrap"><table><thead><tr>{th}</tr></thead><tbody>{"".join(out)}</tbody></table></div>'
+    thead = f'<thead><tr>{th}</tr></thead>' if head else ''   # head=None: a two-column facts table
+    return f'<div class="table-wrap"><table>{thead}<tbody>{"".join(out)}</tbody></table></div>'
 
 
 def try_box(text, href, label='Open in the planner →'):
@@ -228,10 +235,10 @@ rows = []
 for p in range(0, 33):
     n = ipaddress.IPv4Network(f'0.0.0.0/{p}')
     size = n.num_addresses
-    rows.append([f'/{p}', str(n.netmask), str(n.hostmask), fmt(size), fmt(usable(p)),
+    rows.append([f'<a href="slash-{p}-subnet.html">/{p}</a>' if p >= 8 else f'/{p}', str(n.netmask), str(n.hostmask), fmt(size), fmt(usable(p)),
                  fmt(size // 256) if p <= 24 else f'1/{256 // size}'])
 cheat = table(['Prefix', 'Netmask', 'Wildcard', 'Addresses', 'Usable hosts', '/24 networks'], rows,
-              num_cols=(3, 4), mono_cols=(0, 1, 2), hi=lambda r: r[0] in ('/8', '/16', '/24'))
+              num_cols=(3, 4), mono_cols=(0, 1, 2), hi=lambda r: any(f'>/{x}<' in r[0] for x in (8, 16, 24)))
 cloud_rows = []
 for p in range(16, 31):
     def c(pl):
@@ -609,12 +616,178 @@ page('ipv6-subnetting', 'IPv6 subnetting: /48, /56 and /64, nibble boundaries an
     <p>For private IPv6, RFC 4193 reserves <code>fc00::/7</code>; in practice you use <code>fd00::/8</code> plus a random 40-bit Global ID, giving you your own /48. Randomness matters: two companies that both pick <code>fd00::/48</code> will clash if they ever connect.</p>
     <h2>Reverse DNS</h2>
     <p>Reverse zones live under <code>ip6.arpa</code>, one label per nibble in reverse. <code>2001:db8:abcd::/48</code> becomes <code>d.c.b.a.8.b.d.0.1.0.0.2.ip6.arpa</code>. Prefixes that aren’t on a nibble boundary span several zones.</p>
-    {try_box('Split a /48 into nibble-aligned prefixes, give each a name and VLAN, or auto-plan “Sites, /56, 12” in one go.', app(v6_hash), 'Open the IPv6 planner →')}
+    {try_box('Split a /48 into nibble-aligned prefixes, give each a name and VLAN, or auto-plan “Sites, /56, 12” in one go.', app(v6_hash, 'v6'), 'Open the IPv6 planner →')}
 ''', h1='IPv6 subnetting: /48, /56, /64 and nibbles', faq=[
         ('What size IPv6 subnet should a LAN use?', 'A /64. Stateless address autoconfiguration (SLAAC) requires exactly 64 bits for the interface ID.'),
         ('How many /64 subnets are in a /48?', '65,536. A /48 also holds 256 /56s or 16 /52s.'),
         ('What is a nibble boundary in IPv6?', 'A prefix length that is a multiple of 4 (/48, /52, /56, /60, /64). Each hex digit is 4 bits, so these prefixes change whole hex digits and keep addresses and reverse DNS readable.'),
      ])
+
+# ---------------------------------------------------------------- One page per prefix size
+# Every number on these pages is computed with Python's ipaddress module.
+PREFIX_PAGES = []  # (slug, label, description) for the "Subnet sizes" index and the sitemap
+
+USES4 = {
+    8: 'A whole former class A network. 10.0.0.0/8 is the largest private block, usually carved into a /16 per region, site or cloud.',
+    9: 'Half of a /8. Google Cloud’s auto mode networks use 10.128.0.0/9.',
+    10: 'A quarter of a /8. 100.64.0.0/10 is the shared space ISPs use for carrier-grade NAT.',
+    11: 'An eighth of a /8: a large regional or business-unit allocation.',
+    12: 'Sixteen /16s. 172.16.0.0/12 is one of the three private RFC 1918 blocks.',
+    13: 'Eight /16s, often a large region’s share of a 10.0.0.0/8 plan.',
+    14: 'Four /16s: a mid-size region or a group of cloud networks.',
+    15: 'Two /16s. 198.18.0.0/15 is reserved for network benchmarking.',
+    16: 'The classic site or cloud network size: 65,536 addresses. The largest AWS VPC CIDR block and the usual size for a whole VNet or VPC.',
+    17: 'Half of a /16: a large VPC, VNet or campus.',
+    18: 'A quarter of a /16, enough for a VPC with room for big subnets, or a building’s worth of VLANs.',
+    19: 'Thirty-two /24s: a medium VPC or a campus with many VLANs.',
+    20: 'Sixteen /24s: a common size for a spoke VNet or VPC, or a mid-size branch.',
+    21: 'Eight /24s: a small VPC, or a large subnet for Kubernetes pods.',
+    22: 'Four /24s: 1,022 hosts. Used for big flat networks, Wi-Fi with many clients, and Kubernetes node subnets.',
+    23: 'Two /24s: 510 hosts. A large office LAN or a guest Wi-Fi network.',
+    24: 'The everyday LAN: 254 hosts, and easy to read because the subnet is the first three octets. The default for most VLANs and home networks.',
+    25: 'Half of a /24: 126 hosts, for a department, floor or server network.',
+    26: 'A quarter of a /24: 62 hosts, for a small office, a VLAN of printers or phones, or Azure Bastion and Azure Firewall subnets (which must be /26).',
+    27: '30 hosts: small VLANs, management networks, and Azure GatewaySubnet (/27 recommended).',
+    28: '14 hosts: the smallest AWS subnet, and a common size for Transit Gateway attachments and small DMZs.',
+    29: '6 hosts: the smallest Azure and Google Cloud subnet, a small public IP block from an ISP, or a tiny DMZ.',
+    30: '2 hosts: the classic router-to-router link. The smallest OCI subnet.',
+    31: '2 addresses, both usable: point-to-point links under RFC 3021, with no network or broadcast address.',
+    32: 'A single address: loopbacks, host routes and firewall rules for one host.',
+}
+
+
+def prefix_slug(p):
+    return f'slash-{p}-subnet'
+
+
+def octet_note(p):
+    """Where a subnet of this size starts: the octet that varies, and its step."""
+    if p == 32:
+        return 'Every address is its own /32.'
+    octet = min(4, p // 8 + 1)          # the octet the prefix boundary falls in
+    step = 2 ** (8 * octet - p)
+    names = {1: 'first', 2: 'second', 3: 'third', 4: 'last'}
+    if step == 256:
+        return f'A /{p} ends on an octet boundary, so its subnets differ in the {names[octet - 1]} octet and the octets after it are 0.'
+    starts = ', '.join(str(i) for i in range(0, 256, step)[:6]) + (', …' if 256 // step > 6 else '')
+    return f'The block size is {step} in the {names[octet]} octet: a /{p} always starts at {starts}.'
+
+
+def v4_page(p):
+    net = ipaddress.IPv4Network(f'0.0.0.0/{p}')
+    mask, wild, size = str(net.netmask), str(net.hostmask), net.num_addresses
+    bits = '.'.join(f'{int(o):08b}' for o in mask.split('.'))
+    hosts = usable(p)
+    facts = table(None, [
+        ['Subnet mask', f'<span class="mono">{mask}</span>'],
+        ['Wildcard mask', f'<span class="mono">{wild}</span>'],
+        ['Binary mask', f'<span class="mono">{bits}</span>'],
+        ['Total addresses', fmt(size)],
+        ['Usable hosts', fmt(hosts) + (' (RFC 3021: both usable)' if p == 31 else ' (a single host)' if p == 32 else ' (minus network and broadcast)')],
+        [f'/{p}s in a /24', str(256 // size)] if p >= 24 else [f'/24s in a /{p}', fmt(size // 256)],
+    ])
+    # Example subnets: inside a /24 for small prefixes, inside a /16 or /8 for larger ones.
+    parent = ipaddress.IPv4Network('192.168.1.0/24' if p >= 24 else '10.0.0.0/16' if p >= 16 else '10.0.0.0/8')
+    subs = list(parent.subnets(new_prefix=p)) if p > parent.prefixlen else [parent]
+    shown = subs[:16]
+    def rng(n):
+        if n.prefixlen == 32:
+            return str(n.network_address), '—'
+        if n.prefixlen == 31:
+            return f'{n[0]} – {n[1]}', '—'
+        return f'{n[1]} – {n[-2]}', str(n.broadcast_address)
+    sub_rows = [[str(n), *rng(n)] for n in shown]
+    sub_tbl = table(['Subnet', 'Usable range', 'Broadcast'], sub_rows, mono_cols=(0, 1, 2))
+    more = f' The first {len(shown)} of {fmt(len(subs))} are shown.' if len(subs) > len(shown) else ''
+    sub_intro = (f'Every /{p} inside <code>{parent}</code>.{more}' if len(subs) > 1 else f'<code>{parent}</code> itself.')
+    clouds = []
+    for pl, name in (('aws', 'AWS VPC'), ('azure', 'Azure VNet'), ('gcp', 'Google Cloud VPC'), ('oci', 'Oracle Cloud VCN')):
+        u = usable(p, pl)
+        too_big = (pl in ('aws', 'oci') and p < 16)
+        clouds.append([name, '—' if u is None or too_big else fmt(u), 'too small for a subnet' if u is None else 'larger than a VPC CIDR block can be' if too_big else ''])
+    cloud_tbl = table(['Cloud', 'Usable addresses', ''], clouds, num_cols=(1,))
+    split = []
+    if p < 32:
+        split.append(f'A /{p} splits into ' + ', '.join(f'{2 ** k} /{p + k}s' for k in range(1, min(4, 33 - p))) + '.')
+    if p > 0:
+        split.append(f'Two /{p}s that sit side by side, starting on a multiple of {fmt(size * 2)} addresses, join into one /{p - 1}.')
+    links = []
+    if p > 8:
+        links.append(f'<a href="{prefix_slug(p - 1)}.html">← /{p - 1}</a>')
+    links.append('<a href="subnet-sizes.html">All sizes</a>')
+    if p < 32:
+        links.append(f'<a href="{prefix_slug(p + 1)}.html">/{p + 1} →</a>')
+    title = f'/{p} subnet: {mask}, {fmt(size)} addresses, {fmt(hosts)} usable hosts'
+    desc = (f'A /{p} subnet has subnet mask {mask}, {fmt(size)} addresses and {fmt(hosts)} usable hosts. '
+            f'Wildcard, binary mask, example ranges, cloud usable addresses and how /{p} splits and joins.')
+    try_hash = f'{parent.network_address}/{max(p, 8)}' if p >= 24 else f'10.0.0.0/{p}'
+    page(prefix_slug(p), title, desc, f'''    <p class="lede">A /{p} is {fmt(size)} IPv4 address{'es' if size > 1 else ''}, with subnet mask <code>{mask}</code> and {fmt(hosts)} usable host{'s' if hosts != 1 else ''}.</p>
+    {facts}
+    <h2>What a /{p} is used for</h2>
+    <p>{esc(USES4[p])}</p>
+    <h2>Where /{p} subnets start</h2>
+    <p>{octet_note(p)}</p>
+    <p>{sub_intro}</p>
+    {sub_tbl}
+    <h2>Usable addresses in the cloud</h2>
+    <p>Clouds reserve more addresses than the network and broadcast: 5 in AWS and Azure, 4 in Google Cloud, 3 in Oracle Cloud.</p>
+    {cloud_tbl}
+    <h2>Splitting and joining</h2>
+    <p>{' '.join(split)}</p>
+    <p class="pager">{' · '.join(links)}</p>
+    {try_box(f'Open a /{p} in the planner and divide it, name the subnets and export the result.', app(try_hash))}
+''', h1=f'/{p} subnet (subnet mask {mask})', faq=[
+        (f'How many hosts are in a /{p}?', f'A /{p} has {fmt(size)} addresses and {fmt(hosts)} usable hosts.' + ('' if p >= 31 else ' The network and broadcast addresses are not usable.')),
+        (f'What is the subnet mask for /{p}?', f'{mask}. The wildcard mask is {wild}.'),
+        *([(f'How many /{p} subnets are in a /24?', f'{256 // size}.')] if 24 < p <= 32 else []),
+    ], listed=False)
+    PREFIX_PAGES.append((prefix_slug(p), f'/{p}', f'{mask} · {fmt(hosts)} hosts'))
+
+
+for p in range(8, 33):
+    v4_page(p)
+
+V6 = {
+    48: ('One site or campus. The usual allocation an organization gets for each location, and the size of a ULA prefix.', 'fd12:3456:789a::/48'),
+    56: ('A small site, branch office or home connection. Many ISPs give home customers a /56.', '2001:db8:abcd:1200::/56'),
+    64: ('One LAN or VLAN. SLAAC needs exactly 64 bits for the interface ID, so every subnet with hosts is a /64.', '2001:db8:abcd:12::/64'),
+}
+for p, (use, example) in V6.items():
+    n = ipaddress.IPv6Network(example)
+    sixty4 = 2 ** (64 - p)
+    child = 64 if p < 64 else None
+    rows = [['/64 networks inside', fmt(sixty4)], ['Total addresses', f'2<sup>{128 - p}</sup> ({fmt(2 ** (128 - p))})'], ['Example', f'<span class="mono">{n}</span>'],
+            ['Reverse DNS zone', f'<span class="mono">{".".join(reversed(n.network_address.exploded.replace(":", "")[:p // 4]))}.ip6.arpa</span>']]
+    if p == 48:
+        rows.insert(1, ['/56s inside', '256'])
+    ex_rows = [[str(s)] for s in list(n.subnets(new_prefix=p + 8 if p < 64 else 64))[:8]] if p < 64 else []
+    slug = f'ipv6-slash-{p}'
+    title = f'IPv6 /{p}: {fmt(sixty4)} /64 subnet{"s" if sixty4 > 1 else ""}, what it’s for and how to split it'
+    desc = f'An IPv6 /{p} holds {fmt(sixty4)} /64 network{"s" if sixty4 > 1 else ""}. What a /{p} is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.'
+    body = f'''    <p class="lede">{esc(use)}</p>
+    {table(None, rows)}
+'''
+    if ex_rows:
+        body += f'''    <h2>Splitting a /{p}</h2>
+    <p>Split on nibble boundaries (multiples of 4 bits) so each level changes whole hex digits. The first /{p + 8}s of <code>{n}</code>:</p>
+    {table([f'/{p + 8}'], ex_rows, mono_cols=(0,))}
+'''
+    body += f'''    <p>See the <a href="ipv6-subnetting.html">IPv6 subnetting guide</a> for nibbles, /127 links and ULA.</p>
+    <p class="pager"><a href="subnet-sizes.html">All sizes</a></p>
+    {try_box(f'Split a /{p} into named, VLAN-tagged prefixes in the IPv6 planner.', app('192.168.0.0/24/1.0/' + b64({'v6': {'p': str(n), 't': '0'}}), 'v6'), 'Open the IPv6 planner →')}
+'''
+    page(slug, title, desc, body, h1=f'IPv6 /{p} prefix', faq=[
+        (f'How many /64 subnets are in an IPv6 /{p}?', f'{fmt(sixty4)}.'),
+    ], listed=False)
+    PREFIX_PAGES.append((slug, f'IPv6 /{p}', f'{fmt(sixty4)} × /64'))
+
+grid = ''.join(f'<li><a href="{s}.html"><b>{esc(lbl)}</b><span>{esc(d)}</span></a></li>' for s, lbl, d in PREFIX_PAGES)
+page('subnet-sizes', 'Subnet sizes: every IPv4 prefix from /8 to /32, and IPv6 /48, /56 and /64',
+     'One page per subnet size: the subnet mask, address count, usable hosts, example ranges and cloud limits for every IPv4 prefix from /8 to /32, plus IPv6 /48, /56 and /64.',
+     f'''    <p class="lede">Pick a size for its subnet mask, host count, example ranges and how it splits.</p>
+    <ul class="sizes">{grid}</ul>
+    <p>All sizes in one table: the <a href="cidr-cheat-sheet.html">CIDR cheat sheet</a>.</p>
+''', h1='Subnet sizes')
 
 # ---------------------------------------------------------------- Hub
 items = ''.join(f'<li><a href="{s}.html">{esc(t)}</a><p>{esc(d)}</p></li>' for s, t, d in PAGES)
@@ -635,7 +808,7 @@ if start in src and end in src:
     app_html.write_text(src)
 
 # ---------------------------------------------------------------- Sitemap
-urls = [SITE, SITE + 'learn/'] + [SITE + f'learn/{s}.html' for s, _, _ in PAGES]
+urls = [SITE, SITE + 'learn/'] + [SITE + f'learn/{s}.html' for s, _, _ in PAGES] + [SITE + f'learn/{s}.html' for s, _, _ in PREFIX_PAGES]
 (ROOT / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
                                   ''.join(f'  <url>\n    <loc>{u}</loc>\n    <lastmod>{TODAY}</lastmod>\n  </url>\n' for u in urls) + '</urlset>\n')
-print(f'Built {len(PAGES) + 1} pages in {LEARN}')
+print(f'Built {len(PAGES) + len(PREFIX_PAGES) + 1} pages in {LEARN}')

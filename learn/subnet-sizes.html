@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subnet sizes: every IPv4 prefix from /8 to /32, and IPv6 /48, /56 and /64 | IP Plan-O-Matic</title>
+<meta name="description" content="One page per subnet size: the subnet mask, address count, usable hosts, example ranges and cloud limits for every IPv4 prefix from /8 to /32, plus IPv6 /48, /56 and /64.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/subnet-sizes.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="Subnet sizes">
+<meta property="og:description" content="One page per subnet size: the subnet mask, address count, usable hosts, example ranges and cloud limits for every IPv4 prefix from /8 to /32, plus IPv6 /48, /56 and /64.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/subnet-sizes.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "Subnet sizes", "description": "One page per subnet size: the subnet mask, address count, usable hosts, example ranges and cloud limits for every IPv4 prefix from /8 to /32, plus IPv6 /48, /56 and /64.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/subnet-sizes.html", "dateModified": "2026-11-16", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "Subnet sizes", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/subnet-sizes.html"}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › Subnet sizes</nav>
+  <article>
+    <h1>Subnet sizes</h1>
+    <p class="lede">Pick a size for its subnet mask, host count, example ranges and how it splits.</p>
+    <ul class="sizes"><li><a href="slash-8-subnet.html"><b>/8</b><span>255.0.0.0 · 16,777,214 hosts</span></a></li><li><a href="slash-9-subnet.html"><b>/9</b><span>255.128.0.0 · 8,388,606 hosts</span></a></li><li><a href="slash-10-subnet.html"><b>/10</b><span>255.192.0.0 · 4,194,302 hosts</span></a></li><li><a href="slash-11-subnet.html"><b>/11</b><span>255.224.0.0 · 2,097,150 hosts</span></a></li><li><a href="slash-12-subnet.html"><b>/12</b><span>255.240.0.0 · 1,048,574 hosts</span></a></li><li><a href="slash-13-subnet.html"><b>/13</b><span>255.248.0.0 · 524,286 hosts</span></a></li><li><a href="slash-14-subnet.html"><b>/14</b><span>255.252.0.0 · 262,142 hosts</span></a></li><li><a href="slash-15-subnet.html"><b>/15</b><span>255.254.0.0 · 131,070 hosts</span></a></li><li><a href="slash-16-subnet.html"><b>/16</b><span>255.255.0.0 · 65,534 hosts</span></a></li><li><a href="slash-17-subnet.html"><b>/17</b><span>255.255.128.0 · 32,766 hosts</span></a></li><li><a href="slash-18-subnet.html"><b>/18</b><span>255.255.192.0 · 16,382 hosts</span></a></li><li><a href="slash-19-subnet.html"><b>/19</b><span>255.255.224.0 · 8,190 hosts</span></a></li><li><a href="slash-20-subnet.html"><b>/20</b><span>255.255.240.0 · 4,094 hosts</span></a></li><li><a href="slash-21-subnet.html"><b>/21</b><span>255.255.248.0 · 2,046 hosts</span></a></li><li><a href="slash-22-subnet.html"><b>/22</b><span>255.255.252.0 · 1,022 hosts</span></a></li><li><a href="slash-23-subnet.html"><b>/23</b><span>255.255.254.0 · 510 hosts</span></a></li><li><a href="slash-24-subnet.html"><b>/24</b><span>255.255.255.0 · 254 hosts</span></a></li><li><a href="slash-25-subnet.html"><b>/25</b><span>255.255.255.128 · 126 hosts</span></a></li><li><a href="slash-26-subnet.html"><b>/26</b><span>255.255.255.192 · 62 hosts</span></a></li><li><a href="slash-27-subnet.html"><b>/27</b><span>255.255.255.224 · 30 hosts</span></a></li><li><a href="slash-28-subnet.html"><b>/28</b><span>255.255.255.240 · 14 hosts</span></a></li><li><a href="slash-29-subnet.html"><b>/29</b><span>255.255.255.248 · 6 hosts</span></a></li><li><a href="slash-30-subnet.html"><b>/30</b><span>255.255.255.252 · 2 hosts</span></a></li><li><a href="slash-31-subnet.html"><b>/31</b><span>255.255.255.254 · 2 hosts</span></a></li><li><a href="slash-32-subnet.html"><b>/32</b><span>255.255.255.255 · 1 hosts</span></a></li><li><a href="ipv6-slash-48.html"><b>IPv6 /48</b><span>65,536 × /64</span></a></li><li><a href="ipv6-slash-56.html"><b>IPv6 /56</b><span>256 × /64</span></a></li><li><a href="ipv6-slash-64.html"><b>IPv6 /64</b><span>1 × /64</span></a></li></ul>
+    <p>All sizes in one table: the <a href="cidr-cheat-sheet.html">CIDR cheat sheet</a>.</p>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

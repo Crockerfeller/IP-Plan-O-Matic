@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/30 subnet: 255.255.255.252, 4 addresses, 2 usable hosts | IP Plan-O-Matic</title>
+<meta name="description" content="A /30 subnet has subnet mask 255.255.255.252, 4 addresses and 2 usable hosts. Wildcard, binary mask, example ranges, cloud usable addresses and how /30 splits and joins.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-30-subnet.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="/30 subnet (subnet mask 255.255.255.252)">
+<meta property="og:description" content="A /30 subnet has subnet mask 255.255.255.252, 4 addresses and 2 usable hosts. Wildcard, binary mask, example ranges, cloud usable addresses and how /30 splits and joins.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-30-subnet.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "/30 subnet (subnet mask 255.255.255.252)", "description": "A /30 subnet has subnet mask 255.255.255.252, 4 addresses and 2 usable hosts. Wildcard, binary mask, example ranges, cloud usable addresses and how /30 splits and joins.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-30-subnet.html", "dateModified": "2026-11-16", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "/30 subnet (subnet mask 255.255.255.252)", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-30-subnet.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many hosts are in a /30?", "acceptedAnswer": {"@type": "Answer", "text": "A /30 has 4 addresses and 2 usable hosts. The network and broadcast addresses are not usable."}}, {"@type": "Question", "name": "What is the subnet mask for /30?", "acceptedAnswer": {"@type": "Answer", "text": "255.255.255.252. The wildcard mask is 0.0.0.3."}}, {"@type": "Question", "name": "How many /30 subnets are in a /24?", "acceptedAnswer": {"@type": "Answer", "text": "64."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › /30 subnet (subnet mask 255.255.255.252)</nav>
+  <article>
+    <h1>/30 subnet (subnet mask 255.255.255.252)</h1>
+    <p class="lede">A /30 is 4 IPv4 addresses, with subnet mask <code>255.255.255.252</code> and 2 usable hosts.</p>
+    <div class="table-wrap"><table><tbody><tr><td>Subnet mask</td><td><span class="mono">255.255.255.252</span></td></tr><tr><td>Wildcard mask</td><td><span class="mono">0.0.0.3</span></td></tr><tr><td>Binary mask</td><td><span class="mono">11111111.11111111.11111111.11111100</span></td></tr><tr><td>Total addresses</td><td>4</td></tr><tr><td>Usable hosts</td><td>2 (minus network and broadcast)</td></tr><tr><td>/30s in a /24</td><td>64</td></tr></tbody></table></div>
+    <h2>What a /30 is used for</h2>
+    <p>2 hosts: the classic router-to-router link. The smallest OCI subnet.</p>
+    <h2>Where /30 subnets start</h2>
+    <p>The block size is 4 in the last octet: a /30 always starts at 0, 4, 8, 12, 16, 20, ….</p>
+    <p>Every /30 inside <code>192.168.1.0/24</code>. The first 16 of 64 are shown.</p>
+    <div class="table-wrap"><table><thead><tr><th>Subnet</th><th>Usable range</th><th>Broadcast</th></tr></thead><tbody><tr><td class=" m">192.168.1.0/30</td><td class=" m">192.168.1.1 – 192.168.1.2</td><td class=" m">192.168.1.3</td></tr><tr><td class=" m">192.168.1.4/30</td><td class=" m">192.168.1.5 – 192.168.1.6</td><td class=" m">192.168.1.7</td></tr><tr><td class=" m">192.168.1.8/30</td><td class=" m">192.168.1.9 – 192.168.1.10</td><td class=" m">192.168.1.11</td></tr><tr><td class=" m">192.168.1.12/30</td><td class=" m">192.168.1.13 – 192.168.1.14</td><td class=" m">192.168.1.15</td></tr><tr><td class=" m">192.168.1.16/30</td><td class=" m">192.168.1.17 – 192.168.1.18</td><td class=" m">192.168.1.19</td></tr><tr><td class=" m">192.168.1.20/30</td><td class=" m">192.168.1.21 – 192.168.1.22</td><td class=" m">192.168.1.23</td></tr><tr><td class=" m">192.168.1.24/30</td><td class=" m">192.168.1.25 – 192.168.1.26</td><td class=" m">192.168.1.27</td></tr><tr><td class=" m">192.168.1.28/30</td><td class=" m">192.168.1.29 – 192.168.1.30</td><td class=" m">192.168.1.31</td></tr><tr><td class=" m">192.168.1.32/30</td><td class=" m">192.168.1.33 – 192.168.1.34</td><td class=" m">192.168.1.35</td></tr><tr><td class=" m">192.168.1.36/30</td><td class=" m">192.168.1.37 – 192.168.1.38</td><td class=" m">192.168.1.39</td></tr><tr><td class=" m">192.168.1.40/30</td><td class=" m">192.168.1.41 – 192.168.1.42</td><td class=" m">192.168.1.43</td></tr><tr><td class=" m">192.168.1.44/30</td><td class=" m">192.168.1.45 – 192.168.1.46</td><td class=" m">192.168.1.47</td></tr><tr><td class=" m">192.168.1.48/30</td><td class=" m">192.168.1.49 – 192.168.1.50</td><td class=" m">192.168.1.51</td></tr><tr><td class=" m">192.168.1.52/30</td><td class=" m">192.168.1.53 – 192.168.1.54</td><td class=" m">192.168.1.55</td></tr><tr><td class=" m">192.168.1.56/30</td><td class=" m">192.168.1.57 – 192.168.1.58</td><td class=" m">192.168.1.59</td></tr><tr><td class=" m">192.168.1.60/30</td><td class=" m">192.168.1.61 – 192.168.1.62</td><td class=" m">192.168.1.63</td></tr></tbody></table></div>
+    <h2>Usable addresses in the cloud</h2>
+    <p>Clouds reserve more addresses than the network and broadcast: 5 in AWS and Azure, 4 in Google Cloud, 3 in Oracle Cloud.</p>
+    <div class="table-wrap"><table><thead><tr><th>Cloud</th><th class=n>Usable addresses</th><th></th></tr></thead><tbody><tr><td>AWS VPC</td><td class="n">—</td><td>too small for a subnet</td></tr><tr><td>Azure VNet</td><td class="n">—</td><td>too small for a subnet</td></tr><tr><td>Google Cloud VPC</td><td class="n">—</td><td>too small for a subnet</td></tr><tr><td>Oracle Cloud VCN</td><td class="n">1</td><td></td></tr></tbody></table></div>
+    <h2>Splitting and joining</h2>
+    <p>A /30 splits into 2 /31s, 4 /32s. Two /30s that sit side by side, starting on a multiple of 8 addresses, join into one /29.</p>
+    <p class="pager"><a href="slash-29-subnet.html">← /29</a> · <a href="subnet-sizes.html">All sizes</a> · <a href="slash-31-subnet.html">/31 →</a></p>
+    <div class="try"><p>Open a /30 in the planner and divide it, name the subnets and export the result.</p><a class="cta" href="../#192.168.1.0/30">Open in the planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

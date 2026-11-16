@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPv6 /48: 65,536 /64 subnets, what it’s for and how to split it | IP Plan-O-Matic</title>
+<meta name="description" content="An IPv6 /48 holds 65,536 /64 networks. What a /48 is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-48.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="IPv6 /48 prefix">
+<meta property="og:description" content="An IPv6 /48 holds 65,536 /64 networks. What a /48 is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-48.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "IPv6 /48 prefix", "description": "An IPv6 /48 holds 65,536 /64 networks. What a /48 is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-48.html", "dateModified": "2026-11-16", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "IPv6 /48 prefix", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-48.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many /64 subnets are in an IPv6 /48?", "acceptedAnswer": {"@type": "Answer", "text": "65,536."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › IPv6 /48 prefix</nav>
+  <article>
+    <h1>IPv6 /48 prefix</h1>
+    <p class="lede">One site or campus. The usual allocation an organization gets for each location, and the size of a ULA prefix.</p>
+    <div class="table-wrap"><table><tbody><tr><td>/64 networks inside</td><td>65,536</td></tr><tr><td>/56s inside</td><td>256</td></tr><tr><td>Total addresses</td><td>2<sup>80</sup> (1,208,925,819,614,629,174,706,176)</td></tr><tr><td>Example</td><td><span class="mono">fd12:3456:789a::/48</span></td></tr><tr><td>Reverse DNS zone</td><td><span class="mono">a.9.8.7.6.5.4.3.2.1.d.f.ip6.arpa</span></td></tr></tbody></table></div>
+    <h2>Splitting a /48</h2>
+    <p>Split on nibble boundaries (multiples of 4 bits) so each level changes whole hex digits. The first /56s of <code>fd12:3456:789a::/48</code>:</p>
+    <div class="table-wrap"><table><thead><tr><th>/56</th></tr></thead><tbody><tr><td class=" m">fd12:3456:789a::/56</td></tr><tr><td class=" m">fd12:3456:789a:100::/56</td></tr><tr><td class=" m">fd12:3456:789a:200::/56</td></tr><tr><td class=" m">fd12:3456:789a:300::/56</td></tr><tr><td class=" m">fd12:3456:789a:400::/56</td></tr><tr><td class=" m">fd12:3456:789a:500::/56</td></tr><tr><td class=" m">fd12:3456:789a:600::/56</td></tr><tr><td class=" m">fd12:3456:789a:700::/56</td></tr></tbody></table></div>
+    <p>See the <a href="ipv6-subnetting.html">IPv6 subnetting guide</a> for nibbles, /127 links and ULA.</p>
+    <p class="pager"><a href="subnet-sizes.html">All sizes</a></p>
+    <div class="try"><p>Split a /48 into named, VLAN-tagged prefixes in the IPv6 planner.</p><a class="cta" href="../?tab=v6#192.168.0.0/24/1.0/eyJ2NiI6eyJwIjoiZmQxMjozNDU2Ojc4OWE6Oi80OCIsInQiOiIwIn19">Open the IPv6 planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

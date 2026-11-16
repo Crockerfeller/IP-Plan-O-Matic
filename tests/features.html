@@ -590,9 +590,29 @@ T.splitN = async () => {
 T.guidesTab = async () => {
   await load('../index.html#10.0.0.0/24');
   click('#tb-learn');
-  check('guides tab shows cards', !$('tab-learn').hidden && qa('#tab-learn .guide-grid a').length === 9, qa('#tab-learn .guide-grid a').length);
+  check('guides tab shows cards', !$('tab-learn').hidden && qa('#tab-learn .guide-grid a').length === 10 && qa('#tab-learn .guide-grid a').some((a) => a.href.endsWith('learn/subnet-sizes.html')), qa('#tab-learn .guide-grid a').length);
   const res = await Promise.all(qa('#tab-learn .guide-grid a').map((a) => fetch(a.href).then((r) => r.status)));
   check('every guide link resolves', res.every((s) => s === 200), res);
+  click('#tb-plan');
+  // Size pages: every link on the index resolves, and each page links back and forth.
+  const idx = await (await fetch('../learn/subnet-sizes.html')).text();
+  const pages = [...idx.matchAll(/<li><a href="([^"]+)"/g)].map((m) => m[1]);
+  check('size index lists /8 to /32 and IPv6 /48, /56, /64', pages.length === 28 && pages[0] === 'slash-8-subnet.html' && pages[24] === 'slash-32-subnet.html' && pages[27] === 'ipv6-slash-64.html', pages);
+  const st = await Promise.all(pages.map((pg) => fetch('../learn/' + pg).then((r) => r.status)));
+  check('every size page resolves', st.every((s) => s === 200), st);
+  const p26 = await (await fetch('../learn/slash-26-subnet.html')).text();
+  check('/26 page: mask, hosts, ranges, neighbours', p26.includes('255.255.255.192') && p26.includes('<td>Usable hosts</td><td>62 ') && p26.includes('192.168.1.193 – 192.168.1.254') && p26.includes('href="slash-25-subnet.html"') && p26.includes('href="slash-27-subnet.html"'));
+  const cheat = await (await fetch('../learn/cidr-cheat-sheet.html')).text();
+  check('cheat sheet links each prefix to its page', cheat.includes('<a href="slash-26-subnet.html">/26</a>') && !cheat.includes('slash-7-subnet'));
+  const sm = await (await fetch('../sitemap.xml')).text();
+  check('sitemap lists size pages', sm.includes('learn/slash-26-subnet.html') && sm.includes('learn/ipv6-slash-56.html') && sm.includes('learn/subnet-sizes.html'));
+};
+T.tabParam = async () => {
+  await load('../index.html?tab=v6#192.168.0.0/24/1.0/' + b64u({ v6: { p: 'fd12:3456:789a::/48', t: '0' } }));
+  check('?tab=v6 opens the IPv6 tab with the prefix', !$('tab-v6').hidden && $('v6Net').value === 'fd12:3456:789a::/48', $('v6Net').value);
+  check('?tab= dropped from the address bar', W.location.search === '' && W.location.hash.length > 1, W.location.href);
+  await load('../index.html?tab=bogus#10.0.0.0/24');
+  check('unknown ?tab= is ignored', !$('tab-plan').hidden || !$('tab-v6').hidden);
   click('#tb-plan');
 };
 // Data from links and imports can't add lines to router configs; small regressions found in review.

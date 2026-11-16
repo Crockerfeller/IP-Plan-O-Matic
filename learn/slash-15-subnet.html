@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/15 subnet: 255.254.0.0, 131,072 addresses, 131,070 usable hosts | IP Plan-O-Matic</title>
+<meta name="description" content="A /15 subnet has subnet mask 255.254.0.0, 131,072 addresses and 131,070 usable hosts. Wildcard, binary mask, example ranges, cloud usable addresses and how /15 splits and joins.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-15-subnet.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="/15 subnet (subnet mask 255.254.0.0)">
+<meta property="og:description" content="A /15 subnet has subnet mask 255.254.0.0, 131,072 addresses and 131,070 usable hosts. Wildcard, binary mask, example ranges, cloud usable addresses and how /15 splits and joins.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-15-subnet.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "/15 subnet (subnet mask 255.254.0.0)", "description": "A /15 subnet has subnet mask 255.254.0.0, 131,072 addresses and 131,070 usable hosts. Wildcard, binary mask, example ranges, cloud usable addresses and how /15 splits and joins.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-15-subnet.html", "dateModified": "2026-11-16", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "/15 subnet (subnet mask 255.254.0.0)", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/slash-15-subnet.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many hosts are in a /15?", "acceptedAnswer": {"@type": "Answer", "text": "A /15 has 131,072 addresses and 131,070 usable hosts. The network and broadcast addresses are not usable."}}, {"@type": "Question", "name": "What is the subnet mask for /15?", "acceptedAnswer": {"@type": "Answer", "text": "255.254.0.0. The wildcard mask is 0.1.255.255."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › /15 subnet (subnet mask 255.254.0.0)</nav>
+  <article>
+    <h1>/15 subnet (subnet mask 255.254.0.0)</h1>
+    <p class="lede">A /15 is 131,072 IPv4 addresses, with subnet mask <code>255.254.0.0</code> and 131,070 usable hosts.</p>
+    <div class="table-wrap"><table><tbody><tr><td>Subnet mask</td><td><span class="mono">255.254.0.0</span></td></tr><tr><td>Wildcard mask</td><td><span class="mono">0.1.255.255</span></td></tr><tr><td>Binary mask</td><td><span class="mono">11111111.11111110.00000000.00000000</span></td></tr><tr><td>Total addresses</td><td>131,072</td></tr><tr><td>Usable hosts</td><td>131,070 (minus network and broadcast)</td></tr><tr><td>/24s in a /15</td><td>512</td></tr></tbody></table></div>
+    <h2>What a /15 is used for</h2>
+    <p>Two /16s. 198.18.0.0/15 is reserved for network benchmarking.</p>
+    <h2>Where /15 subnets start</h2>
+    <p>The block size is 2 in the second octet: a /15 always starts at 0, 2, 4, 6, 8, 10, ….</p>
+    <p>Every /15 inside <code>10.0.0.0/8</code>. The first 16 of 128 are shown.</p>
+    <div class="table-wrap"><table><thead><tr><th>Subnet</th><th>Usable range</th><th>Broadcast</th></tr></thead><tbody><tr><td class=" m">10.0.0.0/15</td><td class=" m">10.0.0.1 – 10.1.255.254</td><td class=" m">10.1.255.255</td></tr><tr><td class=" m">10.2.0.0/15</td><td class=" m">10.2.0.1 – 10.3.255.254</td><td class=" m">10.3.255.255</td></tr><tr><td class=" m">10.4.0.0/15</td><td class=" m">10.4.0.1 – 10.5.255.254</td><td class=" m">10.5.255.255</td></tr><tr><td class=" m">10.6.0.0/15</td><td class=" m">10.6.0.1 – 10.7.255.254</td><td class=" m">10.7.255.255</td></tr><tr><td class=" m">10.8.0.0/15</td><td class=" m">10.8.0.1 – 10.9.255.254</td><td class=" m">10.9.255.255</td></tr><tr><td class=" m">10.10.0.0/15</td><td class=" m">10.10.0.1 – 10.11.255.254</td><td class=" m">10.11.255.255</td></tr><tr><td class=" m">10.12.0.0/15</td><td class=" m">10.12.0.1 – 10.13.255.254</td><td class=" m">10.13.255.255</td></tr><tr><td class=" m">10.14.0.0/15</td><td class=" m">10.14.0.1 – 10.15.255.254</td><td class=" m">10.15.255.255</td></tr><tr><td class=" m">10.16.0.0/15</td><td class=" m">10.16.0.1 – 10.17.255.254</td><td class=" m">10.17.255.255</td></tr><tr><td class=" m">10.18.0.0/15</td><td class=" m">10.18.0.1 – 10.19.255.254</td><td class=" m">10.19.255.255</td></tr><tr><td class=" m">10.20.0.0/15</td><td class=" m">10.20.0.1 – 10.21.255.254</td><td class=" m">10.21.255.255</td></tr><tr><td class=" m">10.22.0.0/15</td><td class=" m">10.22.0.1 – 10.23.255.254</td><td class=" m">10.23.255.255</td></tr><tr><td class=" m">10.24.0.0/15</td><td class=" m">10.24.0.1 – 10.25.255.254</td><td class=" m">10.25.255.255</td></tr><tr><td class=" m">10.26.0.0/15</td><td class=" m">10.26.0.1 – 10.27.255.254</td><td class=" m">10.27.255.255</td></tr><tr><td class=" m">10.28.0.0/15</td><td class=" m">10.28.0.1 – 10.29.255.254</td><td class=" m">10.29.255.255</td></tr><tr><td class=" m">10.30.0.0/15</td><td class=" m">10.30.0.1 – 10.31.255.254</td><td class=" m">10.31.255.255</td></tr></tbody></table></div>
+    <h2>Usable addresses in the cloud</h2>
+    <p>Clouds reserve more addresses than the network and broadcast: 5 in AWS and Azure, 4 in Google Cloud, 3 in Oracle Cloud.</p>
+    <div class="table-wrap"><table><thead><tr><th>Cloud</th><th class=n>Usable addresses</th><th></th></tr></thead><tbody><tr><td>AWS VPC</td><td class="n">—</td><td>larger than a VPC CIDR block can be</td></tr><tr><td>Azure VNet</td><td class="n">131,067</td><td></td></tr><tr><td>Google Cloud VPC</td><td class="n">131,068</td><td></td></tr><tr><td>Oracle Cloud VCN</td><td class="n">—</td><td>larger than a VPC CIDR block can be</td></tr></tbody></table></div>
+    <h2>Splitting and joining</h2>
+    <p>A /15 splits into 2 /16s, 4 /17s, 8 /18s. Two /15s that sit side by side, starting on a multiple of 262,144 addresses, join into one /14.</p>
+    <p class="pager"><a href="slash-14-subnet.html">← /14</a> · <a href="subnet-sizes.html">All sizes</a> · <a href="slash-16-subnet.html">/16 →</a></p>
+    <div class="try"><p>Open a /15 in the planner and divide it, name the subnets and export the result.</p><a class="cta" href="../#10.0.0.0/15">Open in the planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPv6 /64: 1 /64 subnet, what it’s for and how to split it | IP Plan-O-Matic</title>
+<meta name="description" content="An IPv6 /64 holds 1 /64 network. What a /64 is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.">
+<link rel="canonical" href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-64.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IP Plan-O-Matic">
+<meta property="og:title" content="IPv6 /64 prefix">
+<meta property="og:description" content="An IPv6 /64 holds 1 /64 network. What a /64 is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.">
+<meta property="og:url" content="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-64.html">
+<meta property="og:image" content="https://crockerfeller.github.io/IP-Plan-O-Matic/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="learn.css">
+<script>try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Article", "headline": "IPv6 /64 prefix", "description": "An IPv6 /64 holds 1 /64 network. What a /64 is used for, how to split it on nibble boundaries, its reverse DNS zone and an example.", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-64.html", "dateModified": "2026-11-16", "author": {"@type": "Organization", "name": "Huddacaster"}, "publisher": {"@type": "Organization", "name": "Huddacaster"}, "isPartOf": {"@type": "WebSite", "name": "IP Plan-O-Matic", "url": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "IP Plan-O-Matic", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/"}, {"@type": "ListItem", "position": 3, "name": "IPv6 /64 prefix", "item": "https://crockerfeller.github.io/IP-Plan-O-Matic/learn/ipv6-slash-64.html"}]}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How many /64 subnets are in an IPv6 /64?", "acceptedAnswer": {"@type": "Answer", "text": "1."}}]}]</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="19" height="42" rx="2.5" fill="var(--ink)"/><rect x="26" y="3" width="19" height="19" rx="2.5" fill="var(--brand)"/><rect x="26" y="26" width="9" height="19" rx="2.5" fill="var(--mid)"/><rect x="37" y="26" width="8" height="8.5" rx="2" fill="var(--brand)"/><rect x="37" y="36.5" width="8" height="8.5" rx="2" fill="var(--ink)"/></svg><span>IP Plan-O-Matic</span></a>
+    <a class="cta" href="../">Open the planner →</a>
+  </header>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="https://crockerfeller.github.io/IP-Plan-O-Matic/">IP Plan-O-Matic</a> › <a href="https://crockerfeller.github.io/IP-Plan-O-Matic/learn/">Guides</a> › IPv6 /64 prefix</nav>
+  <article>
+    <h1>IPv6 /64 prefix</h1>
+    <p class="lede">One LAN or VLAN. SLAAC needs exactly 64 bits for the interface ID, so every subnet with hosts is a /64.</p>
+    <div class="table-wrap"><table><tbody><tr><td>/64 networks inside</td><td>1</td></tr><tr><td>Total addresses</td><td>2<sup>64</sup> (18,446,744,073,709,551,616)</td></tr><tr><td>Example</td><td><span class="mono">2001:db8:abcd:12::/64</span></td></tr><tr><td>Reverse DNS zone</td><td><span class="mono">2.1.0.0.d.c.b.a.8.b.d.0.1.0.0.2.ip6.arpa</span></td></tr></tbody></table></div>
+    <p>See the <a href="ipv6-subnetting.html">IPv6 subnetting guide</a> for nibbles, /127 links and ULA.</p>
+    <p class="pager"><a href="subnet-sizes.html">All sizes</a></p>
+    <div class="try"><p>Split a /64 into named, VLAN-tagged prefixes in the IPv6 planner.</p><a class="cta" href="../?tab=v6#192.168.0.0/24/1.0/eyJ2NiI6eyJwIjoiMjAwMTpkYjg6YWJjZDoxMjo6LzY0IiwidCI6IjAifX0">Open the IPv6 planner →</a></div>
+
+  </article>
+  <footer>
+    <p><a href="./">All guides</a> · <a href="../">Subnet planner</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a></p>
+    <p>IP Plan-O-Matic is free, with no ads, no tracking and no sign-up. By Huddacaster, a subsidiary of Crockerfeller Industries © 2026.</p>
+  </footer>
+</div>
+</body>
+</html>
