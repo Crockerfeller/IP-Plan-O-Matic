@@ -20,7 +20,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 - **Route summarization:** collapse a list of IPv4 or IPv6 routes into the fewest blocks and find the covering supernet.
 - **Address info:** IPv4 and IPv6: RFC 1918, CGNAT, ULA, link-local, documentation, multicast and other special ranges, plus the in-addr.arpa or ip6.arpa reverse zone.
 - **IPv6 planner:** split prefixes by bit or nibble; give each prefix a name, VLAN, status and notes; auto-plan by count (e.g. `Sites, /56, 12`); generate a random ULA /48.
-- **Export:** Cisco IOS / IOS-XE, Arista EOS, Juniper Junos, MikroTik RouterOS, FortiGate, Palo Alto PAN-OS, pfSense / OPNsense, Terraform (AWS, Azure, GCP, OCI), Bicep, CloudFormation, an Azure CLI script for PowerShell, Ansible, NetBox and phpIPAM imports, Excel, CSV, JSON, Markdown and HTML tables, with optional DHCP pools and IPv6 interface addresses. Import JSON or CSV.
+- **Export:** Cisco IOS / IOS-XE, Arista EOS, Juniper Junos, MikroTik RouterOS, FortiGate, Palo Alto PAN-OS, pfSense / OPNsense, Terraform (AWS, Azure, GCP, OCI), Bicep, CloudFormation, an Azure CLI script for PowerShell, Ansible, NetBox and phpIPAM imports, Excel, CSV, JSON, Markdown and HTML tables, a PNG or SVG image of the address map and subnet table, with optional DHCP pools and IPv6 interface addresses. Import JSON or CSV.
 - **Save and share:** the whole plan is stored in a compact URL, so you can bookmark it or send it. You can also save named plans in your browser and export them all as a backup. Your working plan is kept automatically.
 - **Works offline:** installable as an app (PWA); after the first visit it runs without a connection.
 - Light and dark themes, works on phones, print-friendly.

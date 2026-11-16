@@ -512,6 +512,8 @@
   .map .mix > i { flex: var(--w) 1 0; min-width: 1px; border-radius: 2px; border: 0; background: var(--border); }
   .map .mix > i.used { background: var(--ok); }
   .map .mix > i.reserved { background: var(--hl-border); }
+  .ex-img { display: block; max-width: 100%; height: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+  .ex-img[hidden] { display: none; }
   .map .mix > i.vl { background: hsl(var(--h) var(--bar-s) 55%); }
   tbody tr.hl td.data { background: var(--hl); }
   tbody tr.clash td.data:first-child { box-shadow: inset 3px 0 0 var(--danger); }
@@ -1200,12 +1202,14 @@
             <option value="netbox-vlans">NetBox: VLANs (CSV import)</option>
             <option value="phpipam">phpIPAM: subnets (CSV import)</option>
             </optgroup>
-            <optgroup label="Spreadsheets and documents">
+            <optgroup label="Spreadsheets, documents and images">
             <option value="xlsx">Excel (.xlsx)</option>
             <option value="csv">CSV (all columns)</option>
             <option value="json">JSON (full plan, re-importable)</option>
             <option value="md">Markdown table (wikis, tickets, README)</option>
             <option value="html">HTML table (Confluence, email, docs)</option>
+            <option value="png">Image: PNG (address map and table)</option>
+            <option value="svg">Image: SVG (address map and table)</option>
             </optgroup>
           </select>
         </div>
@@ -1225,6 +1229,7 @@
       </div>
       <div class="msg" id="exMsg" style="margin-top:10px"></div>
       <textarea class="out" id="exOut" readonly spellcheck="false" style="margin-top:12px"></textarea>
+      <img class="ex-img" id="exImg" alt="Preview of the plan image" hidden>
     </div>
 
     <div class="card pad">
@@ -4985,8 +4990,126 @@
     },
   }, null, 2);
 
-  const EXT = { cisco: 'txt', arista: 'txt', junos: 'txt', mikrotik: 'rsc', fortigate: 'conf', panos: 'txt', pfsense: 'xml', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', ansible: 'yml', csv: 'csv', json: 'json', xlsx: 'xlsx', md: 'md', html: 'html', bicep: 'bicep', 'az-ps': 'ps1', 'cfn-aws': 'yaml', netbox: 'csv', 'netbox-vlans': 'csv', phpipam: 'csv' };
-  const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv' };
+  // ---------- The plan as an image: SVG drawn from the data, and a PNG made from the SVG ----------
+  // Light colors whatever the page theme, because the image goes into documents. System fonts only: an SVG drawn
+  // onto a canvas can't load web fonts.
+  const IMG = {
+    sans: "-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif", mono: "Menlo, Consolas, 'DejaVu Sans Mono', monospace",
+    text: '#161a22', muted: '#5d6573', border: '#e2e5eb', head: '#f3f6fa',
+    free: ['#f3f6fa', '#e2e5eb', '#d5dae2'], used: ['#e3f4ea', '#1d8a4e', '#1d8a4e'], reserved: ['#fff3cf', '#e8b931', '#e8b931'],
+  };
+  const IMG_MAX_ROWS = 600;   // table rows across the whole image; a CSV has the rest
+  const genPlanSvg = (list) => {
+    const W = 960, P = 24, w = W - 2 * P, out = [];
+    let y = P;
+    // Text that fits a width: an estimate from the font size, since an SVG string can't be measured here.
+    const fit = (s, px, fs, mono) => { s = String(s ?? ''); const n = Math.max(1, Math.floor(px / (fs * (mono ? 0.62 : 0.56)))); return s.length > n ? s.slice(0, Math.max(1, n - 1)) + '…' : s; };
+    const text = (x, yy, s, o = {}) => out.push(`<text x="${x}" y="${yy}" font-size="${o.fs || 12}"${o.mono ? ` font-family="${IMG.mono}"` : ''}${o.bold ? ' font-weight="600"' : ''} fill="${o.fill || IMG.text}"${o.anchor ? ` text-anchor="${o.anchor}"` : ''}>${esc(s)}</text>`);
+    const look = (r) => {
+      const m = getMeta(r.key);
+      if (mapMode === 'vlan') return m.v ? [`hsl(${vlanHue(m.v)} 72% 88%)`, `hsl(${vlanHue(m.v)} 72% 50%)`, `hsl(${vlanHue(m.v)} 72% 55%)`] : IMG.free;
+      return IMG[m.s] || IMG.free;
+    };
+    const all = allRows(), usedA = all.filter((r) => getMeta(r.key).s === 'used').reduce((s, r) => s + size(r.mask), 0);
+    const totalA = state.blocks.reduce((s, b) => s + size(b.mask), 0);
+    text(P, y + 22, state.blocks.length === 1 ? blockName(state.blocks[0]) : `${state.blocks.length} networks`, { fs: 22, bold: true });
+    text(W - P, y + 22, new Date().toISOString().slice(0, 10), { fs: 12, fill: IMG.muted, anchor: 'end' });
+    y += 34;
+    const one = state.blocks.length === 1;
+    text(P, y + 14, `${fmt(all.length)} subnet${all.length === 1 ? '' : 's'} · ${Math.round((100 * usedA) / totalA)}% of ${fmt(totalA)} addresses in use${one ? ' · ' + CLOUDS[state.blocks[0].cloud].label : ''}`, { fs: 13, fill: IMG.muted });
+    // Legend
+    let lx = P;
+    const legend = mapMode === 'vlan'
+      ? [...new Set(all.map((r) => getMeta(r.key).v).filter(Boolean))].sort((a, b) => a - b).slice(0, 12).map((v) => [`VLAN ${v}`, [`hsl(${vlanHue(v)} 72% 88%)`, `hsl(${vlanHue(v)} 72% 50%)`]]).concat([['No VLAN', IMG.free]])
+      : [['Free', IMG.free], ['In use', IMG.used], ['Reserved', IMG.reserved]];
+    y += 26;
+    for (const [label, c] of legend) {
+      out.push(`<rect x="${lx}" y="${y + 3}" width="12" height="12" rx="2" fill="${c[0]}" stroke="${c[1]}"/>`);
+      text(lx + 17, y + 13, label, { fs: 12, fill: IMG.muted });
+      lx += 30 + label.length * 7;
+    }
+    y += 28;
+    let rowsLeft = IMG_MAX_ROWS, cut = 0;
+    state.blocks.forEach((b, bi) => {
+      const leaves = collectLeaves(b);
+      if (!one) {   // with one network, the title above already names it
+        out.push(`<line x1="${P}" y1="${y}" x2="${W - P}" y2="${y}" stroke="${IMG.border}"/>`);
+        y += 24;
+        text(P, y, blockName(b), { fs: 16, bold: true });
+        text(W - P, y, `${CLOUDS[b.cloud].label} · ${fmt(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}`, { fs: 12, fill: IMG.muted, anchor: 'end' });
+        y += 12;
+      }
+      // Address map: the same grid as on the Plan tab.
+      const u = Math.min(b.mask + 8, 32), cells = size(b.mask) / size(u), cols = Math.min(16, cells), gap = 3;
+      const cw = (w - (cols - 1) * gap) / cols, nRows = Math.ceil(cells / cols), ch = nRows > 8 ? 16 : 26;   // a full 16-row map stays compact
+      text(P, y + 14, `Each square is a /${u}`, { fs: 11, fill: IMG.muted });
+      y += 22;
+      let i = 0;
+      while (i < leaves.length) {
+        const r = leaves[i], cell = Math.floor((r.addr - b.network) / size(u)), col = cell % cols, row = Math.floor(cell / cols);
+        const x = P + col * (cw + gap), yy = y + row * (ch + gap);
+        if (r.mask <= u) {
+          const k = size(r.mask) / size(u), sc = Math.min(k, cols), sr = Math.max(1, k / cols);
+          const rw = sc * (cw + gap) - gap, rh = sr * (ch + gap) - gap, c = look(r);
+          out.push(`<rect x="${x.toFixed(1)}" y="${yy}" width="${rw.toFixed(1)}" height="${rh}" rx="4" fill="${c[0]}" stroke="${c[1]}"/>`);
+          if (k >= 2) text((x + 6).toFixed(1), yy + (ch > 20 ? 17 : 12), fit(getMeta(r.key).n || `/${r.mask}`, rw - 10, 11), { fs: ch > 20 ? 11 : 10 });
+          i++;
+        } else {
+          const start = i, cellEnd = b.network + (cell + 1) * size(u);
+          while (i < leaves.length && leaves[i].addr < cellEnd) i++;
+          out.push(`<rect x="${x.toFixed(1)}" y="${yy}" width="${cw.toFixed(1)}" height="${ch}" rx="4" fill="#ffffff" stroke="${IMG.border}"/>`);
+          let sx = x + 1.5;
+          for (const s of leaves.slice(start, i)) {
+            const sw = Math.max(1, ((cw - 3) * size(s.mask)) / size(u) - 1);
+            out.push(`<rect x="${sx.toFixed(1)}" y="${yy + 1.5}" width="${sw.toFixed(1)}" height="${ch - 3}" rx="1.5" fill="${look(s)[2]}"/>`);
+            sx += sw + 1;
+          }
+        }
+      }
+      y += nRows * (ch + gap) + 14;
+      // Table: the subnets the Include setting picks for this network.
+      const items = list.filter((x) => x.bi === bi);
+      if (!items.length) return;
+      const C = [[0, 'Subnet', 150, true], [150, 'Name', 250], [400, 'VLAN', 60], [460, 'Usable range', 270, true], [730, 'Hosts', 90, false, 'end'], [820, 'Status', 92]];
+      out.push(`<rect x="${P}" y="${y}" width="${w}" height="24" fill="${IMG.head}"/>`);
+      for (const [cx, h, cwid, , anchor] of C) text(anchor ? P + cx + cwid - 8 : P + cx + 8, y + 16, h.toUpperCase(), { fs: 10.5, bold: true, fill: IMG.muted, anchor });
+      y += 24;
+      for (const x of items) {
+        if (rowsLeft <= 0) { cut++; continue; }
+        rowsLeft--;
+        const range = x.info.uF === null ? '' : x.info.uF === x.info.uL ? ntoa(x.info.uF) : `${ntoa(x.info.uF)} – ${ntoa(x.info.uL)}`;
+        const vals = [x.key, x.meta.n || '', x.meta.v || '', range, fmt(x.info.hosts), x.meta.s === 'used' ? 'In use' : x.meta.s === 'reserved' ? 'Reserved' : 'Free'];
+        C.forEach(([cx, , cwid, mono, anchor], ci) => text(anchor ? P + cx + cwid - 8 : P + cx + 8, y + 15, fit(vals[ci], cwid - 14, 12, mono), { fs: 12, mono, anchor }));
+        out.push(`<line x1="${P}" y1="${y + 22}" x2="${W - P}" y2="${y + 22}" stroke="${IMG.border}"/>`);
+        y += 22;
+      }
+      y += 10;
+    });
+    if (cut) { y += 6; text(P, y + 12, `…and ${fmt(cut)} more subnet${cut === 1 ? '' : 's'}. Export CSV or Excel for the full list.`, { fs: 12, fill: IMG.muted }); y += 20; }
+    y += 14;
+    text(P, y + 12, 'Made with IP Plan-O-Matic · crockerfeller.github.io/IP-Plan-O-Matic', { fs: 11, fill: IMG.muted });
+    y += 12 + P;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Math.ceil(y)}" viewBox="0 0 ${W} ${Math.ceil(y)}" font-family="${IMG.sans}">\n<rect width="100%" height="100%" fill="#ffffff"/>\n${out.join('\n')}\n</svg>\n`;
+  };
+  // PNG at twice the size for sharp text, smaller if that would make a canvas taller than browsers allow.
+  const svgToPng = (svg) => new Promise((res, rej) => {
+    const [, wS, hS] = /width="(\d+)" height="(\d+)"/.exec(svg);
+    const w = Number(wS), h = Number(hS), scale = Math.min(2, 16000 / h);
+    const img = new Image(), url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+      const g = c.getContext('2d');
+      g.scale(scale, scale); g.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      c.toBlob((b) => (b ? res(b) : rej(new Error('png'))), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('svg')); };
+    img.src = url;
+  });
+
+  const EXT = { cisco: 'txt', arista: 'txt', junos: 'txt', mikrotik: 'rsc', fortigate: 'conf', panos: 'txt', pfsense: 'xml', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', ansible: 'yml', csv: 'csv', json: 'json', xlsx: 'xlsx', md: 'md', html: 'html', bicep: 'bicep', 'az-ps': 'ps1', 'cfn-aws': 'yaml', netbox: 'csv', 'netbox-vlans': 'csv', phpipam: 'csv', png: 'png', svg: 'svg' };
+  const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv', svg: 'image/svg+xml' };
   const renderExport = () => {
     const f = $('exFmt').value;
     const whole = f === 'json' || f === 'csv' || f === 'xlsx';
@@ -4994,7 +5117,15 @@
     $('exDhcpL').hidden = !DHCP_FMTS.includes(f);
     clearMsg('exMsg');
     let text;
-    if (f === 'json') text = genJson();
+    const isImg = f === 'png' || f === 'svg';
+    $('exOut').hidden = isImg;
+    $('exImg').hidden = !isImg;
+    if (isImg) {
+      const { list } = exportList();
+      text = genPlanSvg(list);
+      $('exImg').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+      showMsg('exMsg', `The address map of every network, and a table of the subnets that Include picks. ${f === 'png' ? 'Copy puts the image on your clipboard for pasting into a ticket, chat or document.' : 'SVG stays sharp at any size, and opens in browsers, draw.io, Visio and Inkscape.'}`, 'info');
+    } else if (f === 'json') text = genJson();
     else if (f === 'csv') text = buildCsv(false).text;
     else if (f === 'xlsx') {
       // Preview as tab-separated text (Copy pastes straight into a spreadsheet); Download gives the .xlsx file.
@@ -5021,10 +5152,23 @@
     $('exOut').value = text;
   };
   for (const id of ['exFmt', 'exInc', 'exDhcp']) $(id).addEventListener('change', renderExport);
-  $('exCopy').addEventListener('click', async () => toast((await copyText($('exOut').value)) ? 'Copied' : 'Couldn’t copy'));
+  $('exCopy').addEventListener('click', async () => {
+    if ($('exFmt').value === 'png') {
+      // Copy the picture itself where the browser can; the promise keeps Safari's copy inside the click.
+      try {
+        if (!window.ClipboardItem || !navigator.clipboard.write) throw new Error('no image clipboard');
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': svgToPng($('exOut').value) })]);
+        toast('Copied the image');
+      } catch (e) { toast('This browser can’t copy images. Use Download instead.'); }
+      return;
+    }
+    toast((await copyText($('exOut').value)) ? 'Copied' : 'Couldn’t copy');
+  });
   $('exDl').addEventListener('click', () => {
     const f = $('exFmt').value;
     if (f === 'xlsx') { download('subnet-plan.xlsx', buildXlsx(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); return; }
+    if (f === 'png') { svgToPng($('exOut').value).then((b) => download('subnet-plan.png', b), () => toast('Couldn’t make the PNG. Try SVG instead.')); return; }
+    if (f === 'svg') { download('subnet-plan.svg', $('exOut').value, 'image/svg+xml'); return; }
     download(`subnet-plan-${f}.${EXT[f]}`, $('exOut').value, MIME[f] || 'text/plain');
   });
 

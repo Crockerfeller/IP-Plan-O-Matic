@@ -769,6 +769,50 @@ T.exports3 = async () => {
   check('downloads: file names', names.join(' ') === 'subnet-plan-az-ps.ps1 subnet-plan-bicep.bicep subnet-plan-cfn-aws.yaml subnet-plan-netbox.csv subnet-plan-phpipam.csv', names);
   click('#tb-plan');
 };
+T.planImage = async () => {
+  const svgOk = (t) => !new W.DOMParser().parseFromString(t, 'image/svg+xml').querySelector('parsererror');
+  await load('../index.html#10.0.0.0/24');
+  click('#tb-export');
+  $('imText').value = 'Subnet,Name,VLAN,Status\n10.0.0.0/26,"Users <script>alert(1)<\/script> & co",10,used\n10.0.0.64/26,Phones,20,reserved\n';
+  click('#imRun'); await sleep(100);
+  select('#exInc', 'planned'); select('#exFmt', 'svg');
+  let t = $('exOut').value;
+  check('image: preview instead of text', !$('exImg').hidden && $('exOut').hidden && $('exImg').src.startsWith('data:image/svg+xml'), [$('exImg').hidden, $('exOut').hidden]);
+  check('image: well-formed SVG with names escaped', svgOk(t) && !t.includes('<script') && t.includes('Users &lt;script&gt;alert(1)&lt;/script&gt; &amp; co'), t.slice(0, 600));
+  check('image: one network titled once, platform in summary', (t.match(/>10\.0\.0\.0\/24</g) || []).length === 1 && t.includes('addresses in use · Standard'), t.slice(0, 900));
+  check('image: table rows for the picked subnets, statuses', t.includes('>10.0.0.64/26<') && t.includes('>Reserved<') && t.includes('>In use<') && !t.includes('>10.0.0.128/25<'), t);
+  check('image: host counts right-aligned', /text-anchor="end">62</.test(t));
+  check('image: legend', t.includes('>Free<') && t.includes('>In use<') && t.includes('>Reserved<'));
+  // Downloads: SVG as text, PNG drawn from it.
+  const got = [];
+  const orig = W.URL.createObjectURL, origClick = W.HTMLAnchorElement.prototype.click;
+  // Record downloads (anchor clicks) without stopping the PNG step from making its own blob URL for the SVG.
+  W.URL.createObjectURL = (b) => { if (b.type !== 'image/svg+xml' || !got.length) got.push(b); return orig.call(W.URL, b); };
+  W.HTMLAnchorElement.prototype.click = function () { got.push(this.download); };
+  click('#exDl');
+  select('#exFmt', 'png'); click('#exDl');
+  for (let i = 0; i < 60 && got.length < 4; i++) await sleep(50);
+  W.URL.createObjectURL = orig; W.HTMLAnchorElement.prototype.click = origClick;
+  const png = got[2];
+  const sig = png ? [...new Uint8Array(await png.arrayBuffer()).slice(0, 4)] : [];
+  check('image: svg download', got[0] && got[0].type === 'image/svg+xml' && got[1] === 'subnet-plan.svg', got.slice(0, 2).map(String));
+  check('image: png download is a PNG', png && png.type === 'image/png' && got[3] === 'subnet-plan.png' && sig.join() === '137,80,78,71', [String(got[3]), sig]);
+  // VLAN colors follow the map's color setting.
+  click('#tb-plan'); select('#mapColor', 'vlan'); click('#tb-export'); select('#exFmt', 'svg');
+  t = $('exOut').value;
+  check('image: VLAN colors and legend', t.includes('>VLAN 10<') && t.includes('>No VLAN<') && /fill="hsl\(\d+ 72% 88%\)"/.test(t));
+  click('#tb-plan'); select('#mapColor', 'status');
+  // Back to a text format: the text box returns.
+  click('#tb-export'); select('#exFmt', 'cisco');
+  check('image: text formats show text again', !$('exOut').hidden && $('exImg').hidden);
+  // Big plans: the table stops at 600 rows and says so; the map still shows everything.
+  await load('../index.html#10.0.0.0/16');
+  select('#splitAllSel', '26'); click('#splitAllBtn'); await sleep(100);
+  click('#tb-export'); select('#exInc', 'all'); select('#exFmt', 'svg');
+  t = $('exOut').value;
+  check('image: long tables cut at 600 rows with a note', svgOk(t) && t.includes('…and 424 more subnets. Export CSV or Excel for the full list.') && Number(/height="(\d+)"/.exec(t)[1]) < 16000, /height="(\d+)"/.exec(t)[1]);
+  click('#tb-plan');
+};
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azLayout', 'hub');
