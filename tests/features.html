@@ -813,6 +813,71 @@ T.planImage = async () => {
   check('image: long tables cut at 600 rows with a note', svgOk(t) && t.includes('…and 424 more subnets. Export CSV or Excel for the full list.') && Number(/height="(\d+)"/.exec(t)[1]) < 16000, /height="(\d+)"/.exec(t)[1]);
   click('#tb-plan');
 };
+T.cloudImport = async () => {
+  const imp = async (text) => { click('#tb-export'); $('imText').value = text; click('#imRun'); await sleep(80); const m = $('imMsg').textContent; click('#tb-plan'); return m; };
+  const json = (o) => JSON.stringify(o, null, 2);
+  // AWS: describe-vpcs then describe-subnets, pasted together, with the extra fields the CLI prints.
+  const vpcs = { Vpcs: [{ CidrBlock: '10.0.0.0/16', DhcpOptionsId: 'dopt-1', State: 'available', VpcId: 'vpc-0abc', OwnerId: '1', InstanceTenancy: 'default', IsDefault: false,
+    CidrBlockAssociationSet: [{ AssociationId: 'a1', CidrBlock: '10.0.0.0/16', CidrBlockState: { State: 'associated' } }, { AssociationId: 'a2', CidrBlock: '10.1.0.0/20', CidrBlockState: { State: 'associated' } }, { AssociationId: 'a3', CidrBlock: '10.9.0.0/20', CidrBlockState: { State: 'disassociated' } }],
+    Tags: [{ Key: 'Name', Value: 'prod' }] }] };
+  const subs = { Subnets: [
+    { AvailabilityZone: 'us-east-1a', CidrBlock: '10.0.0.0/20', SubnetId: 'subnet-0a1', VpcId: 'vpc-0abc', State: 'available', AvailableIpAddressCount: 4091, Tags: [{ Key: 'Name', Value: 'app-a' }] },
+    { AvailabilityZone: 'us-east-1b', CidrBlock: '10.0.16.0/20', SubnetId: 'subnet-0b2', VpcId: 'vpc-0abc', State: 'available' },
+    { AvailabilityZone: 'us-east-1a', CidrBlock: '10.1.0.0/24', SubnetId: 'subnet-0c3', VpcId: 'vpc-0abc', State: 'available', Tags: [{ Key: 'Name', Value: 'tgw' }] },
+  ] };
+  await load('../index.html#192.168.0.0/24');
+  let m = await imp(json(vpcs) + '\n' + json(subs));
+  check('aws: vpc ranges become base networks', chipsB().length === 2 && chipsB()[0].dataset.cidr === '10.0.0.0/16' && chipsB()[1].dataset.cidr === '10.1.0.0/20' && $('platform').value === 'aws', $('blocks').textContent);
+  check('aws: message', m.includes('Imported 3 subnets from AWS, marked in use') && m.includes('prod (1)'), m);
+  let rows = snap().rows;
+  check('aws: names, zones, ids, in use', rows.some((r) => r.startsWith('10.0.0.0/20') && r.includes('[app-a]') && r.includes('[used]')) && rows.some((r) => r.startsWith('10.0.16.0/20') && r.includes('[used]')), rows);
+  click('#tb-export'); select('#exInc', 'used'); select('#exFmt', 'csv');
+  const csv = $('exOut').value;
+  check('aws: zone and subnet id kept', csv.includes('"us-east-1b"') && csv.includes('subnet-0b2 · vpc-0abc'), csv.slice(0, 600));
+  click('#tb-plan');
+  // Subnets only: the VPC range is guessed from them, and the message says so.
+  await load('../index.html#192.168.0.0/24');
+  m = await imp(json(subs.Subnets));
+  check('aws subnets only: covering block, explained', chipsB().length <= 1 && $('network').value === '10.0.0.0' && $('mask').value === '15' && m.includes('wasn’t in the paste') && m.includes('describe-vpcs'), [m, $('network').value, $('mask').value]);
+  // Azure: az network vnet list, with addressPrefix and addressPrefixes subnets.
+  const vnets = [
+    { addressSpace: { addressPrefixes: ['10.20.0.0/23'] }, id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet-hub', location: 'eastus', name: 'vnet-hub', type: 'Microsoft.Network/virtualNetworks',
+      subnets: [{ addressPrefix: '10.20.0.0/26', name: 'AzureFirewallSubnet', delegations: [] }, { addressPrefix: '10.20.0.128/27', name: 'GatewaySubnet' }] },
+    { addressSpace: { addressPrefixes: ['10.21.0.0/20'] }, id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet-app', location: 'eastus', name: 'vnet-app',
+      subnets: [{ addressPrefixes: ['10.21.0.0/24'], name: 'snet-web', delegations: [{ serviceName: 'Microsoft.Web/serverFarms' }] }] },
+  ];
+  await load('../index.html#192.168.0.0/24');
+  m = await imp(json(vnets));
+  check('azure: vnets and subnets', chipsB().length === 2 && chipsB()[0].dataset.cidr === '10.20.0.0/23' && $('blockLabel').value === 'vnet-hub' && $('platform').value === 'azure' && m.includes('from Azure') && m.includes('vnet-app 10.21.0.0/20'), [m, $('blocks').textContent]);
+  rows = snap().rows;
+  check('azure: service subnets recognised', rows.some((r) => r.includes('[AzureFirewallSubnet]')) && !/must be|exact name/.test($('warnings').textContent), [rows, $('warnings').textContent]);
+  // Google Cloud: subnets with secondary ranges; VPCs have no range of their own.
+  const gsubs = [
+    { ipCidrRange: '10.128.0.0/20', name: 'app', network: 'https://www.googleapis.com/compute/v1/projects/p/global/networks/vpc-main', region: 'https://www.googleapis.com/compute/v1/projects/p/regions/us-central1', kind: 'compute#subnetwork',
+      secondaryIpRanges: [{ ipCidrRange: '10.130.0.0/16', rangeName: 'gke-pods' }] },
+    { ipCidrRange: '10.128.16.0/20', name: 'db', network: 'https://www.googleapis.com/compute/v1/projects/p/global/networks/vpc-main', region: 'https://www.googleapis.com/compute/v1/projects/p/regions/europe-west1' },
+  ];
+  await load('../index.html#192.168.0.0/24');
+  m = await imp(json(gsubs));
+  rows = snap().rows;
+  check('gcp: one covering block, platform, secondary range', $('platform').value === 'gcp' && $('network').value === '10.128.0.0' && $('mask').value === '14' && rows.some((r) => r.startsWith('10.130.0.0/16') && r.includes('[app-gke-pods]')) && m.includes('from Google Cloud'), [m, rows]);
+  // Oracle Cloud: vcn list and subnet list.
+  const ovcn = { data: [{ 'cidr-block': '172.16.0.0/16', 'cidr-blocks': ['172.16.0.0/16'], 'display-name': 'vcn-prod', id: 'ocid1.vcn.oc1.iad.aaa', 'lifecycle-state': 'AVAILABLE' }] };
+  const osub = { data: [{ 'cidr-block': '172.16.1.0/24', 'display-name': 'public', 'vcn-id': 'ocid1.vcn.oc1.iad.aaa', 'availability-domain': null, id: 'ocid1.subnet.oc1.iad.bbb' }] };
+  await load('../index.html#192.168.0.0/24');
+  m = await imp(json(ovcn) + json(osub));
+  check('oci: vcn and subnet', $('platform').value === 'oci' && $('network').value === '172.16.0.0' && $('mask').value === '16' && snap().rows.some((r) => r.startsWith('172.16.1.0/24') && r.includes('[public]')) && !m.includes('wasn’t in the paste'), [m, snap().rows]);
+  // Not a cloud list, and broken JSON: clear errors, plan untouched.
+  m = await imp('[{"foo": 1}]');
+  check('unknown JSON list: clear error', m.includes('isn’t a plan from here or a network list') && $('network').value === '172.16.0.0', m);
+  m = await imp('{"Subnets": [');
+  check('broken JSON: clear error', m.includes('couldn’t be read'), m);
+  // The plan's own JSON still imports.
+  click('#tb-export'); select('#exFmt', 'json'); const own = $('exOut').value; click('#tb-plan');
+  await load('../index.html#192.168.0.0/24');
+  m = await imp(own);
+  check('own JSON still imports', $('network').value === '172.16.0.0' && snap().rows.some((r) => r.includes('[public]')) && !m.includes('from '), m);
+};
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azLayout', 'hub');

@@ -514,6 +514,13 @@
   .map .mix > i.reserved { background: var(--hl-border); }
   .ex-img { display: block; max-width: 100%; height: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
   .ex-img[hidden] { display: none; }
+  .im-cloud { margin: 4px 0 8px; font-size: 13px; }
+  .im-cloud summary { cursor: pointer; color: var(--accent); }
+  .im-cloud dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; margin: 8px 0 0; }
+  .im-cloud dt { font-weight: 600; }
+  .im-cloud .muted { color: var(--muted); }
+  .im-cloud dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .im-cloud code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; background: var(--row-hover); padding: 1px 4px; border-radius: 4px; }
   .map .mix > i.vl { background: hsl(var(--h) var(--bar-s) 55%); }
   tbody tr.hl td.data { background: var(--hl); }
   tbody tr.clash td.data:first-child { box-shadow: inset 3px 0 0 var(--danger); }
@@ -1234,7 +1241,17 @@
 
     <div class="card pad">
       <h2>Import</h2>
-      <p class="sub">Load a JSON file exported from here, or a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes). Importing replaces the current IPv4 plan.</p>
+      <p class="sub">Load a JSON file exported from here, a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes), or the networks you already have in the cloud. Importing replaces the current IPv4 plan.</p>
+      <details class="im-cloud">
+        <summary>Import from AWS, Azure, Google Cloud or Oracle Cloud</summary>
+        <p>Run one of these and paste the output below (or save it to a file and load that). Nothing is sent anywhere: the import happens in this page.</p>
+        <dl>
+          <dt>AWS</dt><dd><code>aws ec2 describe-vpcs; aws ec2 describe-subnets</code> <span class="muted">(both, for the VPC ranges)</span></dd>
+          <dt>Azure</dt><dd><code>az network vnet list</code> <span class="muted">(add <span class="mono">-g &lt;group&gt;</span> for one resource group)</span></dd>
+          <dt>Google Cloud</dt><dd><code>gcloud compute networks subnets list --format=json</code></dd>
+          <dt>Oracle Cloud</dt><dd><code>oci network vcn list -c &lt;compartment&gt;; oci network subnet list -c &lt;compartment&gt;</code></dd>
+        </dl>
+      </details>
       <div class="row">
         <input type="file" id="imFile" accept=".json,.csv,.txt,application/json,text/csv">
       </div>
@@ -5180,14 +5197,116 @@
     const hit = SVCS.find((x) => x.label.toLowerCase() === t.toLowerCase());
     return hit ? hit.id : '';
   };
+  // ---------- Import from the clouds: the JSON their command-line tools print ----------
+  // One paste can hold several JSON documents (AWS VPCs, then subnets): split them at the top level.
+  const jsonDocs = (text) => {
+    const docs = [];
+    let depth = 0, start = -1, inStr = false, escp = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inStr) { if (escp) escp = false; else if (ch === '\\') escp = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true;
+      else if (ch === '{' || ch === '[') { if (depth++ === 0) start = i; }
+      else if (ch === '}' || ch === ']') { if (--depth === 0) docs.push(JSON.parse(text.slice(start, i + 1))); if (depth < 0) throw new Error('bad'); }
+      else if (depth === 0 && !/\s/.test(ch)) throw new Error('bad');
+    }
+    if (depth) throw new Error('bad');
+    return docs;
+  };
+  const lastSeg = (s) => String(s || '').split('/').filter(Boolean).pop() || '';
+  // Returns { defs, entries, source, guessed } or null when the JSON isn't from a cloud CLI.
+  const cloudJson = (docs) => {
+    const nets = new Map();   // network id → { cloud, label, cidrs: [] }
+    const entries = [];
+    let source = '';
+    const net = (id, cloud, label) => { if (!nets.has(id)) nets.set(id, { cloud, label: '', cidrs: [] }); const n = nets.get(id); if (label && !n.label) n.label = label; return n; };
+    const sub = (cidr, f) => { const c = parseCidr(String(cidr || '')); if (c && c.addr === netAddr(c.addr, c.mask)) entries.push({ ...c, s: 'used', ...f }); };
+    const items = (d) => (Array.isArray(d) ? d : d && typeof d === 'object' ? [d] : []);
+    for (const doc of docs) {
+      // AWS: aws ec2 describe-vpcs / describe-subnets (whole output, or just the list)
+      const vpcs = doc && doc.Vpcs ? doc.Vpcs : items(doc).filter((x) => x && x.VpcId && x.CidrBlock && !x.SubnetId);
+      const awsSubs = doc && doc.Subnets ? doc.Subnets : items(doc).filter((x) => x && x.SubnetId && x.CidrBlock);
+      const awsName = (x) => ((x.Tags || []).find((t) => t.Key === 'Name') || {}).Value || '';
+      for (const v of vpcs) {
+        source = 'AWS';
+        const n = net(v.VpcId, 'aws', awsName(v) || v.VpcId);
+        const extra = (v.CidrBlockAssociationSet || []).filter((a) => !a.CidrBlockState || a.CidrBlockState.State === 'associated').map((a) => a.CidrBlock);
+        for (const c of [v.CidrBlock, ...extra]) if (c && !n.cidrs.includes(c)) n.cidrs.push(c);
+      }
+      for (const s of awsSubs) {
+        source = 'AWS';
+        net(s.VpcId, 'aws');
+        sub(s.CidrBlock, { n: awsName(s), z: s.AvailabilityZone, o: [s.SubnetId, s.VpcId].filter(Boolean).join(' · '), net: s.VpcId });
+      }
+      // Azure: az network vnet list / show (subnets included), or az network vnet subnet list
+      for (const v of items(doc).filter((x) => x && x.addressSpace && Array.isArray(x.addressSpace.addressPrefixes))) {
+        source = 'Azure';
+        const id = v.id || v.name, n = net(id, 'azure', v.name);
+        for (const c of v.addressSpace.addressPrefixes) if (!n.cidrs.includes(c)) n.cidrs.push(c);
+        for (const s of v.subnets || []) for (const c of s.addressPrefixes || [s.addressPrefix]) sub(c, { n: s.name, z: '', o: v.location ? `${v.name} · ${v.location}` : v.name, net: id });
+      }
+      for (const s of items(doc).filter((x) => x && !x.addressSpace && (x.addressPrefix || x.addressPrefixes) && /\/virtualNetworks\//i.test(x.id || ''))) {
+        source = 'Azure';
+        const vn = /\/virtualNetworks\/([^/]+)/i.exec(s.id)[1], id = s.id.replace(/\/subnets\/.*$/i, '');
+        net(id, 'azure', vn);
+        for (const c of s.addressPrefixes || [s.addressPrefix]) sub(c, { n: s.name, o: vn, net: id });
+      }
+      // Google Cloud: gcloud compute networks subnets list --format=json (secondary ranges too, e.g. GKE pods)
+      for (const s of items(doc).filter((x) => x && x.ipCidrRange && x.network)) {
+        source = 'Google Cloud';
+        const id = s.network;
+        net(id, 'gcp', lastSeg(s.network));
+        sub(s.ipCidrRange, { n: s.name, z: lastSeg(s.region), o: lastSeg(s.network), net: id });
+        for (const r of s.secondaryIpRanges || []) sub(r.ipCidrRange, { n: `${s.name}-${r.rangeName}`, z: lastSeg(s.region), o: `Secondary range of ${s.name}`, net: id });
+      }
+      // Oracle Cloud: oci network vcn list / subnet list ({"data": [...]})
+      for (const x of items(doc && doc.data ? doc.data : [])) {
+        if (x['vcn-id'] && x['cidr-block']) {
+          source = 'Oracle Cloud';
+          net(x['vcn-id'], 'oci');
+          sub(x['cidr-block'], { n: x['display-name'], z: x['availability-domain'] || '', o: x['display-name'] ? '' : x.id, net: x['vcn-id'] });
+        } else if (x.id && /ocid1\.vcn\./.test(x.id)) {
+          source = 'Oracle Cloud';
+          const n = net(x.id, 'oci', x['display-name']);
+          for (const c of x['cidr-blocks'] || [x['cidr-block']]) if (c && !n.cidrs.includes(c)) n.cidrs.push(c);
+        }
+      }
+    }
+    if (!source) return null;
+    // A network whose address space wasn't in the paste (subnets only, or Google Cloud, whose VPCs have none) gets
+    // the smallest block that covers its subnets.
+    const defs = [];
+    let guessed = 0;
+    for (const [id, n] of nets) {
+      let cidrs = n.cidrs.map((c) => parseCidr(c)).filter(Boolean);
+      if (!cidrs.length) {
+        const mine = entries.filter((e) => e.net === id);
+        if (!mine.length) continue;
+        cidrs = [supernet(mine)];
+        guessed++;
+      }
+      cidrs.forEach((c, i) => defs.push({ c: { addr: c.addr, mask: c.mask }, tree: null, cloud: n.cloud, label: String((n.label || '') + (cidrs.length > 1 ? ` (${i + 1})` : '')).slice(0, 40) }));
+    }
+    defs.sort((a, b) => a.c.addr - b.c.addr || a.c.mask - b.c.mask);
+    return { defs, entries, source, guessed };
+  };
   const importText = (text) => {
     text = String(text || '').replace(/^﻿/, '').trim();
     if (!text) throw new Error('Nothing to import.');
-    let base = null, tree = null, set = null, v6data = null, defs = null, peering = null;
+    let base = null, tree = null, set = null, v6data = null, defs = null, peering = null, cloud = null;
     const entries = [];
-    if (text[0] === '{') {
-      let j;
-      try { j = JSON.parse(text); } catch (e) { throw new Error('That JSON couldn’t be read.'); }
+    if (text[0] === '{' || text[0] === '[') {
+      let docs;
+      try { docs = jsonDocs(text); } catch (e) { throw new Error('That JSON couldn’t be read.'); }
+      cloud = cloudJson(docs);
+      if (!cloud && (docs.length !== 1 || Array.isArray(docs[0]))) throw new Error('That JSON isn’t a plan from here or a network list from AWS, Azure, Google Cloud or Oracle Cloud.');
+    }
+    if (cloud) {
+      entries.push(...cloud.entries);
+      defs = cloud.defs;
+      if (!defs.length) throw new Error(`No networks found in the ${cloud.source} output.`);
+    } else if (text[0] === '{') {
+      const j = jsonDocs(text)[0];
       if (j.base) base = parseCidr(j.base);
       if (j.platform && CLOUDS[j.platform]) set = { cloud: j.platform, gw: j.gateway === 'last' ? 'last' : 'first' };
       for (const s of j.subnets || []) {
@@ -5263,15 +5382,17 @@
     syncControls();
     update();
     renderV6();
-    return { count: inside.length, skipped };
+    return { count: inside.length, skipped, cloud };
   };
   const doImport = (text) => {
     clearMsg('imMsg');
     if ((state.blocks.length > 1 || state.root.c || Object.keys(state.meta).length) && !confirm('Importing replaces the current IPv4 plan. Continue?')) return;
     checkpoint();
     try {
-      const { count, skipped } = importText(text);
-      showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'} into ${state.blocks.map(blockCidr).join(', ')}${skipped ? `. Skipped ${skipped} that didn’t fit the base network` : ''}.`, 'ok');
+      const { count, skipped, cloud } = importText(text);
+      const where = state.blocks.map(blockName).join(', ');
+      const guess = cloud && cloud.guessed ? ` ${cloud.guessed === 1 ? 'One network’s' : `${cloud.guessed} networks’`} address space wasn’t in the paste, so ${cloud.guessed === 1 ? 'it is' : 'they are'} the smallest block covering ${cloud.guessed === 1 ? 'its' : 'their'} subnets.${cloud.source === 'AWS' ? ' Paste the describe-vpcs output too for the real VPC ranges.' : ''}` : '';
+      showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'}${cloud ? ` from ${cloud.source}, marked in use,` : ''} into ${where}${skipped ? `. Skipped ${skipped} that didn’t fit a base network (overlapping networks keep the first)` : ''}.${guess}`, 'ok');
       renderExport();
     } catch (e) {
       showMsg('imMsg', e.message, 'error');
