@@ -878,6 +878,70 @@ T.cloudImport = async () => {
   m = await imp(own);
   check('own JSON still imports', $('network').value === '172.16.0.0' && snap().rows.some((r) => r.includes('[public]')) && !m.includes('from '), m);
 };
+T.comparePlans = async () => {
+  const setRow = async (cidr, name, vlan, status) => {
+    const tr = qa('#body tr').find((r) => r.textContent.includes(cidr) || r.querySelector('td') && r.querySelector('td').textContent.startsWith(cidr));
+    const inp = tr.querySelector('input');
+    if (name != null) { inp.value = name; inp.dispatchEvent(new W.Event('input', { bubbles: true })); }
+    if (vlan != null) { const v = tr.querySelector('input.vlan'); v.value = vlan; v.dispatchEvent(new W.Event('input', { bubbles: true })); }
+    if (status != null) { const s = tr.querySelector('select.status'); s.value = status; s.dispatchEvent(new W.Event('change', { bubbles: true })); }
+    await sleep(20);
+  };
+  const cmp = async (text) => { click('#tb-tools'); $('cmpIn').value = text; click('#cmpRun'); await sleep(150); return [$('cmpOut').textContent, qa('#cmpOut tbody tr').map((r) => [...r.cells].map((c) => c.textContent))]; };
+  // Before: a /24 split in two, named.
+  await load('../index.html#10.0.0.0/24');
+  divideRow(0); await sleep(20);
+  await setRow('10.0.0.0/25', 'Users', '10', 'used');
+  await setRow('10.0.0.128/25', 'Servers', '20', 'used');
+  await W.eval('Promise.resolve()'); await sleep(400);
+  const before = W.location.href;
+  // After: Users renamed and moved to VLAN 11, Servers split into two /26s (one named), and a second network.
+  await setRow('10.0.0.0/25', 'Staff', '11', null);
+  divideRow(1); await sleep(20);
+  await setRow('10.0.0.128/26', 'Servers', '20', 'used');
+  addBox('172.16.0.0/24 Lab'); await sleep(50);
+  const afterRows = snap().rows;
+  let [txt, rows] = await cmp(before);
+  check('compare: summary', txt.includes('From the pasted link to the current plan: 1 network change, 1 changed, 1 split'), txt.slice(0, 200));
+  check('compare: renamed and re-VLANned', rows.some((r) => r[0] === 'Changed' && r[1] === '10.0.0.0/25' && r[2] === 'name: Users; VLAN: 10' && r[3] === 'name: Staff; VLAN: 11'), rows);
+  check('compare: split', rows.some((r) => r[0] === 'Split' && r[1] === '10.0.0.128/25' && r[3] === '10.0.0.128/26 (Servers), 10.0.0.192/26'), rows);
+  check('compare: network added', rows.some((r) => r[0] === 'Network added' && r[1].startsWith('172.16.0.0/')), rows);
+  check('compare: current plan untouched', JSON.stringify(snap().rows) === JSON.stringify(afterRows) && chipsB().length === 2, snap().rows);
+  // Free space only shows when asked.
+  $('cmpAll').click(); await sleep(150);
+  check('compare: free subnets on request', qa('#cmpOut tbody tr').length > rows.length, qa('#cmpOut tbody tr').length);
+  $('cmpAll').click(); await sleep(150);
+  // Markdown for a ticket.
+  let copied = ''; W.navigator.clipboard.writeText = async (t) => { copied = t; };
+  click('#cmpCopy'); await sleep(50);
+  check('compare: copy as Markdown', copied.startsWith('Changes from the pasted link to the current plan:') && copied.includes('| Changed | 10.0.0.0/25 | name: Users; VLAN: 10 | name: Staff; VLAN: 11 |'), copied);
+  // The other way round: joined, removed.
+  click('#tb-plan');
+  await W.eval('Promise.resolve()'); await sleep(400);
+  const after = W.location.href;
+  await load(before);
+  [txt, rows] = await cmp(after);
+  check('compare: joined and network removed', rows.some((r) => r[0] === 'Joined' && r[1] === '10.0.0.128/25' && r[2].startsWith('10.0.0.128/26 (Servers)')) && rows.some((r) => r[0] === 'Network removed'), rows);
+  // Saved plans are in the list.
+  const plans = [{ id: 'x', name: 'Before change', hash: before.split('#')[1], t: Date.now() }];
+  W.localStorage.setItem('subnetPlanner.plans', JSON.stringify(plans));
+  click('#tb-plan'); click('#tb-tools');
+  check('compare: saved plans listed', qa('#cmpSaved option').some((o) => o.textContent === 'Before change'));
+  select('#cmpSaved', '0'); await sleep(150);
+  check('compare: identical saved plan', $('cmpOut').textContent.includes('From saved plan “Before change” to the current plan: no differences'), $('cmpOut').textContent);
+  W.localStorage.removeItem('subnetPlanner.plans');
+  // Against what's deployed: a cloud's network list.
+  await load('../index.html#10.20.0.0/23');
+  select('#platform', 'azure');
+  addBox('10.20.0.0/26 AzureFirewallSubnet'); await sleep(50);
+  const azure = JSON.stringify([{ addressSpace: { addressPrefixes: ['10.20.0.0/23'] }, name: 'vnet-hub', id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet-hub', subnets: [{ addressPrefix: '10.20.0.0/26', name: 'AzureFirewallSubnet' }, { addressPrefix: '10.20.1.0/24', name: 'snet-extra' }] }]);
+  [txt, rows] = await cmp(azure);
+  check('compare: plan vs deployed', txt.includes('From the pasted JSON') && rows.some((r) => r[1] === '10.20.1.0/24' && r[2].includes('snet-extra')) && snap().rows.length === qa('#body tr').length && $('network').value === '10.20.0.0', rows);
+  // Errors.
+  [txt] = await cmp('not a plan');
+  check('compare: bad input', txt.includes('isn’t a plan link'), txt);
+  click('#tb-plan');
+};
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azLayout', 'hub');

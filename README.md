@@ -17,6 +17,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 - **VLSM auto-planner:** list networks with host counts (plus optional VLAN and growth headroom). Each one is placed best-fit, largest first. Replace the plan, or fill only the free space around the subnets you already have. Add availability zones to repeat every tier in each AZ.
 - **Cloud-aware:** AWS VPC, Azure VNet, Google Cloud VPC and Oracle Cloud (OCI) VCN reserved addresses and minimum subnet sizes.
 - **Overlap checker:** test your IPv4 and IPv6 plans against existing networks, VPN peers and VPCs.
+- **Compare plans:** see what changed between a saved plan, a plan link or a cloud's network list and the current plan (subnets added, removed, split or joined, and names, VLANs or statuses changed), and copy it as Markdown for a change review.
 - **Route summarization:** collapse a list of IPv4 or IPv6 routes into the fewest blocks and find the covering supernet.
 - **Address info:** IPv4 and IPv6: RFC 1918, CGNAT, ULA, link-local, documentation, multicast and other special ranges, plus the in-addr.arpa or ip6.arpa reverse zone.
 - **IPv6 planner:** split prefixes by bit or nibble; give each prefix a name, VLAN, status and notes; auto-plan by count (e.g. `Sites, /56, 12`); generate a random ULA /48.
