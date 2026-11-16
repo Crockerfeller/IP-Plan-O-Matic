@@ -9,6 +9,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 ## Features
 
 - **Visual IPv4 subnetting:** divide and join subnets; see network, broadcast, usable range, gateway, netmask, wildcard, binary and host count.
+- **IP assignments:** click a subnet's host count to assign single addresses (servers, printers, firewalls) with a name, MAC and notes, see the platform's reserved addresses, and track how full each subnet is. Paste several at once or import a CSV of addresses; export them as CSV, JSON or a sheet in the Excel file.
 - **Address map:** the base network as a grid of squares, colored by status or VLAN. Click a subnet to jump to its row.
 - **Several base networks in one plan:** HQ, branches and cloud VPCs side by side, each with its own platform rules. Overlapping base networks are refused.
 - **Add by CIDR:** type `10.0.5.0/24 Servers` to carve out an exact subnet, or a range outside the plan to add a new base network.

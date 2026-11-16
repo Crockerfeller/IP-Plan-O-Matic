@@ -942,6 +942,87 @@ T.comparePlans = async () => {
   check('compare: bad input', txt.includes('isn’t a plan link'), txt);
   click('#tb-plan');
 };
+T.ipAssign = async () => {
+  const hostsBtn = (i) => qa('#body tr')[i].querySelector('.hosts-btn');
+  const dlgRows = () => qa('#hostsBody tr').map((r) => [r.cells[0].textContent, r.classList.contains('sys') ? r.cells[1].textContent : r.cells[1].querySelector('input').value]);
+  const assign = async (ip, name, mac = '', note = '') => {
+    if (ip != null) $('hAddIp').value = ip;
+    $('hAddName').value = name; $('hAddMac').value = mac; $('hAddNote').value = note;
+    $('hostsAdd').requestSubmit(); await sleep(30);
+  };
+  await load('../index.html#10.0.0.0/24');
+  divideRow(0); await sleep(20);
+  check('hosts: cell shows usable hosts until something is assigned', hostsBtn(0).textContent === '126' && !hostsBtn(0).classList.contains('has'));
+  hostsBtn(0).click(); await sleep(30);
+  check('hosts: dialog opens on the subnet', $('hostsDlg').open && $('hostsTtl').textContent === 'IP addresses in 10.0.0.0/25' && $('hAddIp').value === '10.0.0.2', [$('hostsTtl').textContent, $('hAddIp').value]);
+  check('hosts: network, gateway and broadcast listed', JSON.stringify(dlgRows()) === JSON.stringify([['10.0.0.0', 'The network ID'], ['10.0.0.1', 'Gateway (the router’s address)'], ['10.0.0.127', 'The broadcast address']]), dlgRows());
+  await assign(null, 'printer-1', 'AA-BB-CC-DD-EE-01', 'Floor 2');
+  check('hosts: assigned, MAC normalised, next free moves on', dlgRows().some(([a, n]) => a === '10.0.0.2' && n === 'printer-1') && W.document.querySelector('#hostsBody input[aria-label="MAC address for 10.0.0.2"]').value === 'aa:bb:cc:dd:ee:01' && $('hAddIp').value === '10.0.0.3' && $('hostsSum').textContent.startsWith('1 of 126 usable addresses assigned (1%) · next free 10.0.0.3'), [dlgRows(), $('hostsSum').textContent]);
+  await assign('10.0.0.2', 'dup');
+  check('hosts: already assigned refused', $('hostsMsg').textContent.includes('10.0.0.2 is already assigned to printer-1'), $('hostsMsg').textContent);
+  await assign('10.0.0.127', 'x');
+  check('hosts: broadcast refused', $('hostsMsg').textContent.includes('10.0.0.127 is the broadcast address'), $('hostsMsg').textContent);
+  await assign('10.0.0.200', 'x');
+  check('hosts: outside the subnet refused', $('hostsMsg').textContent.includes('isn’t in 10.0.0.0/25'), $('hostsMsg').textContent);
+  await assign('10.0.0.9', 'bad mac', 'zz:11');
+  check('hosts: bad MAC refused', $('hostsMsg').textContent.includes('MAC address isn’t valid'), $('hostsMsg').textContent);
+  // Several at once.
+  $('hPaste').value = '10.0.0.20 nas aabb.ccdd.ee02\n10.0.0.21 camera front door\n10.0.0.2 dup\n10.9.9.9 elsewhere\n# comment';
+  click('#hPasteRun'); await sleep(30);
+  check('hosts: paste several', $('hostsMsg').textContent.startsWith('Assigned 2 addresses. Skipped 2') && dlgRows().some(([a, n]) => a === '10.0.0.21' && n === 'camera front door'), $('hostsMsg').textContent);
+  // Edit in place, then close: the table shows the count and a bar.
+  const nm = W.document.querySelector('#hostsBody input[aria-label="Name for 10.0.0.20"]');
+  nm.focus(); nm.value = 'nas-1'; nm.dispatchEvent(new W.Event('input', { bubbles: true })); nm.dispatchEvent(new W.Event('change', { bubbles: true }));
+  $('hostsDlg').close(); await sleep(30);
+  check('hosts: table shows assigned / usable with a bar', hostsBtn(0).textContent === '3 / 126' && hostsBtn(0).classList.contains('has') && hostsBtn(1).textContent === '126', hostsBtn(0).textContent);
+  // Find IP names the host.
+  type('#findIp', '10.0.0.20'); await sleep(30);
+  check('hosts: find IP shows who has it', $('findOut').textContent.includes('Assigned to nas-1 aa:bb:cc:dd:ee:02'), $('findOut').textContent);
+  type('#findIp', '');
+  // Undo removes the last change; redo puts it back.
+  click('#undoBtn'); await sleep(30);
+  click('#redoBtn'); await sleep(30);
+  // Links keep them; joining the subnets keeps them too, because they're kept by address.
+  await W.eval('Promise.resolve()'); await sleep(400);
+  const link = W.location.href;
+  await load(link);
+  check('hosts: link round trip', hostsBtn(0).textContent === '3 / 126', hostsBtn(0).textContent);
+  click('#resetBtn'); await sleep(50);
+  check('hosts: kept when subnets are joined', qa('#body tr').length === 1 && hostsBtn(0).textContent === '3 / 254', hostsBtn(0).textContent);
+  // Removing one.
+  hostsBtn(0).click(); await sleep(30);
+  W.document.querySelector('#hostsBody button[aria-label="Remove 10.0.0.21"]').click(); await sleep(30);
+  $('hostsDlg').close(); await sleep(20);
+  check('hosts: removed', hostsBtn(0).textContent === '2 / 254', hostsBtn(0).textContent);
+  // Exports: CSV list, JSON round trip, Excel sheet.
+  click('#tb-export'); select('#exFmt', 'hosts');
+  const csv = $('exOut').value;
+  check('hosts: CSV export', csv === '"IP address","Name","MAC address","Notes","Subnet","Subnet name","VLAN"\n"10.0.0.2","printer-1","aa:bb:cc:dd:ee:01","Floor 2","10.0.0.0/24","",""\n"10.0.0.20","nas-1","aa:bb:cc:dd:ee:02","","10.0.0.0/24","",""', csv);
+  select('#exFmt', 'json');
+  const js = JSON.parse($('exOut').value);
+  check('hosts: JSON export', js.hosts && js.hosts.length === 2 && js.hosts[0].ip === '10.0.0.2' && js.hosts[0].mac === 'aa:bb:cc:dd:ee:01' && js.hosts[1].subnet === '10.0.0.0/24', js.hosts);
+  await load('../index.html#192.168.0.0/24');
+  click('#tb-export'); $('imText').value = JSON.stringify(js); click('#imRun'); await sleep(80); click('#tb-plan');
+  check('hosts: JSON import', hostsBtn(0).textContent === '2 / 254', hostsBtn(0).textContent);
+  // A CSV of addresses adds to the current plan instead of replacing it.
+  click('#tb-export');
+  $('imText').value = 'IP Address,Hostname,MAC Address\n10.0.0.50,laptop,11:22:33:44:55:66\n10.0.0.51,,\n172.16.0.1,far away,\n';
+  click('#imRun'); await sleep(80);
+  const m = $('imMsg').textContent;
+  click('#tb-plan');
+  check('hosts: address CSV adds to the plan', m === 'Assigned 1 IP address in the current plan. Skipped 1 outside it, 1 without a valid address or a name.' && hostsBtn(0).textContent === '3 / 254' && qa('#body tr').length === 1, [m, hostsBtn(0).textContent]);
+  // Cloud subnets list the platform's reserved addresses.
+  await load('../index.html#10.1.0.0/24');
+  select('#platform', 'azure');
+  hostsBtn(0).click(); await sleep(30);
+  check('hosts: Azure reserved addresses', dlgRows().map((r) => r[0]).join() === '10.1.0.0,10.1.0.1,10.1.0.2,10.1.0.3,10.1.0.255' && $('hAddIp').value === '10.1.0.4', dlgRows());
+  $('hostsDlg').close();
+  // Hostile names from a link stay text.
+  await load('../index.html#10.0.0.0/24/0/' + b64u({ h: { '10.0.0.5': ['<img src=x onerror=alert(1)>\nusername evil'], 'bogus': ['x'], '10.0.0.6': [''] } }));
+  hostsBtn(0).click(); await sleep(30);
+  check('hosts: link names cleaned and shown as text', dlgRows().some(([a, n]) => a === '10.0.0.5' && n === '<img src=x onerror=alert(1)> username evil') && !W.document.querySelector('#hostsBody img') && dlgRows().length === 4, dlgRows());
+  $('hostsDlg').close();
+};
 T.azureHubSpoke = async () => {
   await load('../index.html#192.168.0.0/24');
   click('#tplBtn'); select('#azLayout', 'hub');

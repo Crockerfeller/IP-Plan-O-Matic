@@ -21,6 +21,12 @@ check('hub-and-spoke dialog fits', ar2.right <= D.documentElement.clientWidth + 
 $('azDlg').close(); click('#tb-plan'); click('#peerBtn'); await sleep(50);
 const pr = $('peerDlg').getBoundingClientRect();
 check('peering dialog fits', $('peerDlg').open && pr.right <= D.documentElement.clientWidth + 1 && $('peerDlg').scrollWidth <= $('peerDlg').clientWidth + 1, { r: pr.right, sw: $('peerDlg').scrollWidth, cw: $('peerDlg').clientWidth });
+// IP assignments dialog
+$('peerDlg').close(); click('#tb-plan');
+qa('#body tr')[0].querySelector('.hosts-btn').click(); await sleep(50);
+const hr = $('hostsDlg').getBoundingClientRect();
+check('IP addresses dialog fits', $('hostsDlg').open && hr.right <= D.documentElement.clientWidth + 1 && $('hostsDlg').scrollWidth <= $('hostsDlg').clientWidth + 1, { r: hr.right, sw: $('hostsDlg').scrollWidth, cw: $('hostsDlg').clientWidth });
+$('hostsDlg').close();
 // Guide pages: the CIDR table and a few prefix pages (wide tables scroll inside their own box).
 for (const g of ['cidr-cheat-sheet', 'subnet-sizes', 'subnetting-practice', 'slash-26-subnet', 'slash-8-subnet', 'ipv6-slash-48']) {
   await load('../learn/' + g + '.html');

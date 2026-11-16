@@ -293,11 +293,30 @@
   #buildNo.ready { color: var(--ok); }
   @keyframes readyPulse { 0%, 100% { box-shadow: 0 0 0 0 var(--ok); } 50% { box-shadow: 0 0 0 4px transparent; background: var(--ok-weak); } 25%, 75% { background: transparent; } }
   @media (prefers-reduced-motion: reduce) { #reloadBtn.ready { animation: none; } }
-  dialog#plansDlg {
+  dialog#plansDlg, dialog#hostsDlg {
     width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
     border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
   }
-  dialog#plansDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  dialog#plansDlg::backdrop, dialog#hostsDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  .hosts-btn { font: inherit; background: none; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; color: inherit; cursor: pointer; display: inline-grid; gap: 2px; justify-items: end; min-width: 60px; }
+  .hosts-btn:hover { border-color: var(--border); background: var(--panel); }
+  .hosts-btn i { display: block; width: 100%; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--ok) var(--p), var(--border) var(--p)); }
+  .hosts-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin: 4px 0 12px; }
+  .hosts-bar i { display: block; height: 100%; width: var(--p, 0%); background: var(--ok); }
+  .hosts-add { display: grid; grid-template-columns: 140px minmax(0, 1fr) 150px minmax(0, 1fr) auto; gap: 8px; }
+  .hosts-add input { min-width: 0; }
+  .hosts-wrap { margin-top: 12px; max-height: 50vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .hosts-tbl { width: 100%; font-size: 13px; }
+  .hosts-tbl td { padding: 4px 8px; }
+  .hosts-tbl td.mono { white-space: nowrap; }
+  .hosts-tbl tr.sys td { color: var(--muted); }
+  .hosts-tbl .cell-input { width: 100%; min-width: 120px; }
+  .hosts-tbl .cell-input.mono { min-width: 150px; }
+  .hosts-tbl .cell-input[aria-invalid] { border-color: var(--danger) !important; }
+  .hosts-paste { margin-top: 12px; font-size: 13px; }
+  .hosts-paste summary { cursor: pointer; color: var(--accent); }
+  .hosts-paste textarea { min-height: 80px; margin-top: 6px; width: 100%; }
+  @media (max-width: 640px) { .hosts-add { grid-template-columns: 1fr 1fr; } .hosts-add button { grid-column: 1 / -1; } }
   .dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
   .dlg-head h2 { margin: 0; font-size: 18px; }
   #plansDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
@@ -787,6 +806,30 @@
     </table>
   </dialog>
 
+  <dialog id="hostsDlg" aria-labelledby="hostsTtl">
+    <div class="dlg-head">
+      <h2 id="hostsTtl">IP addresses</h2>
+      <button type="button" class="icon" id="hostsClose" aria-label="Close">✕</button>
+    </div>
+    <p class="sub" id="hostsSum"></p>
+    <div class="hosts-bar" id="hostsBar" aria-hidden="true"><i></i></div>
+    <form class="hosts-add" id="hostsAdd" autocomplete="off">
+      <input type="text" id="hAddIp" class="mono" spellcheck="false" aria-label="IP address" placeholder="IP address">
+      <input type="text" id="hAddName" spellcheck="false" aria-label="Name" placeholder="Name, e.g. printer-2" maxlength="80">
+      <input type="text" id="hAddMac" class="mono" spellcheck="false" aria-label="MAC address (optional)" placeholder="MAC (optional)">
+      <input type="text" id="hAddNote" spellcheck="false" aria-label="Notes" placeholder="Notes" maxlength="200">
+      <button type="submit" class="primary">Assign</button>
+    </form>
+    <div class="msg" id="hostsMsg" style="margin-top:8px"></div>
+    <div class="table-wrap hosts-wrap"><table class="hosts-tbl"><thead><tr><th>Address</th><th>Name</th><th>MAC address</th><th>Notes</th><th></th></tr></thead><tbody id="hostsBody"></tbody></table></div>
+    <details class="hosts-paste">
+      <summary>Assign several at once</summary>
+      <p class="sub">One per line: the address, then a name, and a MAC address if you have one.</p>
+      <textarea id="hPaste" spellcheck="false" placeholder="10.0.0.20 printer-1 aa:bb:cc:dd:ee:01&#10;10.0.0.21 printer-2"></textarea>
+      <button type="button" id="hPasteRun" style="margin-top:8px">Assign these</button>
+    </details>
+  </dialog>
+
   <dialog id="plansDlg" aria-labelledby="plansTtl">
     <div class="dlg-head">
       <h2 id="plansTtl">Saved plans</h2>
@@ -1229,6 +1272,7 @@
             <optgroup label="Spreadsheets, documents and images">
             <option value="xlsx">Excel (.xlsx)</option>
             <option value="csv">CSV (all columns)</option>
+            <option value="hosts">IP assignments (CSV)</option>
             <option value="json">JSON (full plan, re-importable)</option>
             <option value="md">Markdown table (wikis, tickets, README)</option>
             <option value="html">HTML table (Confluence, email, docs)</option>
@@ -1258,7 +1302,7 @@
 
     <div class="card pad">
       <h2>Import</h2>
-      <p class="sub">Load a JSON file exported from here, a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes), or the networks you already have in the cloud. Importing replaces the current IPv4 plan.</p>
+      <p class="sub">Load a JSON file exported from here, a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes), or the networks you already have in the cloud. Importing replaces the current IPv4 plan. A CSV with an <span class="mono">IP address</span> column instead (and Name, MAC, Notes) adds assigned addresses to the current plan.</p>
       <details class="im-cloud">
         <summary>Import from AWS, Azure, Google Cloud or Oracle Cloud</summary>
         <p>Run one of these and paste the output below (or save it to a file and load that). Nothing is sent anywhere: the import happens in this page.</p>
@@ -1664,7 +1708,7 @@
   // Peering options: m layout (hub / mesh / custom / none), h hub base network, f Azure forwarded traffic,
   // g Azure gateway transit, t AWS connection (tgw = Transit Gateway, pcx = VPC peering), r AWS routes in main route tables.
   const PEER_DEFAULTS = { m: 'hub', h: '', f: 1, g: 0, t: 'tgw', r: 1 };
-  const state = { blocks: [mkBlock(aton('192.168.0.0'), 24)], active: 0, meta: {}, peers: null, po: { ...PEER_DEFAULTS } };
+  const state = { blocks: [mkBlock(aton('192.168.0.0'), 24)], active: 0, meta: {}, hosts: {}, peers: null, po: { ...PEER_DEFAULTS } };
   // meta: { 'a.b.c.d/m': { n: name, v: vlan, o: note, s: 'used' | 'reserved' } }, shared by all blocks
   const blk = () => state.blocks[state.active];
   for (const f of ['network', 'mask', 'root']) Object.defineProperty(state, f, { get: () => blk()[f], set: (v) => { blk()[f] = v; } });
@@ -2041,6 +2085,41 @@
     // Older links store just a name string per prefix; cleanMeta accepts both.
     v6.meta = cleanMetaMap(o.m);
   };
+  // ---------- IP assignments: single addresses with a name, MAC and notes ----------
+  // Kept by address, not by subnet, so they stay put when subnets are split or joined.
+  // MACs are stored as aa:bb:cc:dd:ee:ff; aa-bb-…, aabb.ccdd.eeff and aabbccddeeff are accepted.
+  const normMac = (s) => {
+    const t = String(s ?? '').trim();
+    if (!t || !/^[0-9a-f:.\-]+$/i.test(t)) return '';
+    const hex = t.replace(/[^0-9a-f]/gi, '').toLowerCase();
+    return hex.length === 12 ? hex.match(/../g).join(':') : '';
+  };
+  const cleanHost = (v) => {
+    const a = Array.isArray(v) ? v : v && typeof v === 'object' ? [v.n ?? v.name, v.m ?? v.mac, v.o ?? v.note] : [v];
+    const c = {};
+    if (a[0]) c.n = oneLine(a[0]).trim().slice(0, 80);
+    const m = normMac(a[1]);
+    if (m) c.m = m;
+    if (a[2]) c.o = oneLine(a[2]).trim().slice(0, 200);
+    return c.n || c.m || c.o ? c : null;
+  };
+  const cleanHosts = (o) => {
+    const out = {};
+    if (o && typeof o === 'object' && !Array.isArray(o)) for (const [k, v] of Object.entries(o)) { const ip = aton(k), c = cleanHost(v); if (ip !== null && c) out[ntoa(ip)] = c; }
+    return out;
+  };
+  // Assigned addresses as sorted numbers, rebuilt when the assignments change.
+  let hostIpsCache = null;
+  const hostIps = () => hostIpsCache || (hostIpsCache = Object.keys(state.hosts).map(aton).sort((a, b) => a - b));
+  const hostsChanged = () => { hostIpsCache = null; };
+  const hostsIn = (addr, mask) => {
+    const ips = hostIps(), last = lastAddr(addr, mask);
+    let lo = 0, hi = ips.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (ips[mid] < addr) lo = mid + 1; else hi = mid; }
+    const out = [];
+    for (let i = lo; i < ips.length && ips[i] <= last; i++) out.push(ips[i]);
+    return out;
+  };
   const extras = () => {
     const keys = nodeKeys();
     const m = {};
@@ -2061,6 +2140,9 @@
       if (state.active) o.a = state.active;
     }
     if (state.peers) { o.p = state.peers.filter(([a, b]) => blockByCidr(a) && blockByCidr(b)); o.po = state.po; }
+    // Assigned addresses inside the plan, each as [name] or [name, mac] or [name, mac, notes].
+    const hs = Object.entries(state.hosts).filter(([ip]) => blockOf(aton(ip)) >= 0);
+    if (hs.length) o.h = Object.fromEntries(hs.map(([ip, h]) => [ip, h.o ? [h.n || '', h.m || '', h.o] : h.m ? [h.n || '', h.m] : [h.n || '']]));
     const v = v6Serialize();
     if (v) o.v6 = v;
     return Object.keys(o).length ? b64e(JSON.stringify(o)) : '';
@@ -2152,6 +2234,8 @@
     state.active = Number.isInteger(x.a) && x.a > 0 && x.a < blocks.length ? x.a : 0;
     settings.gw = x.g === 'last' ? 'last' : 'first';
     state.meta = cleanMetaMap(x.m);
+    state.hosts = cleanHosts(x.h);
+    hostsChanged();
     state.peers = cleanPeers(x.p);
     state.po = cleanPo(x.po);
     v6Load(x.v6 || { p: V6_DEFAULT });
@@ -2697,7 +2781,21 @@
       if (visible.range) cell('mono', `${ntoa(leaf.addr)} – ${ntoa(info.last)}`);
       if (visible.usable) cell('mono', info.uF === null ? '—' : (info.uF === info.uL ? ntoa(info.uF) : `${ntoa(info.uF)} – ${ntoa(info.uL)}`));
       if (visible.gateway) cell('mono', info.gw === null ? '—' : ntoa(info.gw));
-      if (visible.hosts) cell('mono num', fmt(info.hosts));
+      if (visible.hosts) {
+        // Usable hosts, or "assigned / usable" with a fill bar once addresses are assigned. Opens the IP list.
+        const n = hostsIn(leaf.addr, leaf.mask).length;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'hosts-btn' + (n ? ' has' : '');
+        if (n) {
+          const t = document.createElement('span'); t.textContent = `${fmt(n)} / ${fmt(info.hosts)}`;
+          const bar = document.createElement('i'); bar.style.setProperty('--p', Math.min(100, (100 * n) / Math.max(1, info.hosts)) + '%');
+          b.append(t, bar);
+        } else b.textContent = fmt(info.hosts);
+        b.title = n ? `${fmt(n)} of ${fmt(info.hosts)} usable addresses assigned. Click to see or assign IPs.` : `${fmt(info.hosts)} usable hosts. Click to assign IP addresses.`;
+        b.setAttribute('aria-label', `${b.title} (${key})`);
+        b.addEventListener('click', () => openHosts(key));
+        cell('mono num col-hosts', b);
+      }
       if (visible.status) {
         const sel = document.createElement('select');
         sel.className = 'status ' + (meta.s || 'free');
@@ -3206,7 +3304,9 @@
     else if (info.uF !== null && ip >= info.uF && ip <= info.uL) role = `usable host #${fmt(ip - info.uF + 1)} of ${fmt(info.hosts)}`;
     else role = 'not usable on this platform';
     const name = getMeta(leaf.key).n;
-    out.innerHTML = `<b class="mono">${ntoa(ip)}</b> is in <b class="mono">${leaf.key}</b>${name ? ` (${esc(name)})` : ''}: ${esc(role)}.`;
+    const hst = state.hosts[ntoa(ip)];
+    const who = hst ? ` Assigned to <b>${esc(hst.n || hst.m || 'a host')}</b>${hst.n && hst.m ? ` <span class="mono">${esc(hst.m)}</span>` : ''}.` : '';
+    out.innerHTML = `<b class="mono">${ntoa(ip)}</b> is in <b class="mono">${leaf.key}</b>${name ? ` (${esc(name)})` : ''}: ${esc(role)}.${who}`;
     if (scroll && row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
   $('findIp').addEventListener('input', () => runFind(true));
@@ -3730,6 +3830,8 @@
     state.blocks = res.vnets.map((v) => { const b = mkBlock(v.addr, v.mask, tpl.cloud, v.label); b.root = v.root; return b; });
     state.active = 0;
     state.meta = {};
+    state.hosts = {};
+    hostsChanged();
     // Hub and spoke peering to match; the Peering button changes it.
     const hubC = single ? '' : cidrStr(res.vnets[0].addr, res.vnets[0].mask);
     state.peers = single ? null : res.vnets.slice(1).map((v) => [hubC, cidrStr(v.addr, v.mask)]);
@@ -4983,6 +5085,8 @@
       const k = v6Key(lf.a, lf.m), mm = v6Get(k);
       return [k, mm.n || '', mm.v ? Number(mm.v) : '', mm.s || 'free', mm.o || '', fmt6(lf.a), fmt6(lf.a + size6(lf.m) - 1n), lf.m <= 64 ? `${pow2Text(64 - lf.m)} x /64` : `${pow2Text(128 - lf.m)} addresses`];
     });
+    const hr = hostRows();
+    if (hr.length) sheets.push(['IP addresses', ['IP address', 'Name', 'MAC address', 'Notes', 'Subnet', 'Subnet name', 'VLAN'], hr.map((h) => [h.ip, h.n, h.m, h.o, h.subnet, h.sn, h.v ? Number(h.v) : ''])]);
     if (v6.root.c || Object.keys(v6.meta).length) sheets.push(['IPv6 plan', ['Prefix', 'Name', 'VLAN', 'Status', 'Notes', 'First address', 'Last address', 'Size'], v6rows]);
     const files = [
       ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
@@ -5017,12 +5121,23 @@
         firstUsable: i.uF === null ? null : ntoa(i.uF), lastUsable: i.uL === null ? null : ntoa(i.uL), hosts: i.hosts,
       };
     }),
+    ...(hostRows().length ? { hosts: hostRows().map((h) => ({ ip: h.ip, name: h.n, mac: h.m || null, note: h.o, subnet: h.subnet })) } : {}),
     ipv6: {
       prefix: v6Key(v6.net, v6.mask), tree: v6TreeStr(v6.root),
       names: Object.fromEntries(Object.entries(v6.meta).filter(([, m]) => m.n).map(([k, m]) => [k, m.n])),
       meta: v6.meta,
     },
   }, null, 2);
+  // Every assigned address in the plan, in address order, with its subnet.
+  const hostRows = () => {
+    const leaves = allRows();
+    return hostIps().filter((ip) => blockOf(ip) >= 0).map((ip) => {
+      const h = state.hosts[ntoa(ip)], leaf = leaves.find((r) => inBlock(ip, r.addr, r.mask)), m = leaf ? getMeta(leaf.key) : {};
+      return { ip: ntoa(ip), n: h.n || '', m: h.m || '', o: h.o || '', subnet: leaf ? leaf.key : '', sn: m.n || '', v: m.v || '' };
+    });
+  };
+  const genHostsCsv = () => [['IP address', 'Name', 'MAC address', 'Notes', 'Subnet', 'Subnet name', 'VLAN'], ...hostRows().map((h) => [h.ip, h.n, h.m, h.o, h.subnet, h.sn, h.v])]
+    .map((r) => r.map(csvQ).join(',')).join('\n');
 
   // ---------- The plan as an image: SVG drawn from the data, and a PNG made from the SVG ----------
   // Light colors whatever the page theme, because the image goes into documents. System fonts only: an SVG drawn
@@ -5142,11 +5257,11 @@
     img.src = url;
   });
 
-  const EXT = { cisco: 'txt', arista: 'txt', junos: 'txt', mikrotik: 'rsc', fortigate: 'conf', panos: 'txt', pfsense: 'xml', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', ansible: 'yml', csv: 'csv', json: 'json', xlsx: 'xlsx', md: 'md', html: 'html', bicep: 'bicep', 'az-ps': 'ps1', 'cfn-aws': 'yaml', netbox: 'csv', 'netbox-vlans': 'csv', phpipam: 'csv', png: 'png', svg: 'svg' };
-  const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv', svg: 'image/svg+xml' };
+  const EXT = { cisco: 'txt', arista: 'txt', junos: 'txt', mikrotik: 'rsc', fortigate: 'conf', panos: 'txt', pfsense: 'xml', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', ansible: 'yml', csv: 'csv', json: 'json', xlsx: 'xlsx', md: 'md', html: 'html', bicep: 'bicep', 'az-ps': 'ps1', 'cfn-aws': 'yaml', netbox: 'csv', 'netbox-vlans': 'csv', phpipam: 'csv', png: 'png', svg: 'svg', hosts: 'csv' };
+  const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv', svg: 'image/svg+xml', hosts: 'text/csv' };
   const renderExport = () => {
     const f = $('exFmt').value;
-    const whole = f === 'json' || f === 'csv' || f === 'xlsx';
+    const whole = f === 'json' || f === 'csv' || f === 'xlsx' || f === 'hosts';
     $('exInc').disabled = whole;
     $('exDhcpL').hidden = !DHCP_FMTS.includes(f);
     clearMsg('exMsg');
@@ -5161,6 +5276,10 @@
       showMsg('exMsg', `The address map of every network, and a table of the subnets that Include picks. ${f === 'png' ? 'Copy puts the image on your clipboard for pasting into a ticket, chat or document.' : 'SVG stays sharp at any size, and opens in browsers, draw.io, Visio and Inkscape.'}`, 'info');
     } else if (f === 'json') text = genJson();
     else if (f === 'csv') text = buildCsv(false).text;
+    else if (f === 'hosts') {
+      text = genHostsCsv();
+      showMsg('exMsg', hostRows().length ? 'Every assigned IP address with its name, MAC and subnet. Import it back (here or into another plan) to add the addresses.' : 'No IP addresses are assigned yet. Click a number in the Hosts column on the Plan tab to assign some.', 'info');
+    }
     else if (f === 'xlsx') {
       // Preview as tab-separated text (Copy pastes straight into a spreadsheet); Download gives the .xlsx file.
       const m = buildMatrix(false);
@@ -5310,7 +5429,7 @@
   const importText = (text) => {
     text = String(text || '').replace(/^﻿/, '').trim();
     if (!text) throw new Error('Nothing to import.');
-    let base = null, tree = null, set = null, v6data = null, defs = null, peering = null, cloud = null;
+    let base = null, tree = null, set = null, v6data = null, defs = null, peering = null, cloud = null, hosts = {};
     const entries = [];
     if (text[0] === '{' || text[0] === '[') {
       let docs;
@@ -5332,6 +5451,7 @@
       }
       if (j.tree) tree = j.tree;
       if (j.ipv6) v6data = j.ipv6;
+      if (Array.isArray(j.hosts)) hosts = cleanHosts(Object.fromEntries(j.hosts.filter((h) => h && h.ip).map((h) => [h.ip, h])));
       if (j.peering && typeof j.peering === 'object') peering = j.peering;
       if (Array.isArray(j.blocks) && j.blocks.length) {
         defs = j.blocks.map((b) => ({ c: parseCidr(b && b.base), tree: b && b.tree, cloud: b && CLOUDS[b.platform] ? b.platform : 'std', label: String((b && b.label) || '').slice(0, 40) })).filter((d) => d.c);
@@ -5386,6 +5506,8 @@
     state.blocks = blocks;
     state.active = 0;
     state.meta = {};
+    state.hosts = hosts;
+    hostsChanged();
     state.peers = peering ? cleanPeers(peering.pairs) : null;
     state.po = cleanPo(peering && peering.options);
     for (const e of inside) {
@@ -5401,8 +5523,41 @@
     renderV6();
     return { count: inside.length, skipped, cloud };
   };
+  // A CSV with an IP address column and no Subnet column is a list of addresses (a DHCP lease export, an IPAM
+  // dump): it adds them to the current plan instead of replacing it.
+  const importHosts = (text) => {
+    const recs = parseCsv(String(text).replace(/^\uFEFF/, '').trim());
+    const hdr = recs.shift().map((h) => h.trim().toLowerCase());
+    const col = (...names) => hdr.findIndex((h) => names.includes(h));
+    const ii = col('ip', 'ip address', 'ipaddress', 'address', 'ipv4', 'ipv4 address'), ni = col('name', 'hostname', 'host', 'device'), mi = col('mac', 'mac address', 'macaddress', 'hardware address'), oi = col('notes', 'note', 'description', 'comment');
+    let added = 0, outside = 0, bad = 0;
+    const adds = [];
+    for (const r of recs) {
+      const ip = aton(String(r[ii] || '').trim());
+      if (ip === null) { bad++; continue; }
+      if (blockOf(ip) < 0) { outside++; continue; }
+      const h = cleanHost([ni >= 0 ? r[ni] : '', mi >= 0 ? r[mi] : '', oi >= 0 ? r[oi] : '']);
+      if (h) adds.push([ntoa(ip), h]); else bad++;
+    }
+    if (!adds.length) throw new Error(outside ? `None of the ${outside} addresses are inside this plan (${state.blocks.map(blockCidr).join(', ')}).` : 'No addresses with a name or MAC found.');
+    checkpoint();
+    for (const [ip, h] of adds) { state.hosts[ip] = h; added++; }
+    hostsChanged();
+    update();
+    return `Assigned ${added} IP address${added === 1 ? '' : 'es'} in the current plan${outside ? `. Skipped ${outside} outside it` : ''}${bad ? `${outside ? ',' : '. Skipped'} ${bad} without a valid address or a name` : ''}.`;
+  };
+  const isHostCsv = (text) => {
+    const t = String(text || '').replace(/^\uFEFF/, '').trim();
+    if (!t || t[0] === '{' || t[0] === '[') return false;
+    const hdr = (parseCsv(t.split(/\r?\n/)[0])[0] || []).map((h) => h.trim().toLowerCase());
+    return !hdr.some((h) => ['subnet', 'cidr', 'network', 'prefix'].includes(h)) && hdr.some((h) => ['ip', 'ip address', 'ipaddress', 'address', 'ipv4', 'ipv4 address'].includes(h));
+  };
   const doImport = (text) => {
     clearMsg('imMsg');
+    if (isHostCsv(text)) {
+      try { showMsg('imMsg', importHosts(text), 'ok'); renderExport(); } catch (e) { showMsg('imMsg', e.message, 'error'); }
+      return;
+    }
     if ((state.blocks.length > 1 || state.root.c || Object.keys(state.meta).length) && !confirm('Importing replaces the current IPv4 plan. Continue?')) return;
     checkpoint();
     try {
@@ -5421,6 +5576,143 @@
     if (!f) return;
     f.text().then((t) => { doImport(t); $('imFile').value = ''; });
   });
+
+  // ---------- IP assignments dialog ----------
+  let hostsKey = null;
+  const hostsCtx = () => {
+    const c = parseCidr(hostsKey), bi = blockOf(c.addr), cloud = bi >= 0 ? state.blocks[bi].cloud : settings.cloud;
+    return { c, info: hostInfo(c.addr, c.mask, cloud), cloud };
+  };
+  const nextFree = () => {
+    const { info } = hostsCtx();
+    if (info.uF === null) return null;
+    const taken = new Set(hostsIn(info.addr, info.mask));
+    for (let ip = info.uF; ip <= info.uL; ip++) if (!taken.has(ip) && ip !== info.gw) return ip;
+    return null;
+  };
+  // Why an address can't be assigned in this subnet, or '' if it can.
+  const hostProblem = (ip) => {
+    const { c, info } = hostsCtx();
+    if (ip === null) return 'That isn’t an IPv4 address.';
+    if (!inBlock(ip, c.addr, c.mask)) return `${ntoa(ip)} isn’t in ${hostsKey}.`;
+    const res = info.reserved.find(([a]) => a === ip);
+    if (res) return `${ntoa(ip)} is ${res[1]}.`;
+    if (info.uF === null || ip < info.uF || ip > info.uL) return `${ntoa(ip)} isn’t usable on this platform.`;
+    const h = state.hosts[ntoa(ip)];
+    if (h) return `${ntoa(ip)} is already assigned${h.n ? ` to ${h.n}` : ''}.`;
+    return '';
+  };
+  const renderHosts = () => {
+    const { c, info } = hostsCtx(), meta = getMeta(hostsKey);
+    $('hostsTtl').textContent = `IP addresses in ${hostsKey}${meta.n ? ` (${meta.n})` : ''}`;
+    const mine = hostsIn(c.addr, c.mask), used = mine.filter((ip) => info.uF !== null && ip >= info.uF && ip <= info.uL).length;
+    const nf = nextFree(), pct = info.hosts ? Math.round((100 * used) / info.hosts) : 0;
+    $('hostsSum').textContent = `${fmt(used)} of ${fmt(info.hosts)} usable address${info.hosts === 1 ? '' : 'es'} assigned (${pct}%)${nf === null ? '. None left.' : ` · next free ${ntoa(nf)}`}`;
+    $('hostsBar').style.setProperty('--p', Math.min(100, (100 * used) / Math.max(1, info.hosts)) + '%');
+    if (!$('hAddIp').value && nf !== null) $('hAddIp').value = ntoa(nf);
+    // The platform's own addresses, read-only, among the assigned ones.
+    const sys = info.reserved.map(([a, why]) => [a, why[0].toUpperCase() + why.slice(1)]);
+    if (info.gw !== null && !info.reserved.some(([a]) => a === info.gw)) sys.push([info.gw, 'Gateway (the router’s address)']);
+    const list = [...sys.map(([a, why]) => ({ a, sys: why })), ...mine.map((a) => ({ a, h: state.hosts[ntoa(a)] }))].sort((x, y) => x.a - y.a || (x.sys ? -1 : 1));
+    const body = $('hostsBody');
+    body.innerHTML = '';
+    for (const x of list) {
+      const tr = document.createElement('tr');
+      const ipTd = document.createElement('td');
+      ipTd.className = 'mono';
+      ipTd.textContent = ntoa(x.a);
+      tr.appendChild(ipTd);
+      if (x.sys) {
+        tr.className = 'sys';
+        const td = document.createElement('td');
+        td.colSpan = 4;
+        td.textContent = x.sys;
+        tr.appendChild(td);
+      } else {
+        const ip = ntoa(x.a);
+        for (const [f, cls, ph, label] of [['n', '', 'Name', 'Name'], ['m', 'mono', 'aa:bb:cc:dd:ee:ff', 'MAC address'], ['o', '', 'Notes', 'Notes']]) {
+          const td = document.createElement('td');
+          const inp = document.createElement('input');
+          inp.type = 'text'; inp.className = 'cell-input ' + cls; inp.placeholder = ph; inp.spellcheck = false;
+          inp.value = x.h[f] || '';
+          inp.setAttribute('aria-label', `${label} for ${ip}`);
+          inp.addEventListener('focus', () => { delete inp.dataset.cp; });
+          inp.addEventListener('input', () => {
+            if (f === 'm') { inp.toggleAttribute('aria-invalid', !!inp.value.trim() && !normMac(inp.value)); if (inp.value.trim() && !normMac(inp.value)) return; }
+            firstEdit(inp);
+            const h = { ...state.hosts[ip] };
+            if (f === 'm') { if (normMac(inp.value)) h.m = normMac(inp.value); else delete h.m; } else if (inp.value.trim()) h[f] = oneLine(inp.value).slice(0, f === 'n' ? 80 : 200); else delete h[f];
+            if (h.n || h.m || h.o) state.hosts[ip] = h; else { delete state.hosts[ip]; hostsChanged(); }
+            writeHashSoon();
+          });
+          inp.addEventListener('change', () => { if (f === 'm' && normMac(inp.value)) inp.value = normMac(inp.value); render(); });
+          td.appendChild(inp);
+          tr.appendChild(td);
+        }
+        const td = document.createElement('td');
+        const del = document.createElement('button');
+        del.type = 'button'; del.className = 'small icon-x'; del.textContent = '✕';
+        del.setAttribute('aria-label', `Remove ${ip}`);
+        del.title = `Remove ${ip}`;
+        del.addEventListener('click', () => { checkpoint(); delete state.hosts[ip]; hostsChanged(); update(); renderHosts(); });
+        td.appendChild(del);
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    }
+  };
+  const openHosts = (key) => {
+    hostsKey = key;
+    for (const id of ['hAddIp', 'hAddName', 'hAddMac', 'hAddNote']) $(id).value = '';
+    clearMsg('hostsMsg');
+    renderHosts();
+    showDlg($('hostsDlg'));
+    $('hAddName').focus();
+  };
+  $('hostsAdd').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ip = aton($('hAddIp').value.trim()), why = hostProblem(ip);
+    if (why) { showMsg('hostsMsg', why, 'error'); $('hAddIp').focus(); return; }
+    const macIn = $('hAddMac').value.trim();
+    if (macIn && !normMac(macIn)) { showMsg('hostsMsg', 'That MAC address isn’t valid. Use six pairs of hex digits, like aa:bb:cc:dd:ee:ff.', 'error'); $('hAddMac').focus(); return; }
+    const h = cleanHost([$('hAddName').value, macIn, $('hAddNote').value]);
+    if (!h) { showMsg('hostsMsg', 'Give it a name (or a MAC address).', 'error'); $('hAddName').focus(); return; }
+    checkpoint();
+    state.hosts[ntoa(ip)] = h;
+    hostsChanged();
+    clearMsg('hostsMsg');
+    for (const id of ['hAddIp', 'hAddName', 'hAddMac', 'hAddNote']) $(id).value = '';
+    update();
+    renderHosts();
+    $('hAddName').focus();
+  });
+  // Several at once: "10.0.0.20 printer-1 aa:bb:cc:dd:ee:01" per line (the MAC can be anywhere after the address).
+  $('hPasteRun').addEventListener('click', () => {
+    const lines = $('hPaste').value.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+    let added = 0;
+    const bad = [];
+    const adds = [];
+    for (const line of lines) {
+      const [first, ...rest] = line.split(/[\s,;\t]+/);
+      const ip = aton(first || ''), why = hostProblem(ip) || (adds.some(([a]) => a === ip) ? 'listed twice' : '');
+      const mac = rest.find((t) => normMac(t)), name = rest.filter((t) => t !== mac).join(' ');
+      const h = cleanHost([name, mac, '']);
+      if (why || !h) { bad.push(first || line); continue; }
+      adds.push([ip, h]);
+    }
+    if (adds.length) {
+      checkpoint();
+      for (const [ip, h] of adds) { state.hosts[ntoa(ip)] = h; added++; }
+      hostsChanged();
+      update();
+      renderHosts();
+    }
+    showMsg('hostsMsg', `Assigned ${added} address${added === 1 ? '' : 'es'}.${bad.length ? ` Skipped ${bad.length} (outside the subnet, reserved, already assigned or without a name): ${bad.slice(0, 6).join(', ')}${bad.length > 6 ? '…' : ''}.` : ''}`, bad.length ? 'error' : 'ok');
+    if (!bad.length) $('hPaste').value = '';
+  });
+  $('hostsClose').addEventListener('click', () => $('hostsDlg').close());
+  $('hostsDlg').addEventListener('click', (e) => { if (e.target === $('hostsDlg')) $('hostsDlg').close(); });
+  $('hostsDlg').addEventListener('close', () => { hostsKey = null; render(); });
 
   // ---------- Compare plans ----------
   // Another plan, read without changing the current one: load it, take its subnets, put the current plan back.
