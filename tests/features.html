@@ -759,17 +759,61 @@ T.azureSingle = async () => {
 T.reloadBtn = async () => {
   await load('../index.html#10.0.0.0/24');
   const rb = $('reloadBtn');
-  check('reload button left of Plans', rb && rb.nextElementSibling === $('plansBtn') && rb.title.includes('Your plan is kept'));
+  check('reload button left of Plans', rb && rb.parentElement.nextElementSibling === $('plansBtn') && rb.title.includes('Your plan is kept'));
   divideRow(0);
   const inp = qa('#body tr')[0].querySelector('input');
   inp.focus(); inp.value = 'Kept'; inp.dispatchEvent(new W.Event('input', { bubbles: true }));
+  W.__beforeReload = true;   // gone once the page really reloads
   let reloaded = false;
   F.onload = () => { reloaded = true; };
   rb.click();
   for (let i = 0; i < 40 && !reloaded; i++) await sleep(100);
   W = F.contentWindow; D = W.document; await sleep(400);
-  check('reload happened', reloaded);
-  check('plan and unsaved edit survive reload', qa('#body tr').length === 2 && qa('#body tr')[0].querySelector('input').value === 'Kept', snap().rows);
+  check('reload happened', reloaded && !W.__beforeReload);
+  check('plan and unsaved edit survive reload', !W.__beforeReload && qa('#body tr').length === 2 && qa('#body tr')[0].querySelector('input').value === 'Kept', snap().rows);
+};
+// The version tests need a stamped build (tests/run.sh serves one). Served straight from the repo, the page is a dev build.
+const builtVersion = async () => {
+  const r = await fetch('../version.json', { cache: 'no-store' });
+  return r.ok ? r.json() : null;
+};
+T.buildNotice = async () => {
+  await load('../index.html#10.0.0.0/24');
+  const v = await builtVersion();
+  const bn = $('buildNo'), rb = $('reloadBtn');
+  if (!v) {
+    check('dev build labelled', !bn.hidden && bn.textContent === 'dev' && $('ver').textContent === 'Dev build', [bn.textContent, $('ver').textContent]);
+    return;
+  }
+  const mine = v.sha.slice(0, 7);
+  check('build number above Reload', !bn.hidden && bn.nextElementSibling === rb && bn.textContent === 'Build ' + mine, bn.textContent);
+  check('footer shows build and date, links to the commit', $('ver').textContent === `Build ${mine} · ${v.date}` && $('ver').querySelector('a').href.endsWith('/commit/' + v.sha), $('ver').textContent);
+  check('not green while current', !rb.classList.contains('ready'));
+  const real = W.fetch; let asked = null;
+  const serve = (body) => { W.fetch = (u, o) => { asked = [String(u), o && o.cache]; return Promise.resolve(new W.Response(JSON.stringify(body))); }; };
+  // The server has the same build: still not green.
+  serve(v);
+  W.dispatchEvent(new W.Event('online')); await sleep(50);
+  check('same build: not green', asked && asked[0].endsWith('/version.json') && asked[1] === 'no-store' && !rb.classList.contains('ready'), asked);
+  // Junk in version.json is ignored.
+  serve({ sha: 'nope' });
+  W.dispatchEvent(new W.Event('online')); await sleep(50);
+  check('bad version.json ignored', !rb.classList.contains('ready'));
+  // A newer build appears.
+  serve({ sha: 'abcdef0'.padEnd(40, '1'), date: '2026-12-01' });
+  W.dispatchEvent(new W.Event('online')); await sleep(50);
+  check('newer build: button green', rb.classList.contains('ready') && bn.classList.contains('ready') && rb.title.includes('abcdef0, 2026-12-01') && bn.title.includes('abcdef0'), [rb.className, rb.title]);
+  check('build number still shows the loaded build', bn.textContent === 'Build ' + mine, bn.textContent);
+  W.fetch = () => Promise.reject(new TypeError('offline'));
+  W.dispatchEvent(new W.Event('online')); await sleep(50);
+  check('offline after notice: stays green', rb.classList.contains('ready'));
+  W.fetch = real;
+  // Reloading loads the real build again, so the notice clears.
+  W.__beforeReload = true;
+  rb.click();
+  await Promise.race([new Promise((res) => { F.onload = res; }), sleep(5000)]);
+  W = F.contentWindow; D = W.document; await sleep(300);
+  check('after reload: not green, build shown', !W.__beforeReload && !$('reloadBtn').classList.contains('ready') && $('buildNo').textContent === 'Build ' + mine);
 };
 T.baseOnLeave = async () => {
   await load('../index.html#192.168.0.0/24');
@@ -1004,34 +1048,32 @@ T.networksUi = async () => {
 T.updateCheck = async () => {
   await load('../index.html#10.0.0.0/24');
   check('update link shown off the hosted site', !$('updBtn').hidden);
+  const v = await builtVersion();
+  if (!v) {
+    click('#updBtn'); await sleep(100);
+    check('update: dev copy told to git pull', $('toast').textContent.includes('git pull'), $('toast').textContent);
+    return;
+  }
   const real = W.fetch.bind(W);
-  let remote = '0'.repeat(40), offline = false;
+  const SITE = 'https://crockerfeller.github.io/IP-Plan-O-Matic/';
+  let remote = { sha: '0'.repeat(40), date: '2026-12-01' }, offline = false, asked = null;
   W.fetch = (u, o) => {
-    if (!String(u).startsWith('https://api.github.com/')) return real(u, o);
-    if (offline) return Promise.reject(new TypeError('offline'));
-    const body = String(u).includes('/contents/') ? { sha: remote } : [{ sha: 'c'.repeat(40), commit: { message: 'Add things\n\nmore', committer: { date: '2026-11-20T10:00:00Z' } } }];
-    return Promise.resolve(new W.Response(JSON.stringify(body), { status: 200 }));
+    if (!String(u).startsWith(SITE)) return real(u, o);
+    asked = String(u);
+    return offline ? Promise.reject(new TypeError('offline')) : Promise.resolve(new W.Response(JSON.stringify(remote)));
   };
   dialogs.length = 0; confirmAnswer = false;
   click('#updBtn'); await sleep(300);
-  const mine = $('updBtn').dataset.local;
-  check('update: local version hashed', /^[0-9a-f]{40}$/.test(mine), mine);
-  check('update: newer version prompt', dialogs.length === 1 && dialogs[0].includes('newer version') && dialogs[0].includes('2026-11-20: “Add things”') && dialogs[0].includes('git pull'), dialogs);
-  remote = mine; dialogs.length = 0;
+  check('update: asks the hosted site', asked === SITE + 'version.json', asked);
+  check('update: newer version prompt', dialogs.length === 1 && dialogs[0].includes('build 0000000 from 2026-12-01') && dialogs[0].includes(`You have build ${v.sha.slice(0, 7)} from ${v.date}`) && dialogs[0].includes('.zip'), dialogs);
+  remote = v; dialogs.length = 0;
   click('#updBtn'); await sleep(300);
-  check('update: up to date', dialogs.length === 0 && $('toast').textContent.includes('You have the latest version (updated 2026-11-20)'), $('toast').textContent);
+  check('update: up to date', dialogs.length === 0 && $('toast').textContent.includes(`You have the latest version (build ${v.sha.slice(0, 7)}, ${v.date})`), $('toast').textContent);
   offline = true;
   click('#updBtn'); await sleep(300);
-  check('update: offline message', $('toast').textContent.includes('Couldn’t reach GitHub'), $('toast').textContent);
-  offline = false; remote = null;
-  const realF = W.fetch;
-  W.fetch = (u, o) => (String(u).startsWith('https://api.github.com/') ? Promise.resolve(new W.Response('{}', { status: 403 })) : real(u, o));
-  click('#updBtn'); await sleep(300);
-  check('update: rate limit message', $('toast').textContent.includes('limiting update checks'), $('toast').textContent);
-  W.fetch = realF;
+  check('update: offline message', $('toast').textContent.includes('Couldn’t reach the IP Plan-O-Matic site'), $('toast').textContent);
   check('update: link text restored', $('updBtn').textContent.includes('Check for updates'));
   W.fetch = real; confirmAnswer = true;
-  document.title = 'local-blob:' + mine;
 };
 (async () => {
   const only = new URLSearchParams(location.search).get('t');

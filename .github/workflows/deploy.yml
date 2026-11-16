@@ -1,0 +1,51 @@
+# Test, build and deploy the site to GitHub Pages.
+# Every push to main runs the browser test suites against the built site; only if they all pass is it deployed.
+# Pull requests run the tests without deploying.
+# One-time setup: repo Settings → Pages → Build and deployment → Source: "GitHub Actions".
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per branch at a time; a deploy in progress is never cancelled halfway.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the test suites (headless Chrome)
+        run: tests/run.sh
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the site, stamped with this commit
+        run: python3 tools/build_site.py _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

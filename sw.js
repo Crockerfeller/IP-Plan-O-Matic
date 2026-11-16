@@ -1,6 +1,7 @@
 /* IP Plan-O-Matic service worker: makes the app work offline.
-   Bump CACHE whenever the list of files below changes. */
-const CACHE = 'ipom-v2';
+   The deploy (tools/build_site.py) writes the commit hash into CACHE, so every build gets a fresh cache and the
+   old one is deleted when the new worker activates. */
+const CACHE = 'ipom-%%BUILD_SHA%%';
 const FONT_CACHE = 'ipom-fonts-v1';
 const SHELL = [
   './',
@@ -32,6 +33,9 @@ const putIn = (name, req, res) => caches.open(name).then((c) => c.put(req, res))
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // A script asking for a fresh copy (the new-build check) goes straight to the network.
+  // Navigations still go through below, so a page always has its offline fallback.
+  if (req.mode !== 'navigate' && (req.cache === 'reload' || req.cache === 'no-store')) return;
   const url = new URL(req.url);
 
   // Google Fonts: cache first, so the app looks the same offline.
@@ -42,8 +46,10 @@ self.addEventListener('fetch', (e) => {
     })));
     return;
   }
-  // Anything else off-site (the GitHub API for the footer version) goes straight to the network.
+  // Anything else off-site goes straight to the network.
   if (url.origin !== self.location.origin) return;
+  // The build's version file and download are never served from the cache.
+  if (url.pathname.endsWith('/version.json') || url.pathname.endsWith('.zip')) return;
 
   // Pages: network first so a new deploy shows up right away, cached copy when offline.
   // Only the app page itself is stored as the offline app; other pages (the guides) are cached under their own URL.

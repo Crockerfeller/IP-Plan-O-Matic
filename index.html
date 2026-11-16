@@ -207,7 +207,7 @@
   .guide-grid a:hover { background: var(--row-hover); }
   .guide-grid b { display: block; color: var(--accent); font-size: 15px; margin-bottom: 4px; }
   .guide-grid span { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .tabbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .tabbar { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
   .tabbar nav.tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; border-bottom: 0; }
   .tabbar #plansBtn, .tabbar #reloadBtn { flex: none; height: 32px; margin-bottom: 4px; }
   .tabbar #themeBtn { flex: none; height: 32px; width: 32px; margin: 0 0 4px -4px; }
@@ -282,6 +282,14 @@
   #reloadBtn.busy svg { animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { #reloadBtn.busy svg { animation: none; } }
+  /* Build number above Reload; the button pulses green when a newer build is on the server */
+  .reload-wrap { flex: none; display: flex; flex-direction: column; align-items: center; margin-bottom: 4px; }
+  .tabbar .reload-wrap #reloadBtn { margin-bottom: 0; }
+  #buildNo { font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); margin-bottom: 2px; white-space: nowrap; }
+  #reloadBtn.ready { border-color: var(--ok); color: var(--ok); background: var(--ok-weak); animation: readyPulse 1.6s ease-in-out infinite; }
+  #buildNo.ready { color: var(--ok); }
+  @keyframes readyPulse { 0%, 100% { box-shadow: 0 0 0 0 var(--ok); } 50% { box-shadow: 0 0 0 4px transparent; background: var(--ok-weak); } 25%, 75% { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { #reloadBtn.ready { animation: none; } }
   dialog#plansDlg {
     width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
     border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
@@ -628,6 +636,7 @@
     .actions button { flex: 1 1 calc(50% - 4px); }
     th, td { padding: 8px 10px; }
     #plansBtn, #reloadBtn { width: 38px; padding: 0; justify-content: center; }
+    #buildNo .bn-word { display: none; }
     #plansBtn .btn-txt, #reloadBtn .btn-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   }
   /* Phone: logo and theme button share one row, so scale the logo (same proportions) to fit */
@@ -944,10 +953,13 @@
     <button type="button" role="tab" id="tb-v6" data-tab="v6">IPv6</button>
     <button type="button" role="tab" id="tb-learn" data-tab="learn">Guides</button>
   </nav>
-    <button type="button" id="reloadBtn" class="no-print" title="Reload the latest version of IP Plan-O-Matic, skipping cached copies. Your plan is kept.">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-      <span class="btn-txt">Reload</span>
-    </button>
+    <div class="reload-wrap no-print">
+      <span id="buildNo" hidden></span>
+      <button type="button" id="reloadBtn" title="Reload the latest version of IP Plan-O-Matic, skipping cached copies. Your plan is kept.">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        <span class="btn-txt">Reload</span>
+      </button>
+    </div>
     <button type="button" id="plansBtn" class="no-print" title="Save this plan in your browser, or open one you saved" aria-haspopup="dialog">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
       <span class="btn-txt">Plans</span>
@@ -5363,59 +5375,87 @@
     try { localStorage.setItem('subnetPlanner.theme', next); } catch (e) { /* ignore */ }
   });
 
-  // ---------- Check for updates: for copies run from a download, a git clone or localhost ----------
-  // .gitattributes marks index.html "ident", so git writes this file's blob hash into BUILD_ID on checkout and in
-  // GitHub's zip downloads. GitHub's API reports the blob hash of the latest index.html: equal hashes, same version.
-  // The keyword is only spelled out once, in BUILD_ID; everywhere else it is built from pieces so git leaves it alone.
-  const BUILD_ID = '$Id$';
+  // ---------- Build number, new-build notice and Check for updates ----------
+  // The deploy (tools/build_site.py, run by GitHub Actions) writes the commit hash and date into BUILD and publishes
+  // version.json next to the page. A copy that wasn't built that way, such as a git clone, keeps the placeholders:
+  // it is a dev build, with no build number and no update checks (git pull updates it).
+  const BUILD = { sha: '%%BUILD_SHA%%', date: '%%BUILD_DATE%%' };
+  const STAMPED = /^[0-9a-f]{40}$/.test(BUILD.sha);
   const REPO = 'Crockerfeller/IP-Plan-O-Matic';
-  const ZIP_URL = `https://github.com/${REPO}/archive/refs/heads/main.zip`;
-  const KW = '\\$' + 'Id';
-  const stampRe = new RegExp(`^${KW}: ([0-9a-f]{40}) \\$$`), stampAnyRe = new RegExp(`${KW}: [0-9a-f]{40} \\$`, 'g');
-  const localBlob = async () => {
-    const m = stampRe.exec(BUILD_ID);
-    if (m) return m[1];
-    // No stamp (a copy git didn't check out): hash this page's own source the way git does. Fails on file:// pages.
-    const res = await fetch(location.href.split('#')[0], { cache: 'no-store' });
-    if (!res.ok) throw new Error('read');
-    const body = new TextEncoder().encode((await res.text()).replace(stampAnyRe, '$' + 'Id$'));
-    const head = new TextEncoder().encode(`blob ${body.length}\0`);
-    const all = new Uint8Array(head.length + body.length);
-    all.set(head); all.set(body, head.length);
-    return [...new Uint8Array(await crypto.subtle.digest('SHA-1', all))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  const SITE = 'https://crockerfeller.github.io/IP-Plan-O-Matic/';
+  const ZIP_URL = SITE + 'IP-Plan-O-Matic.zip';
+  const OFFICIAL = location.hostname === 'crockerfeller.github.io';
+  const short = (sha) => sha.slice(0, 7);
+  const RELOAD_TITLE = $('reloadBtn').title;
+  let newBuild = null;
+
+  // The build number above Reload and in the footer; Reload turns green when a newer build is on the server.
+  const showBuild = () => {
+    const el = $('buildNo'), rb = $('reloadBtn'), ver = $('ver');
+    el.innerHTML = STAMPED ? `<span class="bn-word">Build </span>${short(BUILD.sha)}` : 'dev';
+    el.title = !STAMPED ? 'Development copy: not built by the deploy, so it has no build number'
+      : `Build ${short(BUILD.sha)} from ${BUILD.date} is loaded` + (newBuild ? `. Build ${short(newBuild.sha)} from ${newBuild.date} is available.` : '');
+    el.hidden = false;
+    const a = document.createElement('a');
+    a.href = STAMPED ? `https://github.com/${REPO}/commit/${BUILD.sha}` : `https://github.com/${REPO}/commits/main`;
+    a.textContent = STAMPED ? `Build ${short(BUILD.sha)} · ${BUILD.date}` : 'Dev build';
+    a.title = STAMPED ? 'The commit this page was built from' : 'This copy wasn’t built by the deploy, so it has no build number';
+    ver.replaceChildren(a);
+    ver.hidden = false;
+    el.classList.toggle('ready', !!newBuild);
+    rb.classList.toggle('ready', !!newBuild);
+    rb.title = newBuild ? `A newer build (${short(newBuild.sha)}, ${newBuild.date}) is available. Reload to use it. Your plan is kept.` : RELOAD_TITLE;
   };
+
+  // version.json is a few dozen bytes. cache: 'no-store' skips the browser cache, and sw.js passes such requests
+  // straight to the network.
+  const getVersion = async (base) => {
+    const res = await fetch(new URL('version.json', base), { cache: 'no-store' });
+    if (!res.ok) throw new Error(String(res.status));
+    const v = await res.json();
+    if (!v || !/^[0-9a-f]{40}$/.test(v.sha)) throw new Error('bad version.json');
+    return v;
+  };
+
+  // Newer build on the server this page came from: check every 30 minutes while the tab is visible, when it comes
+  // back into view (at most every 5 minutes) and when the browser comes back online.
+  const CHECK_EVERY = 30 * 60e3, RECHECK_ON_RETURN = 5 * 60e3;
+  let lastCheck = 0, checking = false;
+  const checkBuild = async () => {
+    if (newBuild || checking) return;
+    checking = true; lastCheck = Date.now();
+    try {
+      const v = await getVersion(location.href);
+      if (v.sha !== BUILD.sha) { newBuild = v; showBuild(); }
+    } catch (e) { /* offline, or no version.json where this copy is served: try again later */ } finally { checking = false; }
+  };
+  if (STAMPED && (location.protocol === 'https:' || location.protocol === 'http:')) {
+    setInterval(() => { if (!document.hidden) checkBuild(); }, CHECK_EVERY);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastCheck > RECHECK_ON_RETURN) checkBuild(); });
+    addEventListener('online', checkBuild);
+  }
+  showBuild();
+
+  // Check for updates: for downloaded copies. Compares this build with the hosted site's version.json (GitHub Pages
+  // allows cross-origin reads) and offers the zip the deploy builds. The hosted site is always current, so it has no link.
   const checkUpdates = async () => {
+    if (!STAMPED) { toast('This is a development copy. If you cloned it with git, run “git pull” to update it.'); return; }
     const b = $('updBtn');
     b.textContent = ' · Checking…';
     try {
-      let mine = null;
-      try { mine = await localBlob(); } catch (e) { /* unknown version */ }
-      const getJson = (u) => fetch(u, { headers: { Accept: 'application/vnd.github+json' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-      // (403 / 429 from GitHub means its hourly limit for anonymous requests is used up.)
-      const [latest, commits] = await Promise.all([
-        getJson(`https://api.github.com/repos/${REPO}/contents/index.html?ref=main`),
-        getJson(`https://api.github.com/repos/${REPO}/commits?path=index.html&per_page=1`).catch(() => []),
-      ]);
-      const c = Array.isArray(commits) && commits[0] && commits[0].commit;
-      const when = c ? ((c.committer && c.committer.date) || '').slice(0, 10) : '';
-      const what = c ? String(c.message || '').split('\n')[0] : '';
-      b.title = mine ? `This copy: ${mine.slice(0, 7)} · latest: ${String(latest.sha).slice(0, 7)}` : 'This copy’s version couldn’t be read';
-      b.dataset.local = mine || '';
-      if (mine && mine === latest.sha) { toast(`You have the latest version${when ? ` (updated ${when})` : ''}.`); return; }
-      const intro = mine ? 'A different, newer version of IP Plan-O-Matic is on GitHub' : 'Couldn’t tell which version this copy is. The latest on GitHub';
-      if (confirm(`${intro}${when ? ` was last changed ${when}: “${what}”` : ''}.\n\nDownload the latest version as a .zip?\n(If you cloned it with git, run “git pull” instead.)`)) {
+      const v = await getVersion(SITE);
+      if (v.sha === BUILD.sha) { toast(`You have the latest version (build ${short(v.sha)}, ${v.date}).`); return; }
+      if (confirm(`A newer version of IP Plan-O-Matic is available: build ${short(v.sha)} from ${v.date}. You have build ${short(BUILD.sha)} from ${BUILD.date}.\n\nDownload the new version as a .zip?`)) {
         const a = document.createElement('a');
         a.href = ZIP_URL;
         document.body.appendChild(a); a.click(); a.remove();
       }
     } catch (e) {
-      toast(e === 403 || e === 429 ? 'GitHub is limiting update checks right now. Try again in an hour.' : 'Couldn’t reach GitHub to check for updates. Try again when you’re online.');
+      toast('Couldn’t reach the IP Plan-O-Matic site to check for updates. Try again when you’re online.');
     } finally {
       b.textContent = ' · Check for updates';
     }
   };
-  // The hosted site always serves the latest version, so the link is only for other copies.
-  const OFFICIAL = location.hostname === 'crockerfeller.github.io';
   $('updBtn').hidden = OFFICIAL;
   $('updBtn').addEventListener('click', (e) => { e.preventDefault(); checkUpdates(); });
 
@@ -5428,10 +5468,12 @@
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();   // commit a half-typed edit
     clearTimeout(hashTimer); writeHash();
     try { await hashWritten; } catch (e) { /* ignore */ }
-    try {
+    // Cap the whole service-worker step: getRegistration() itself waits while a first install is still caching.
+    const swStep = (async () => {
       const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
-      if (reg) await Promise.race([reg.update(), new Promise((r) => setTimeout(r, 3000))]);
-    } catch (e) { /* offline or no service worker */ }
+      if (reg) await reg.update();
+    })().catch(() => { /* offline or no service worker */ });
+    await Promise.race([swStep, new Promise((r) => setTimeout(r, 3000))]);
     location.reload();
   });
 
@@ -5482,32 +5524,6 @@
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
   addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ }); });
 }
-/* Footer version: latest commit on main, from the public GitHub API */
-(() => {
-  const el = document.getElementById('ver');
-  // Only on the hosted site, where the latest commit is the version being served; copies use Check for updates.
-  if (!el || location.hostname !== 'crockerfeller.github.io') return;
-  const show = (sha, date) => {
-    const a = document.createElement('a');
-    a.href = 'https://github.com/Crockerfeller/IP-Plan-O-Matic/commit/' + sha;
-    a.textContent = 'v ' + sha.slice(0, 7) + (date ? ' · ' + date : '');
-    a.title = 'Latest commit on GitHub';
-    el.replaceChildren(a);
-    el.hidden = false;
-  };
-  try {
-    const c = JSON.parse(sessionStorage.getItem('ipom.ver') || 'null');
-    if (c && c.s) { show(c.s, c.d); return; }
-  } catch (e) { /* ignore */ }
-  fetch('https://api.github.com/repos/crockerfeller/IP-Plan-O-Matic/commits/main', { headers: { Accept: 'application/vnd.github+json' } })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(j => {
-      const d = ((j.commit && j.commit.committer && j.commit.committer.date) || '').slice(0, 10);
-      show(j.sha, d);
-      try { sessionStorage.setItem('ipom.ver', JSON.stringify({ s: j.sha, d })); } catch (e) { /* ignore */ }
-    })
-    .catch(() => { /* offline or rate-limited: leave hidden */ });
-})();
 </script>
 </body>
 </html>

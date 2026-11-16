@@ -40,9 +40,13 @@ Network engineers, sysadmins, cloud architects, homelabbers, and CCNA / Network+
 
 ## Run locally
 
-It's a single `index.html` with no build step. Open it in a browser. Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`.
+It's a single `index.html` with no build step. Open it in a browser. Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`. A copy run straight from the repo is a **dev build**: it shows "dev" instead of a build number.
 
-A local copy shows **Check for updates** in the footer. It compares your copy with the latest `index.html` on GitHub and offers the new version as a .zip (or run `git pull` in a clone). This works because `.gitattributes` marks `index.html` as `ident`: git stamps the file's blob hash into it on checkout and in GitHub's zip downloads.
+## Versions and deploys
+
+Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): the test suites run against the built site, and only if they all pass is it deployed to GitHub Pages. Pull requests run the tests without deploying.
+
+The build (`python3 tools/build_site.py _site`) stamps `index.html` and `sw.js` with the commit hash and date, writes `version.json`, and packs `IP-Plan-O-Matic.zip`. The page shows its build above the Reload button and in the footer. It checks `version.json` now and then, and turns Reload green when a newer build is live. A downloaded copy has **Check for updates** in the footer, which compares it with the live site and offers the new zip.
 
 ## Support
 
