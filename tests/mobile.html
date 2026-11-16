@@ -22,7 +22,7 @@ $('azDlg').close(); click('#tb-plan'); click('#peerBtn'); await sleep(50);
 const pr = $('peerDlg').getBoundingClientRect();
 check('peering dialog fits', $('peerDlg').open && pr.right <= D.documentElement.clientWidth + 1 && $('peerDlg').scrollWidth <= $('peerDlg').clientWidth + 1, { r: pr.right, sw: $('peerDlg').scrollWidth, cw: $('peerDlg').clientWidth });
 // Guide pages: the CIDR table and a few prefix pages (wide tables scroll inside their own box).
-for (const g of ['cidr-cheat-sheet', 'subnet-sizes', 'slash-26-subnet', 'slash-8-subnet', 'ipv6-slash-48']) {
+for (const g of ['cidr-cheat-sheet', 'subnet-sizes', 'subnetting-practice', 'slash-26-subnet', 'slash-8-subnet', 'ipv6-slash-48']) {
   await load('../learn/' + g + '.html');
   const de = D.documentElement;
   check(`no sideways scroll on guide ${g}`, de.scrollWidth <= de.clientWidth + 1, { sw: de.scrollWidth, cw: de.clientWidth });

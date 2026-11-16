@@ -32,7 +32,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 
 ## Guides
 
-Short references built from computed data, in [`learn/`](https://crockerfeller.github.io/IP-Plan-O-Matic/learn/): CIDR cheat sheet, host counts, VLSM, private ranges, IPv6 subnetting, subnet sizing for AWS, Azure, Google Cloud and Oracle Cloud, and a page for every subnet size from /8 to /32 plus IPv6 /48, /56 and /64. Rebuild them with `python3 tools/build_learn.py`.
+Short references built from computed data, in [`learn/`](https://crockerfeller.github.io/IP-Plan-O-Matic/learn/): CIDR cheat sheet, host counts, VLSM, private ranges, IPv6 subnetting, subnet sizing for AWS, Azure, Google Cloud and Oracle Cloud, a page for every subnet size from /8 to /32 plus IPv6 /48, /56 and /64, and a [subnetting practice](https://crockerfeller.github.io/IP-Plan-O-Matic/learn/subnetting-practice.html) quiz that checks each answer and shows the working. Rebuild them with `python3 tools/build_learn.py`.
 
 ## Who it's for
 

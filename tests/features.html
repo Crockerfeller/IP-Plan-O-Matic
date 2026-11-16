@@ -590,7 +590,7 @@ T.splitN = async () => {
 T.guidesTab = async () => {
   await load('../index.html#10.0.0.0/24');
   click('#tb-learn');
-  check('guides tab shows cards', !$('tab-learn').hidden && qa('#tab-learn .guide-grid a').length === 10 && qa('#tab-learn .guide-grid a').some((a) => a.href.endsWith('learn/subnet-sizes.html')), qa('#tab-learn .guide-grid a').length);
+  check('guides tab shows cards', !$('tab-learn').hidden && qa('#tab-learn .guide-grid a').length === 11 && qa('#tab-learn .guide-grid a').some((a) => a.href.endsWith('learn/subnet-sizes.html')), qa('#tab-learn .guide-grid a').length);
   const res = await Promise.all(qa('#tab-learn .guide-grid a').map((a) => fetch(a.href).then((r) => r.status)));
   check('every guide link resolves', res.every((s) => s === 200), res);
   click('#tb-plan');
@@ -606,6 +606,52 @@ T.guidesTab = async () => {
   check('cheat sheet links each prefix to its page', cheat.includes('<a href="slash-26-subnet.html">/26</a>') && !cheat.includes('slash-7-subnet'));
   const sm = await (await fetch('../sitemap.xml')).text();
   check('sitemap lists size pages', sm.includes('learn/slash-26-subnet.html') && sm.includes('learn/ipv6-slash-56.html') && sm.includes('learn/subnet-sizes.html'));
+};
+T.practice = async () => {
+  await load('../learn/subnetting-practice.html');
+  const P = W.ipomPractice;
+  check('practice engine loaded', !!P && typeof P.answer === 'function');
+  // The answers match Python's ipaddress on the accuracy suite's random networks.
+  const data = await (await fetch('accuracy-cases.json')).json();
+  let bad = 0;
+  for (const c of data.cases) {
+    const [a, m] = c.inp.split('/'), ip = P.toInt(a), p = Number(m);
+    const got = { net: P.answer('network', ip, p) + '/' + p, hi: P.answer('broadcast', ip, p), first: P.answer('first', ip, p), last: P.answer('last', ip, p), mask: P.answer('mask', ip, p), wild: P.answer('wildcard', ip, p), hosts: Number(P.answer('hosts', ip, p)) };
+    if (got.net !== c.net || got.hi !== c.hi || got.first !== c.first || got.last !== c.last || got.mask !== c.mask || got.wild !== c.wild || got.hosts !== c.hosts) { if (bad++ < 3) results.push('PRACTICE MISMATCH ' + JSON.stringify({ c, got })); }
+  }
+  check(`practice answers match Python ipaddress on ${data.cases.length} random networks`, bad === 0, bad);
+  check('practice: smallest subnet for N hosts', [[3, '/29'], [6, '/29'], [7, '/28'], [50, '/26'], [62, '/26'], [63, '/25'], [500, '/23'], [1022, '/22'], [1023, '/21']].every(([h, want]) => P.answer('fit', 0, 0, h) === want));
+  check('practice: subnets inside, same subnet', P.answer('count', 0, 24, 27) === '8' && P.answer('same', P.toInt('192.168.5.130'), 26, P.toInt('192.168.5.190')) === 'yes' && P.answer('same', P.toInt('192.168.5.130'), 26, P.toInt('192.168.5.200')) === 'no');
+  // Every kind at every level: the right answer is accepted, a wrong one isn't, and there's an explanation.
+  let s = 7; const rnd = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
+  let gbad = 0;
+  for (const level of ['easy', 'medium', 'hard']) for (const kind of Object.keys(P.KINDS)) for (let i = 0; i < 40; i++) {
+    const q = P.make(kind, level, rnd), right = P.answer(q.kind, q.ip, q.p, q.extra);
+    const ok = q.text && P.isRight(q, right) && !P.isRight(q, right + '9') && P.explain(q).length > 20 && q.p >= 8 && q.p <= 32 && q.ip >= 0 && q.ip < 2 ** 32;
+    if (!ok && gbad++ < 3) results.push('PRACTICE QUESTION ' + JSON.stringify({ q, right }));
+  }
+  check('practice: 1,320 generated questions accept their answer and explain it', gbad === 0, gbad);
+  const q1 = { kind: 'prefix', ip: 0, p: 26 }, q2 = { kind: 'hosts', ip: 0, p: 22 }, q3 = { kind: 'same', ip: 0, p: 24, extra: 1 }, q4 = { kind: 'network', ip: P.toInt('10.4.17.200'), p: 21 };
+  check('practice: answers in other forms', P.isRight(q1, '26') && P.isRight(q1, ' /26 ') && P.isRight(q2, '1,022') && P.isRight(q3, 'Yes') && P.isRight(q4, '10.004.016.000') && !P.isRight(q4, '10.4.16.1'));
+  check('practice: block-size working', P.explain(q4).includes('block size of 8 in the third octet') && P.explain(q4).includes('17 falls in the block 16–23'), P.explain(q4));
+  // The page: answer right, then wrong.
+  W.localStorage.removeItem('ipom.practice');
+  await load('../learn/subnetting-practice.html');
+  check('practice page shows a question', $('qText').textContent.endsWith('?'), $('qText').textContent);
+  // Read the current question back from the text by asking for one kind only.
+  qa('#qKinds input').forEach((c) => { c.checked = c.value === 'mask'; });
+  $('qKinds').dispatchEvent(new W.Event('change', { bubbles: true }));
+  const pfx = Number(/a \/(\d+)\?/.exec($('qText').textContent)[1]);
+  $('qIn').value = W.ipomPractice.answer('mask', 0, pfx);
+  $('qForm').requestSubmit(); await sleep(20);
+  check('practice: right answer scored', $('qFb').classList.contains('ok') && $('qScore').textContent === '1 / 1' && $('qCheck').textContent === 'Next question', [$('qFb').textContent, $('qScore').textContent]);
+  $('qForm').requestSubmit(); await sleep(20);
+  $('qIn').value = '1.2.3.4'; $('qForm').requestSubmit(); await sleep(20);
+  check('practice: wrong answer shows the answer and working', $('qFb').classList.contains('bad') && $('qFb').textContent.startsWith('The answer is 255.') && $('qScore').textContent === '1 / 2' && $('qStreak').textContent.startsWith('streak 0 · best 1'), $('qFb').textContent);
+  await load('../learn/subnetting-practice.html');
+  check('practice: score kept in this browser', $('qScore').textContent === '1 / 2');
+  click('#qReset');
+  check('practice: reset', $('qScore').textContent === '0 / 0');
 };
 T.tabParam = async () => {
   await load('../index.html?tab=v6#192.168.0.0/24/1.0/' + b64u({ v6: { p: 'fd12:3456:789a::/48', t: '0' } }));

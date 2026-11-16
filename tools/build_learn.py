@@ -126,6 +126,23 @@ tr.hi td { background: var(--accent-weak); }
 .sizes b { display: block; font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .sizes span { font-size: 12px; color: var(--muted); }
 .pager { margin-top: 20px; }
+.quiz { border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 16px 0 24px; background: var(--bg); }
+.qbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; font-size: 14px; }
+.qbar select { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); }
+.qstat { color: var(--muted); }
+.qstat b { color: var(--text); }
+.qtext { font-size: 20px; font-weight: 600; margin: 16px 0 12px; }
+.qform { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.qform input { flex: 1 1 200px; min-width: 0; font: 16px 'JetBrains Mono', ui-monospace, monospace; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); }
+.qform input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.qform .cta { border: 0; cursor: pointer; font: inherit; }
+.qlink { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.qfb { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; }
+.qfb.ok { background: var(--ok-weak); }
+.qfb.bad { background: var(--warn-weak); }
+.qkinds { margin-top: 14px; font-size: 14px; }
+.qkinds summary { cursor: pointer; color: var(--muted); }
+#qKinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; margin-top: 8px; }
 footer { margin-top: 28px; font-size: 13px; color: var(--muted); text-align: center; }
 footer a { color: var(--muted); }
 footer p { max-width: none; }
@@ -621,6 +638,46 @@ page('ipv6-subnetting', 'IPv6 subnetting: /48, /56 and /64, nibble boundaries an
         ('What size IPv6 subnet should a LAN use?', 'A /64. Stateless address autoconfiguration (SLAAC) requires exactly 64 bits for the interface ID.'),
         ('How many /64 subnets are in a /48?', '65,536. A /48 also holds 256 /56s or 16 /52s.'),
         ('What is a nibble boundary in IPv6?', 'A prefix length that is a multiple of 4 (/48, /52, /56, /60, /64). Each hex digit is 4 bits, so these prefixes change whole hex digits and keep addresses and reverse DNS readable.'),
+     ])
+
+# ---------------------------------------------------------------- Subnetting practice
+# The quiz itself is learn/practice.js (hand-written); this page is its markup and the method behind it.
+page('subnetting-practice', 'Subnetting practice: free IPv4 subnetting questions with answers',
+     'Practice IPv4 subnetting with random questions: network and broadcast addresses, first and last host, masks, wildcards, host counts and subnet sizes. Every answer is checked and the working is shown.',
+     f'''    <p class="lede">Random subnetting questions with the answer and the working, for the CCNA, Network+ or just keeping sharp. Nothing to sign up for; your score stays in this browser.</p>
+    <div class="quiz" id="quiz">
+      <div class="qbar">
+        <label>Level <select id="qLevel">
+          <option value="easy">Easy: /24 to /30</option>
+          <option value="medium" selected>Medium: /16 to /30</option>
+          <option value="hard">Hard: /8 to /30</option>
+        </select></label>
+        <span class="qstat"><b id="qScore">0 / 0</b> <span id="qStreak"></span> <button type="button" id="qReset" class="qlink">Reset</button></span>
+      </div>
+      <p class="qtext" id="qText" aria-live="polite">Loading a question…</p>
+      <form id="qForm" class="qform" autocomplete="off">
+        <input id="qIn" aria-label="Your answer" spellcheck="false" autocapitalize="off">
+        <button type="submit" id="qCheck" class="cta">Check</button>
+        <button type="button" id="qSkip" class="qlink">Show answer</button>
+      </form>
+      <p class="qfb" id="qFb" aria-live="polite" hidden></p>
+      <details class="qkinds"><summary>Question types</summary><div id="qKinds"></div></details>
+      <noscript><p>The practice questions need JavaScript.</p></noscript>
+    </div>
+    <script src="practice.js" defer></script>
+    <h2>The block-size method</h2>
+    <p>You can answer almost every subnetting question without binary:</p>
+    <ol>
+      <li><b>Find the interesting octet.</b> A /17 to /24 changes the third octet, /25 to /32 the last, /9 to /16 the second.</li>
+      <li><b>Find the block size.</b> It’s 256 minus the mask’s value in that octet. A /21 has mask 255.255.<b>248</b>.0, so the block size is 256 − 248 = <b>8</b>.</li>
+      <li><b>Find the block your address is in.</b> For 10.4.<b>17</b>.200/21, 17 is in the block 16–23. So the network is <b>10.4.16.0</b> and the broadcast is <b>10.4.23.255</b>.</li>
+      <li><b>First and last hosts</b> are one after the network and one before the broadcast: 10.4.16.1 to 10.4.23.254.</li>
+    </ol>
+    <p>Host counts are 2<sup>(32 − prefix)</sup> − 2; see <a href="how-many-hosts-in-a-subnet.html">how many hosts are in a subnet</a> and the <a href="subnet-sizes.html">page for each size</a>.</p>
+    {try_box('Check any answer in the planner: type the network on the Check &amp; summarize tab to see its range, mask and hosts.', app())}
+''', h1='Subnetting practice', faq=[
+        ('How do you find the network address of a subnet quickly?', 'Find the block size in the interesting octet (256 minus the mask value there), then round the address down to a multiple of the block size. For 10.4.17.200/21 the block size is 8 in the third octet, so the network is 10.4.16.0.'),
+        ('How do you find the broadcast address?', 'It is the last address of the block: the network address plus the block size, minus one, with the following octets at 255. For 10.4.17.200/21 that is 10.4.23.255.'),
      ])
 
 # ---------------------------------------------------------------- One page per prefix size
