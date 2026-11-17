@@ -1489,6 +1489,12 @@ T.ubiquitiAndFormatMenu = async () => {
   check('fmt menu: submenu pops out', !subOf(azure).hidden && azure.getAttribute('aria-expanded') === 'true');
   click(subOf(azure).querySelector('[data-fmt="bicep"]'));
   check('fmt menu: pick sets the format and closes', $('exFmt').value === 'bicep' && pop.hidden && $('exFmtCur').textContent === 'Bicep: Azure' && $('exOut').value.includes('Microsoft.Network/virtualNetworks'), $('exFmtCur').textContent);
+  // Submenu items sit outside the list, so check they still get the menu-item styles.
+  click('#exFmtBtn'); click(qa('#exFmtMenu .fm-parent')[0]);
+  const cs = (el) => W.getComputedStyle(el), labOff = (el) => Math.round(el.querySelector('.fm-lab').getBoundingClientRect().left - el.getBoundingClientRect().left), cfnB = q('.fmenu-sub [data-fmt="cfn-aws"]');
+  check('fmt menu: submenu items laid out like the list', cs(cfnB).display === 'flex' && labOff(cfnB) === labOff(q('#exFmtMenu [data-fmt="cisco"]')), [cs(cfnB).display, labOff(cfnB), labOff(q('#exFmtMenu [data-fmt="cisco"]'))]);
+  check('fmt menu: only the chosen item shows a tick', cs(cfnB.querySelector('.fm-tick')).visibility === 'hidden' && cs(q('.fmenu-sub [data-fmt="bicep"] .fm-tick')).visibility === 'visible');
+  click('#exFmtBtn');
   check('fmt menu: chosen item and its parent ticked', q('#exFmtMenu ~ .fmenu-sub [data-fmt="bicep"]').getAttribute('aria-checked') === 'true' && azure.querySelector('.fm-tick').style.visibility === 'visible');
   // A real mouse hovers before it clicks: the hover opens the submenu and the click must not shut it.
   const hover = (el) => el.dispatchEvent(new W.PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));

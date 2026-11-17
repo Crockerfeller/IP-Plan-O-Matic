@@ -637,11 +637,11 @@
   .fmenu-pop[hidden], .fmenu-sub[hidden] { display: none; }
   .fmenu-pop .fm-head { padding: 8px 10px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
   .fmenu-pop .fm-head:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--border); padding-top: 10px; }
-  .fmenu-pop button { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; border: 0; text-align: left; white-space: nowrap; }
-  .fmenu-pop button .fm-lab { flex: 1; }
-  .fmenu-pop button .fm-tick { width: 1em; visibility: hidden; }
-  .fmenu-pop button[aria-checked="true"] .fm-tick { visibility: visible; }
-  .fmenu-pop button[aria-checked="true"] { font-weight: 600; }
+  :is(.fmenu-pop, .fmenu-sub) button { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; border: 0; text-align: left; white-space: nowrap; }
+  :is(.fmenu-pop, .fmenu-sub) button .fm-lab { flex: 1; }
+  :is(.fmenu-pop, .fmenu-sub) button .fm-tick { width: 1em; visibility: hidden; }
+  :is(.fmenu-pop, .fmenu-sub) button[aria-checked="true"] .fm-tick { visibility: visible; }
+  :is(.fmenu-pop, .fmenu-sub) button[aria-checked="true"] { font-weight: 600; }
   .fm-ico { flex: none; width: 26px; height: 16px; }   /* one slot for logos, glyphs and badges so the names line up */
   .fm-ico.glyph { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
   .fm-badge { display: inline-flex; align-items: center; justify-content: center; height: 15px; padding: 0; box-sizing: border-box; border: 1px solid var(--border); border-radius: 4px; font-size: 8.5px; font-weight: 700; letter-spacing: .02em; line-height: 1; color: var(--muted); }
@@ -652,7 +652,7 @@
     #exFmtBtn { min-width: 0; width: 100%; }
     .fmenu-pop { min-width: 0; width: min(320px, calc(100vw - 32px)); }
     .fmenu-sub { position: static; box-shadow: none; border: 0; border-left: 2px solid var(--border); border-radius: 0; margin-left: 14px; min-width: 0; }
-    .fmenu-pop button { white-space: normal; height: auto; min-height: 34px; }
+    :is(.fmenu-pop, .fmenu-sub) button { white-space: normal; height: auto; min-height: 34px; }
   }
   kbd { font-family: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
 
