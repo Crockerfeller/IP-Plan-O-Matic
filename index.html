@@ -646,7 +646,7 @@
   .fm-ico.glyph { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
   .fm-badge { display: inline-flex; align-items: center; justify-content: center; height: 15px; padding: 0; box-sizing: border-box; border: 1px solid var(--border); border-radius: 4px; font-size: 8.5px; font-weight: 700; letter-spacing: .02em; line-height: 1; color: var(--muted); }
   .fm-group { position: relative; }
-  .fmenu-sub { position: fixed; z-index: 21; display: flex; flex-direction: column; min-width: 220px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+  .fmenu-sub { position: absolute; z-index: 21; display: flex; flex-direction: column; min-width: 220px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
   .fm-group > button[aria-expanded="true"] { background: var(--bg); }
   @media (max-width: 640px) {
     #exFmtBtn { min-width: 0; width: 100%; }
@@ -5466,7 +5466,7 @@
     return `<span class="fm-ico fm-badge" aria-hidden="true">${k}</span>`;
   };
   const fmtText = (v) => $('exFmt').querySelector(`option[value="${v}"]`).textContent;
-  const fmtPop = $('exFmtMenu');
+  const fmtPop = $('exFmtMenu'), fmtWrap = fmtPop.parentElement;
   const fmtItem = (v, label) => {
     const b = document.createElement('button');
     b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.dataset.fmt = v;
@@ -5474,6 +5474,9 @@
     b.querySelector('.fm-lab').textContent = label || fmtText(v);
     return b;
   };
+  // Submenus live beside the scrolling list (in .fmenu), not inside it, so nothing can clip them;
+  // on a phone they move into the list, under their parent. parentOf / subOf link the two.
+  const subOf = new Map(), parentOf = new Map();
   for (const [head, items] of FMT_MENU) {
     const h = document.createElement('div');
     h.className = 'fm-head'; h.setAttribute('role', 'presentation'); h.textContent = head;
@@ -5483,36 +5486,40 @@
     for (const it of items) {
       if (!Array.isArray(it[1])) { grp.append(fmtItem(it[0], it[1])); continue; }
       const wrap = document.createElement('div'), b = document.createElement('button'), sub = document.createElement('div');
+      const id = 'fmSub' + subOf.size;
       wrap.className = 'fm-group';
-      b.type = 'button'; b.className = 'fm-parent'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false');
+      b.type = 'button'; b.className = 'fm-parent'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', id);
       b.innerHTML = `<span class="fm-tick" aria-hidden="true">✓</span>${fmtIcon(it[0])}<span class="fm-lab"></span><span aria-hidden="true">▸</span>`;
       b.querySelector('.fm-lab').textContent = it[0];
-      sub.className = 'fmenu-sub'; sub.setAttribute('role', 'menu'); sub.setAttribute('aria-label', it[0]); sub.hidden = true;
+      sub.id = id; sub.className = 'fmenu-sub'; sub.setAttribute('role', 'menu'); sub.setAttribute('aria-label', it[0]); sub.hidden = true;
       for (const [v, label] of it[1]) sub.append(fmtItem(v, label));
-      wrap.append(b, sub); grp.append(wrap);
+      subOf.set(b, sub); parentOf.set(sub, b);
+      wrap.append(b); grp.append(wrap); fmtWrap.append(sub);
     }
   }
   const narrow = () => matchMedia('(max-width: 640px)').matches;
-  const fmtSubs = () => [...fmtPop.querySelectorAll('.fmenu-sub')];
+  const fmtSubs = () => [...subOf.values()];
   const fmtSub = (b, open) => {
-    const sub = b.nextElementSibling;
-    if (open) for (const o of fmtSubs()) if (o !== sub && !o.hidden) fmtSub(o.previousElementSibling, false);
+    const sub = subOf.get(b);
+    if (open) for (const o of fmtSubs()) if (o !== sub && !o.hidden) fmtSub(parentOf.get(o), false);
+    const home = open && narrow() ? b.parentElement : fmtWrap;
+    if (sub.parentElement !== home) home.append(sub);
     sub.hidden = !open; b.setAttribute('aria-expanded', String(open));
     if (!open || narrow()) { sub.style.left = sub.style.top = ''; if (open) sub.lastElementChild.scrollIntoView({ block: 'nearest' }); return; }
-    // Pop out beside the item, on whichever side has room, kept on screen.
-    const r = b.getBoundingClientRect(), w = sub.offsetWidth, hgt = sub.offsetHeight;
+    // Pop out beside the item, on whichever side has room, kept on screen. Coordinates are relative to .fmenu.
+    const r = b.getBoundingClientRect(), f = fmtWrap.getBoundingClientRect(), w = sub.offsetWidth, hgt = sub.offsetHeight;
     const right = r.right + 4 + w <= innerWidth - 8;
-    sub.style.left = `${right ? r.right + 4 : Math.max(8, r.left - 4 - w)}px`;
-    sub.style.top = `${Math.max(8, Math.min(r.top - 5, innerHeight - hgt - 8))}px`;
+    sub.style.left = `${(right ? r.right + 4 : Math.max(8, r.left - 4 - w)) - f.left}px`;
+    sub.style.top = `${Math.max(8, Math.min(r.top - 5, innerHeight - hgt - 8)) - f.top}px`;
   };
   const fmtOpen = (open, focus) => {
-    if (!open) { clearTimeout(hoverTimer); for (const o of fmtSubs()) fmtSub(o.previousElementSibling, false); }
+    if (!open) { clearTimeout(hoverTimer); for (const o of fmtSubs()) fmtSub(parentOf.get(o), false); }
     fmtPop.hidden = !open; $('exFmtBtn').setAttribute('aria-expanded', String(open));
     if (open && focus) {
       // Start on the chosen format, opening its submenu.
-      const cur = fmtPop.querySelector('[aria-checked="true"]');
+      const cur = fmtWrap.querySelector('[data-fmt][aria-checked="true"]');
       const sub = cur.closest('.fmenu-sub');
-      if (sub) fmtSub(sub.previousElementSibling, true);
+      if (sub) fmtSub(parentOf.get(sub), true);
       cur.scrollIntoView({ block: 'nearest' }); cur.focus();
     }
   };
@@ -5520,25 +5527,26 @@
     const v = $('exFmt').value;
     $('exFmtCur').textContent = fmtText(v);
     $('exFmtIco').innerHTML = fmtIcon(v);
-    for (const b of fmtPop.querySelectorAll('[data-fmt]')) b.setAttribute('aria-checked', String(b.dataset.fmt === v));
-    for (const b of fmtPop.querySelectorAll('.fm-parent')) b.querySelector('.fm-tick').style.visibility = b.nextElementSibling.querySelector(`[data-fmt="${v}"]`) ? 'visible' : '';
+    for (const b of fmtWrap.querySelectorAll('[data-fmt]')) b.setAttribute('aria-checked', String(b.dataset.fmt === v));
+    for (const [b, sub] of subOf) b.querySelector('.fm-tick').style.visibility = sub.querySelector(`[data-fmt="${v}"]`) ? 'visible' : '';
   };
   $('exFmt').addEventListener('change', fmtSync);
   fmtSync();
   $('exFmtBtn').addEventListener('click', (e) => { e.stopPropagation(); fmtOpen(fmtPop.hidden, true); });
   $('exFmtBtn').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); fmtOpen(true, true); } });
-  // With a mouse, hovering a parent has already opened its submenu, so the click that usually follows
-  // must keep it open, not toggle it shut. A click without a hover first (touch, keyboard) toggles.
+  const inMenu = (el) => el && el !== $('exFmtBtn') && (fmtPop.contains(el) || !!el.closest('.fmenu-sub'));
+  // A mouse click on a parent always opens its submenu (hovering may already have). Touch and keyboard toggle it,
+  // unless a hover opened it a moment ago.
   let hoverOpened = null, hoverAt = 0, hoverTimer = 0;
-  fmtPop.addEventListener('click', (e) => {
-    e.stopPropagation();
+  fmtWrap.addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (!b) return;
+    if (!inMenu(b)) return;
+    e.stopPropagation();
     if (b.classList.contains('fm-parent')) {
       clearTimeout(hoverTimer);
-      const sub = b.nextElementSibling, fresh = hoverOpened === b && performance.now() - hoverAt < 1500;
+      const sub = subOf.get(b), keep = e.pointerType === 'mouse' || (hoverOpened === b && performance.now() - hoverAt < 1500);
       hoverOpened = null;
-      fmtSub(b, sub.hidden || fresh);
+      fmtSub(b, sub.hidden || keep);
       if (!sub.hidden && e.detail === 0) sub.querySelector('button').focus();
       return;
     }
@@ -5553,35 +5561,39 @@
   const hoverTo = (b) => {
     const open = fmtSubs().find((o) => !o.hidden);
     if (b.classList.contains('fm-parent')) {
-      if (!b.nextElementSibling.hidden) return;
+      if (!subOf.get(b).hidden) return;
       fmtSub(b, true); hoverOpened = b; hoverAt = performance.now();
-    } else if (open) fmtSub(open.previousElementSibling, false);
+    } else if (open) fmtSub(parentOf.get(open), false);
   };
-  fmtPop.addEventListener('pointerover', (e) => {
+  fmtWrap.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse' || narrow()) return;
-    clearTimeout(hoverTimer);
+    if (e.target.closest('.fmenu-sub')) { clearTimeout(hoverTimer); return; }   // inside the open submenu: keep it
     const b = e.target.closest('button');
-    if (!b || b.closest('.fmenu-sub')) return;   // inside the open submenu: keep it
-    if (fmtSubs().some((o) => !o.hidden && o.previousElementSibling !== b)) hoverTimer = setTimeout(() => hoverTo(b), 250);
+    if (!inMenu(b)) return;
+    clearTimeout(hoverTimer);
+    if (fmtSubs().some((o) => !o.hidden && parentOf.get(o) !== b)) hoverTimer = setTimeout(() => hoverTo(b), 250);
     else hoverTo(b);
   });
-  fmtPop.addEventListener('keydown', (e) => {
+  fmtWrap.addEventListener('keydown', (e) => {
+    const a = document.activeElement;
+    if (!inMenu(a)) return;
     e.stopPropagation();
-    const a = document.activeElement, sub = a.closest('.fmenu-sub');
-    // Arrows move within the current level: the submenu, or the top level (skipping submenu items).
+    const sub = a.closest('.fmenu-sub');
+    // Arrows move within the current level: the submenu, or the top level.
     const level = sub ? [...sub.querySelectorAll('button')] : [...fmtPop.querySelectorAll('button')].filter((b) => !b.closest('.fmenu-sub'));
     const i = level.indexOf(a);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = level[(i + (e.key === 'ArrowDown' ? 1 : level.length - 1)) % level.length]; n.scrollIntoView({ block: 'nearest' }); n.focus(); }
     else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); level[e.key === 'Home' ? 0 : level.length - 1].focus(); }
-    else if (e.key === 'ArrowRight' && a.classList.contains('fm-parent')) { e.preventDefault(); fmtSub(a, true); a.nextElementSibling.querySelector('button').focus(); }
-    else if ((e.key === 'ArrowLeft' || e.key === 'Escape') && sub) { e.preventDefault(); const p = sub.previousElementSibling; fmtSub(p, false); p.focus(); }
+    else if (e.key === 'ArrowRight' && a.classList.contains('fm-parent')) { e.preventDefault(); fmtSub(a, true); subOf.get(a).querySelector('button').focus(); }
+    else if ((e.key === 'ArrowLeft' || e.key === 'Escape') && sub) { e.preventDefault(); const p = parentOf.get(sub); fmtSub(p, false); p.focus(); }
     else if (e.key === 'Escape') { e.preventDefault(); fmtOpen(false); $('exFmtBtn').focus(); }
     else if (e.key === 'Tab') fmtOpen(false);
   });
   document.addEventListener('click', (e) => { if (!fmtPop.hidden && !e.target.closest('.fmenu')) fmtOpen(false); });
   // Phones resize as the address bar hides, so keep the menu open and just move an open submenu.
-  addEventListener('resize', () => { for (const o of fmtSubs()) if (!o.hidden) fmtSub(o.previousElementSibling, true); });
-  fmtPop.addEventListener('scroll', () => { for (const o of fmtSubs()) if (!o.hidden) fmtSub(o.previousElementSibling, true); });
+  const fmtPlace = () => { for (const o of fmtSubs()) if (!o.hidden) fmtSub(parentOf.get(o), true); };
+  addEventListener('resize', fmtPlace);
+  fmtPop.addEventListener('scroll', fmtPlace);
   $('exCopy').addEventListener('click', async () => {
     if ($('exFmt').value === 'png') {
       // Copy the picture itself where the browser can; the promise keeps Safari's copy inside the click.
