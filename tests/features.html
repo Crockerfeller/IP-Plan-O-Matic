@@ -1477,6 +1477,9 @@ T.ubiquitiAndFormatMenu = async () => {
   check('fmt menu: cloud and Ubiquiti submenus', parents.join('|') === 'Amazon Web Services|Microsoft Azure|Google Cloud|Oracle Cloud (OCI)|Ubiquiti', parents);
   const opts = qa('#exFmt option').map((o) => o.value), items = qa('#exFmtMenu [data-fmt]').map((b) => b.dataset.fmt);
   check('fmt menu: every format once, in order', items.join() === opts.join(), [items, opts]);
+  check('fmt menu: every item has an icon', qa('#exFmtMenu button').every((b) => b.querySelector('.fm-ico')), qa('#exFmtMenu button').filter((b) => !b.querySelector('.fm-ico')).map((b) => b.textContent));
+  check('fmt menu: brand logos and badges', q('#exFmtMenu [data-fmt="cisco"] svg.fm-ico path') && q('#exFmtMenu [data-fmt="unifi"] svg.fm-ico') && q('#exFmtMenu [data-fmt="cfn-aws"] .fm-badge').textContent === 'AWS');
+  check('fmt menu: button shows the icon', !!q('#exFmtIco svg'));
   check('fmt menu: default still Cisco', $('exFmt').value === 'cisco' && $('exFmtCur').textContent === 'Cisco IOS / IOS-XE', $('exFmtCur').textContent);
   click('#exFmtBtn');
   check('fmt menu: opens', !pop.hidden && $('exFmtBtn').getAttribute('aria-expanded') === 'true');
