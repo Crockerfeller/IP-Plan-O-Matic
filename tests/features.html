@@ -1395,7 +1395,8 @@ T.networksUi = async () => {
   await load('../index.html#10.0.0.0/16');
   check('on-prem: add button in the row', chipsB().length === 0 && $('netAddBtn').textContent === '+ Add network' && $('netRowActs').contains($('netAddBtn')));
   select('#platform', 'azure');
-  check('cloud: one editable card, peering off', chipsB().length === 1 && chipsB()[0].classList.contains('editing') && chipsB()[0].contains($('network')) && chipsB()[0].contains($('platform')) && $('peerBtn').disabled);
+  check('cloud: one editable card, peering off', chipsB().length === 1 && chipsB()[0].classList.contains('editing') && chipsB()[0].contains($('network')) && !chipsB()[0].contains($('platform')) && $('peerBtn').disabled);
+  check('cloud: Platform stays in the toolbar, visible', $('platformField').parentElement === $('netForm') && !!$('platform').offsetParent && $('platformL').textContent === 'Platform');
   check('platform keeps focus after moving into the card', D.activeElement !== $('platform') || chipsB()[0].contains(D.activeElement));
   check('cloud word on add button', $('netAddBtn').textContent === '+ Add VNet');
   check('context bar names the VNet', !$('netCtx').hidden && $('netCtx').textContent.startsWith('Working in VNet 10.0.0.0/16 · Azure VNet'), $('netCtx').textContent);
@@ -1588,6 +1589,8 @@ T.onpremWizard = async () => {
   for (const [p, want] of [['azure', 'Azure subnet wizard…'], ['aws', 'AWS subnet wizard…']]) { select('#platform', p); check(`wizard button: ${p}`, !btn.hidden && label() === want, label()); }
   for (const p of ['gcp', 'oci']) { select('#platform', p); check(`wizard button hidden on ${p}`, btn.hidden); }
   select('#platform', 'std');
+  const spot = () => { const r = $('platform').getBoundingClientRect(); return { parent: $('platform').closest('.net-card') ? 'card' : 'toolbar', shown: r.width > 0 }; };
+  for (const p of ['azure', 'aws', 'std']) { select('#platform', p); const s2 = spot(); check(`Platform stays in the toolbar on ${p}`, s2.parent === 'toolbar' && s2.shown, s2); }
   click('#tplBtn');
   check('on-prem wizard opens, not the cloud one', $('siteDlg').open && !$('azDlg').open);
   check('a /24 is too small, so it suggests a /16', $('siteSpace').value === '10.10.0.0/16', $('siteSpace').value);

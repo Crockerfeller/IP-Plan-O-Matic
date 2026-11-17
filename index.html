@@ -427,6 +427,7 @@
   .net-edit { display: contents; }
   .net-card .net-edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; font-size: 14px; }
   .net-card .net-edit .field.grow { flex: 1 1 210px; }
+  #platformL { display: block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .net-card .net-edit #blockLabel { width: 150px !important; }
   .net-card .net-edit > button[type=submit] { order: 1; margin-left: auto; }
   @media (max-width: 640px) { .net-card.editing::after { display: none; } }   /* cards stack: the pointer would land on the next card */
@@ -1121,7 +1122,7 @@
       <div class="net-ctx" id="netCtx" hidden></div>
       <form class="row" id="netForm" autocomplete="off">
         <span id="netEditHome" hidden></span>
-        <!-- One network's settings. On-prem with a single network: inline in this row. Otherwise: inside the selected card. -->
+        <!-- One network's address space and name. On-prem with a single network: inline in this row. Otherwise: inside the selected card. -->
         <div class="net-edit" id="netEdit">
         <div class="field grow">
           <label for="network" id="networkL">Network address space</label>
@@ -1136,8 +1137,10 @@
           <input type="text" id="blockLabel" form="netForm" spellcheck="false" placeholder="e.g. HQ" maxlength="40" style="width:130px">
         </div>
         <button type="submit" form="netForm" class="primary">Update</button>
-        <div class="field">
-          <label for="platform">Platform</label>
+        </div>
+        <!-- Platform stays here in every layout, so it never jumps into a card. With several networks it sets the selected one. -->
+        <div class="field" id="platformField">
+          <label for="platform" id="platformL">Platform</label>
           <select id="platform" form="netForm" title="Changes which addresses are reserved in each subnet">
             <option value="std">Standard (on-prem)</option>
             <option value="aws">AWS VPC</option>
@@ -1145,7 +1148,6 @@
             <option value="gcp">Google Cloud VPC</option>
             <option value="oci">Oracle Cloud (OCI) VCN</option>
           </select>
-        </div>
         </div>
         <span class="net-row-acts" id="netRowActs"></span>
         <button type="button" id="tplBtn" class="wiz" title="Pick the Azure or AWS services you need (gateway, firewall, Bastion, delegated subnets…) and get a VNet or VPC, or a hub and spokes, with a correctly named, correctly sized subnet for each. Applying it replaces the current IPv4 plan."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.6 3.4 3.4 1.6-3.4 1.6L8 11.5 6.4 8.1 3 6.5l3.4-1.6z" fill="currentColor"/><path d="M13 10.5l.7 1.3 1.3.7-1.3.7-.7 1.3-.7-1.3-1.3-.7 1.3-.7z" fill="currentColor"/></svg>Azure / AWS subnet wizard…</button>
@@ -2556,6 +2558,8 @@
     let foc = ed.contains(document.activeElement) ? document.activeElement : null;
     $('networkL').textContent = cards ? 'Address space' : 'Network address space';
     $('blockLabelL').textContent = cards ? 'Name' : 'Network name';
+    $('platformL').textContent = many ? `Platform of ${blk().label || blockCidr(blk())}` : 'Platform';
+    $('platform').title = many ? `Changes which addresses are reserved in each subnet of the selected network (${blockCidr(blk())}). Pick a card to change another one.` : 'Changes which addresses are reserved in each subnet';
     const acts = $('netRowActs');
     acts.innerHTML = '';
     el.innerHTML = '';
