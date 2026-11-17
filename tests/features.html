@@ -734,6 +734,28 @@ T.exports3 = async () => {
   check('netbox: import hint', m.includes('IPAM → Prefixes → Import'), m);
   [t, m] = gen('netbox-vlans');
   check('netbox vlans: none in plan', t === '"vid","name","status"' && m.includes('no VLANs'), [t, m]);
+  // Route tables through Azure Firewall (on by default) and NSGs (opt-in), in all three Azure formats.
+  [t] = gen('az-ps');
+  check('az routes: default route to the firewall IP', t.includes("$FirewallIp = '10.0.0.4'") && t.includes("Add-Route 'rt-spoke-workload' 'default-via-firewall' '0.0.0.0/0'") && t.includes("Set-SubnetRouteTable 'vnet-spoke-workload' 'snet-web' 'rt-spoke-workload'"), t.slice(-4000));
+  check('az routes: gateway subnet routes each spoke via the firewall', /Add-RouteTable 'rt-hub-gateway' 'false'\nAdd-Route 'rt-hub-gateway' 'to-spoke-workload' '10\.0\.16\.0\/\d+'/.test(t) && t.includes("Set-SubnetRouteTable 'vnet-hub' 'GatewaySubnet' 'rt-hub-gateway'"), t.slice(-4000));
+  check('az routes: none on Bastion, App Gateway or the firewall', !/Set-SubnetRouteTable [^\n]*'(AzureBastionSubnet|snet-appgw|AzureFirewallSubnet)'/.test(t) && t.includes('# No route table on AzureBastionSubnet'), t.slice(-4000));
+  check('az routes: no NSGs unless asked', !t.includes('Add-Nsg '));
+  $('exAzNsg').checked = true;
+  [t] = gen('az-ps');
+  check('az nsg: one per subnet, skipping the ones Azure refuses', t.includes("Add-Nsg 'vnet-spoke-workload' 'snet-web' 'nsg-spoke-workload-web'") && !/Add-Nsg [^\n]*'(GatewaySubnet|AzureFirewallSubnet|AzureBastionSubnet)'/.test(t) && t.includes('# No NSG on GatewaySubnet'), t.slice(-3000));
+  [t] = gen('tf-azure');
+  check('tf azure: route table, association and nsg', t.includes('variable "firewall_private_ip"') && t.includes('resource "azurerm_route_table" "rt_spoke_workload"') && t.includes('next_hop_in_ip_address = var.firewall_private_ip') && t.includes('bgp_route_propagation_enabled = false') && /resource "azurerm_subnet_route_table_association" "snet_web" \{\n  subnet_id      = azurerm_subnet\.snet_web\.id/.test(t) && t.includes('resource "azurerm_subnet_network_security_group_association"'), t.slice(-3000));
+  [t] = gen('bicep');
+  check('bicep: subnet points at its route table and nsg', t.includes("param firewallPrivateIp string = '10.0.0.4'") && /name: 'snet-web'\n\s+properties: \{\n\s+addressPrefix: '[^']+'\n\s+routeTable: \{\n\s+id: rt_spoke_workload\.id\n\s+\}\n\s+networkSecurityGroup: \{\n\s+id: nsg_spoke_workload_web\.id/.test(t), t.slice(0, 3000));
+  $('exAzNsg').checked = false; $('exAzRt').checked = false;
+  [t] = gen('az-ps');
+  check('az routes: can be turned off', !t.includes('Add-RouteTable') && !t.includes('$FirewallIp'), t.slice(-1500));
+  $('exAzRt').checked = true;
+  click('#tb-export'); select('#exFmt', 'cisco');
+  check('az options only for Azure formats', $('exAzRtL').hidden && $('exAzNsgL').hidden);
+  select('#exFmt', 'bicep');
+  check('az options shown for Bicep', !$('exAzRtL').hidden && !$('exAzNsgL').hidden);
+  click('#tb-plan');
   [t] = gen('phpipam');
   check('phpipam: section, subnet, mask, master', t.includes('"IP Plan-O-Matic","10.0.0.64","26","AzureBastionSubnet","","10.0.0.0/23"'), t.slice(0, 500));
   // VLANs, and an undivided network: one row, not a container plus a prefix.
