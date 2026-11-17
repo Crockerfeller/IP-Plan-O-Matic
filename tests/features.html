@@ -483,6 +483,12 @@ T.exports2 = async () => {
   check('pfsense: adds, saves and applies', t.includes("config_set_path('vlans/vlan', $vlans);") && t.includes('write_config(') && t.includes('interface_vlan_configure($a[1]);') && t.includes('services_dhcpd_configure();') && t.includes('filter_configure();'), t.slice(-900));
   check('pfsense: only PHP, no stray close tag', (t.match(/\?>/g) || []).length === 0, t);
   check('pfsense: .php download hint', $('exMsg').textContent.includes('Execute PHP Commands'), $('exMsg').textContent);
+  t = gen('opnsense');
+  check('opnsense: two-part api script', t.startsWith('#!/usr/bin/env bash') && t.includes('vlans) vlans;;') && t.includes('dhcp) dhcp;;') && t.includes('-u "$OPN_KEY:$OPN_SECRET"'), t.slice(0, 1500));
+  check('opnsense: vlan request', t.includes('api POST interfaces/vlan_settings/add_item "{\\"vlan\\":{\\"if\\":\\"${PARENT:-PARENT}\\",\\"tag\\":\\"10\\",\\"pcp\\":\\"0\\",\\"proto\\":\\"\\",\\"vlanif\\":\\"vlan010\\",\\"descr\\":"\'"Servers"\'"}}"'), t);
+  check('opnsense: kea subnet keeps our gateway', t.includes(`api POST kea/dhcpv4/add_subnet '{"subnet4":{"subnet":"10.0.0.0/24","pools":"10.0.0.2-10.0.0.254","option_data_autocollect":"0","option_data":{"routers":"10.0.0.1","domain_name_servers":"10.0.0.1"},"description":"Servers"}}'`), t);
+  check('opnsense: assignment checklist', /vlan010 +10 +SERVERS +10\.0\.0\.1\/24/.test(t) && t.includes('Interfaces > Assignments'), t);
+  check('opnsense: hint', $('exMsg').textContent.includes('API key'), $('exMsg').textContent);
   t = gen('ansible');
   check('ansible yaml', t.startsWith('---') && t.includes('  - name: "Servers"') && t.includes('    vlan: 10') && t.includes('  - name: "Wifi'), t.slice(0, 600));
   t = gen('md');
@@ -674,7 +680,7 @@ T.hardening = async () => {
   check('link bad vlan dropped', r0.querySelector('input.vlan').value === '', r0.querySelector('input.vlan').value);
   check('link bad status dropped', r0.querySelector('select.status').value === 'free');
   click('#tb-export'); select('#exInc', 'all');
-  for (const f of ['cisco', 'junos', 'mikrotik', 'arista', 'tf-aws', 'pfsense', 'edgeos', 'unifi']) {
+  for (const f of ['cisco', 'junos', 'mikrotik', 'arista', 'tf-aws', 'pfsense', 'opnsense', 'edgeos', 'unifi']) {
     select('#exFmt', f);
     check(`${f}: no injected line from link`, !/^(username|ip route)/m.test($('exOut').value), $('exOut').value);
   }
