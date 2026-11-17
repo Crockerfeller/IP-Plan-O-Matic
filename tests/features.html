@@ -1587,7 +1587,7 @@ T.onpremWizard = async () => {
   const btn = $('tplBtn'), label = () => btn.textContent.trim();
   check('wizard button: on-prem on Standard', !btn.hidden && label() === 'On-prem network wizard…', label());
   for (const [p, want] of [['azure', 'Azure subnet wizard…'], ['aws', 'AWS subnet wizard…']]) { select('#platform', p); check(`wizard button: ${p}`, !btn.hidden && label() === want, label()); }
-  for (const p of ['gcp', 'oci']) { select('#platform', p); check(`wizard button hidden on ${p}`, btn.hidden); }
+  for (const [p, want] of [['gcp', 'Google Cloud subnet wizard…'], ['oci', 'Oracle Cloud subnet wizard…']]) { select('#platform', p); check(`wizard button: ${p}`, !btn.hidden && label() === want, label()); }
   select('#platform', 'std');
   const spot = () => { const r = $('platform').getBoundingClientRect(); return { parent: $('platform').closest('.net-card') ? 'card' : 'toolbar', shown: r.width > 0 }; };
   for (const p of ['azure', 'aws', 'std']) { select('#platform', p); const s2 = spot(); check(`Platform stays in the toolbar on ${p}`, s2.parent === 'toolbar' && s2.shown, s2); }
@@ -1623,6 +1623,45 @@ T.onpremWizard = async () => {
   type('#siteSpace', other.replace(/\/\d+$/, '/16'));
   check('overlap with another base network is refused', $('siteSum').textContent.includes(`overlaps ${other}`) && $('siteApply').disabled, [other, $('siteSum').textContent]);
   $('siteDlg').close();
+};
+T.gcpOciWizards = async () => {
+  const tick = (id) => qa(`#azVnets input[type=checkbox][data-svc="${id}"]`).forEach((b) => { if (!b.checked) b.click(); });
+  const exportAll = (f) => { click('#tb-export'); select('#exInc', 'all'); select('#exFmt', f); const v = $('exOut').value; click('#tb-plan'); return v; };
+  // Google Cloud: one VPC, two regions, GKE with secondary ranges and private services access.
+  await load('../index.html#192.168.0.0/24');
+  select('#platform', 'gcp'); click('#tplBtn');
+  check('gcp wizard opens', $('azDlg').open && $('azTtl').textContent === 'Google Cloud VPC with service subnets' && $('azCloud').value === 'gcp', $('azTtl').textContent);
+  check('gcp: regions, not zones', !$('azZonesF').hidden && $('azZonesL').textContent === 'Regions' && $('azZones').value === 'us-central1', [$('azZonesL').textContent, $('azZones').value]);
+  const conn = q('#azVnets select[data-svc="gcp-vpcac"]');
+  check('gcp: Serverless VPC Access connector is exactly a /28', conn && [...conn.options].map((o) => o.value).join() === '28', conn && [...conn.options].map((o) => o.value));
+  check('gcp: private services access offers up to a /16', [...q('#azVnets select[data-svc="gcp-psa"]').options].some((o) => o.value === '16'));
+  type('#azZones', 'us-central1, europe-west1');
+  for (const id of ['gcp-gke', 'gcp-gke-pods', 'gcp-gke-svc', 'gcp-psa']) tick(id);
+  check('gcp: subnets repeat per region, the global range once', $('azOut').textContent.includes('proxy-only-us-central1') && $('azOut').textContent.includes('proxy-only-europe-west1') && $('azOut').textContent.includes('psa-range') && !$('azOut').textContent.includes('psa-range-'), $('azOut').textContent.slice(0, 600));
+  click('#azApply'); await sleep(50);
+  check('gcp: applied as a Google Cloud VPC', $('platform').value === 'gcp' && $('tplBtn').textContent.trim() === 'Google Cloud subnet wizard…');
+  let t = exportAll('tf-gcp');
+  check('gcp tf: proxy-only purpose and role', /name          = "proxy-only-us-central1"[\s\S]*?region        = "us-central1"[\s\S]*?purpose       = "REGIONAL_MANAGED_PROXY"\n  role          = "ACTIVE"/.test(t), t.slice(0, 2000));
+  check('gcp tf: GKE ranges become secondary ranges on the node subnet', /resource "google_compute_subnetwork" "gke_nodes_us_central1" \{[\s\S]*?secondary_ip_range \{\n    range_name    = "pods"[\s\S]*?range_name    = "services"/.test(t) && !t.includes('"gke_pods_us_central1"'), t);
+  check('gcp tf: private services access range and connection', /resource "google_compute_global_address" "psa_range" \{[\s\S]*?purpose       = "VPC_PEERING"/.test(t) && t.includes('reserved_peering_ranges = [google_compute_global_address.psa_range.name]'), t.slice(-1500));
+  // Google Cloud hub and spoke: VPC Network Peering, hub exports routes.
+  select('#platform', 'gcp'); click('#tplBtn'); select('#azLayout', 'hub'); type('#azSpace', '10.0.0.0/14');
+  click('#azApply'); await sleep(50);
+  t = exportAll('tf-gcp');
+  check('gcp tf: one VPC per network, peered both ways', t.includes('resource "google_compute_network" "hub"') && t.includes('resource "google_compute_network" "spoke_workload"') && /"hub_to_spoke_workload" \{[\s\S]*?export_custom_routes = true/.test(t) && /"spoke_workload_to_hub" \{[\s\S]*?import_custom_routes = true\n  depends_on/.test(t), t.slice(-1500));
+  click('#peerBtn'); await sleep(50);
+  check('peering dialog explains Google Cloud', !$('peerGcp').hidden && $('peerAz').hidden && $('peerAws').hidden && $('peerOci').hidden);
+  $('peerDlg').close();
+  // Oracle Cloud hub and spoke: a DRG with every VCN attached.
+  await load('../index.html#192.168.0.0/24');
+  select('#platform', 'oci'); click('#tplBtn');
+  check('oci wizard opens, no zones', $('azDlg').open && $('azTtl').textContent === 'Oracle Cloud VCN with service subnets' && $('azZonesF').hidden, $('azTtl').textContent);
+  select('#azLayout', 'hub');
+  check('oci: hub has the Network Firewall', $('azVnets').textContent.includes('Hub VCN (shared network: firewall and shared services)') && !!q('#azVnets input[data-svc="oci-nfw"]:checked'));
+  click('#azApply'); await sleep(50);
+  t = exportAll('tf-oci');
+  check('oci tf: DRG with both VCNs attached', t.includes('resource "oci_core_drg" "main"') && /resource "oci_core_drg_attachment" "hub" \{[\s\S]*?network_details \{\n    id   = oci_core_vcn\.hub\.id\n    type = "VCN"/.test(t) && t.includes('resource "oci_core_drg_attachment" "spoke_workload"'), t.slice(-1500));
+  check('oci tf: firewall subnet in the hub', /display_name   = "firewall"/.test(t), t.slice(0, 1500));
 };
 (async () => {
   const only = new URLSearchParams(location.search).get('t');

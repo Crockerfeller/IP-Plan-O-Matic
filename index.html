@@ -339,6 +339,7 @@
   .peer-pairs { display: grid; gap: 4px; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; max-height: 40vh; overflow: auto; }
   .peer-pair { display: flex; gap: 10px; align-items: center; min-height: 32px; font-size: 14px; cursor: pointer; overflow-wrap: anywhere; }
   .peer-opts { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: flex-end; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  .peer-opts p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 13px; }
   .peer-opts h3 { width: 100%; margin: 0; font-size: 14px; }
   .peer-opts > label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
   #peerMsg { margin-top: 12px; }
@@ -926,6 +927,8 @@
         <select id="azCloud">
           <option value="azure">Azure VNets</option>
           <option value="aws">AWS VPCs</option>
+          <option value="gcp">Google Cloud VPCs</option>
+          <option value="oci">Oracle Cloud VCNs</option>
         </select>
       </div>
       <div class="field">
@@ -940,7 +943,7 @@
         <input type="text" id="azSpace" spellcheck="false" value="10.0.0.0/16" style="width:170px" title="The hub and spokes are placed inside this range, hub first, each on its own boundary">
       </div>
       <div class="field grow" id="azZonesF" hidden>
-        <label for="azZones">Availability Zones</label>
+        <label for="azZones" id="azZonesL">Availability Zones</label>
         <input type="text" id="azZones" spellcheck="false" value="us-east-1a, us-east-1b, us-east-1c" title="Each subnet is made once per zone">
       </div>
       <button type="button" id="azAddSpoke">Add spoke</button>
@@ -988,7 +991,7 @@
       <h2 id="peerTtl">Peering</h2>
       <button type="button" class="icon" id="peerClose" aria-label="Close">✕</button>
     </div>
-    <p class="sub">Choose which base networks connect to each other. The Azure and AWS Terraform exports then include them: Azure VNet peerings, or an AWS Transit Gateway or VPC peering connections, with routes. Only networks on the same cloud can be peered.</p>
+    <p class="sub">Choose which base networks connect to each other. The Terraform exports then include them: Azure VNet peerings, an AWS Transit Gateway or VPC peering connections with routes, Google Cloud VPC Network Peering, or an Oracle Cloud DRG. Only networks on the same cloud can be peered.</p>
     <div class="row">
       <div class="field">
         <label for="peerMode">Layout</label>
@@ -1020,6 +1023,14 @@
         </select>
       </div>
       <label><input type="checkbox" id="peerRoutes"> Add routes to each VPC’s main route table</label>
+    </div>
+    <div id="peerGcp" class="peer-opts">
+      <h3>Google Cloud</h3>
+      <p class="muted">VPC Network Peering in both directions. In hub and spoke, the hub exports its custom routes and the spokes import them, so a firewall appliance in the hub can be the spokes’ way out. Peering isn’t transitive: spokes reach each other only through such an appliance.</p>
+    </div>
+    <div id="peerOci" class="peer-opts">
+      <h3>Oracle Cloud</h3>
+      <p class="muted">One DRG (Dynamic Routing Gateway) with every VCN attached. Each subnet’s route table still needs rules sending the other VCNs’ ranges to the DRG.</p>
     </div>
     <div class="msg" id="peerMsg" role="status"></div>
     <div class="row dlg-foot">
@@ -1743,19 +1754,64 @@
     { id: 'aws-ekscp',    role: 'spoke', label: 'EKS cluster (control plane ENIs)', name: 'eks-cluster', min: 28, rec: 28, on: false, minAz: 2, doc: 'eks/latest/userguide/network-reqs.html', tip: 'At least 6 free addresses each (16 recommended), in two or more AZs' },
     { id: 'aws-eksnodes', role: 'spoke', label: 'EKS nodes and pods (VPC CNI)', name: 'eks-nodes', min: 24, rec: 20, on: false, soft: true, doc: 'eks/latest/userguide/network-reqs.html', tip: 'With the VPC CNI every pod takes a VPC address: size for pods, not just nodes' },
   ];
+  // Google Cloud: subnets are regional, so each one is made once per region listed. Checked against Google Cloud docs,
+  // November 2026. purpose: set on the subnet in the Terraform export. secondary: a GKE secondary range on the gke-nodes
+  // subnet, not a subnet of its own. once: one per VPC, not per region (private services access is a global range).
+  // max: the largest size offered (the menus otherwise start three steps above the recommendation).
+  const GCP_SVCS = [
+    { id: 'gcp-nva',      role: 'hub',   label: 'Network virtual appliances (firewalls)', name: 'nva', min: 29, rec: 28, on: true, soft: true, tip: 'For third-party firewalls the spokes route through' },
+    { id: 'gcp-shared',   role: 'hub',   label: 'Shared services (DNS, AD, jump hosts)', name: 'shared-services', min: 29, rec: 26, on: true },
+    { id: 'gcp-proxy',    role: 'spoke', label: 'Proxy-only (regional Application / proxy Network LBs)', name: 'proxy-only', min: 26, rec: 23, on: true, purpose: 'REGIONAL_MANAGED_PROXY', doc: 'load-balancing/docs/proxy-only-subnets', tip: 'One per region in each VPC that uses Envoy-based load balancers: a /26 at least, and Google suggests starting with a /23' },
+    { id: 'gcp-web',      role: 'spoke', label: 'Workload: web tier', name: 'web', min: 29, rec: 24, on: true },
+    { id: 'gcp-app',      role: 'spoke', label: 'Workload: app tier', name: 'app', min: 29, rec: 24, on: true },
+    { id: 'gcp-data',     role: 'spoke', label: 'Workload: data tier', name: 'data', min: 29, rec: 24, on: true },
+    { id: 'gcp-psa',      role: 'spoke', label: 'Private services access (Cloud SQL, Memorystore…)', name: 'psa-range', min: 24, rec: 20, max: 16, once: true, on: false, doc: 'vpc/docs/configure-private-services-access', tip: 'A global range reserved for Google’s managed services, one per VPC: a /24 at least, and Google recommends a /16' },
+    { id: 'gcp-run',      role: 'spoke', label: 'Cloud Run Direct VPC egress', name: 'run-egress', min: 26, rec: 24, on: false, doc: 'run/docs/configuring/vpc-direct-vpc', tip: 'A /26 or larger. Cloud Run takes addresses 16 at a time: allow twice your instances plus a buffer' },
+    { id: 'gcp-vpcac',    role: 'spoke', label: 'Serverless VPC Access connector', name: 'vpc-connector', min: 28, rec: 28, max: 28, on: false, doc: 'vpc/docs/configure-serverless-vpc-access', tip: 'Exactly a /28 for each connector. Google recommends Direct VPC egress instead where it fits' },
+    { id: 'gcp-psc',      role: 'spoke', label: 'Private Service Connect (publishing a service)', name: 'psc-nat', min: 29, rec: 28, on: false, soft: true, purpose: 'PRIVATE_SERVICE_CONNECT', doc: 'vpc/docs/configure-private-service-connect-producer', tip: 'NAT addresses for a service you publish, in its load balancer’s region. Google sets no size beyond a subnet’s /29 minimum' },
+    { id: 'gcp-gke',      role: 'spoke', label: 'GKE nodes', name: 'gke-nodes', min: 29, rec: 22, on: false, soft: true, doc: 'kubernetes-engine/docs/concepts/alias-ips', tip: 'The subnet the nodes use: a /22 holds 1,020 nodes' },
+    { id: 'gcp-gke-pods', role: 'spoke', label: 'GKE Pods (secondary range on gke-nodes)', name: 'gke-pods', min: 21, rec: 18, max: 14, on: false, soft: true, secondary: 'pods', doc: 'kubernetes-engine/docs/concepts/alias-ips', tip: 'Each node takes a /24 for up to 110 Pods, so a /18 serves 64 nodes. Google advises caution below a /21' },
+    { id: 'gcp-gke-svc',  role: 'spoke', label: 'GKE Services (secondary range on gke-nodes)', name: 'gke-services', min: 28, rec: 20, on: false, soft: true, secondary: 'services', doc: 'kubernetes-engine/docs/concepts/alias-ips', tip: 'GKE’s default is a /20. Newer clusters can use GKE’s own 34.118.224.0/20 instead: then untick this' },
+  ];
+  // Oracle Cloud: regional subnets. Oracle gives few minimum sizes, so most sizes follow its examples (soft).
+  // Checked against Oracle docs, November 2026.
+  const OCI_SVCS = [
+    { id: 'oci-nfw',       role: 'hub',   label: 'Network Firewall', name: 'firewall', min: 29, rec: 28, on: true, soft: true, doc: 'network-firewall/overview.htm', tip: 'The spokes route through it via the DRG. Oracle sets no size; with NAT it needs 4 or 5 spare addresses' },
+    { id: 'oci-shared',    role: 'hub',   label: 'Shared services (DNS, AD, jump hosts)', name: 'shared-services', min: 29, rec: 26, on: true },
+    { id: 'oci-lb',        role: 'spoke', label: 'Public: load balancers', name: 'lb-public', min: 29, rec: 26, on: true, soft: true, doc: 'Balance/Tasks/managingloadbalancer.htm', tip: 'A public load balancer takes 2 addresses in a regional subnet' },
+    { id: 'oci-app',       role: 'spoke', label: 'Private: application', name: 'private-app', min: 29, rec: 24, on: true },
+    { id: 'oci-db',        role: 'spoke', label: 'Private: databases', name: 'private-db', min: 29, rec: 24, on: true },
+    { id: 'oci-fss',       role: 'spoke', label: 'File Storage mount targets', name: 'fss', min: 29, rec: 28, on: false, doc: 'File/Tasks/managingmounttargets.htm', tip: 'Each mount target takes 3 addresses, so a /28 holds 4. Not a /30 or smaller' },
+    { id: 'oci-oke-api',   role: 'spoke', label: 'OKE: Kubernetes API endpoint', name: 'oke-api', min: 30, rec: 29, on: false, soft: true, doc: 'ContEng/Concepts/contengnetworkconfig.htm', tip: 'Oracle’s examples use a /30 or a /29' },
+    { id: 'oci-oke-nodes', role: 'spoke', label: 'OKE: worker nodes', name: 'oke-nodes', min: 29, rec: 24, on: false, soft: true, doc: 'ContEng/Concepts/contengnetworkconfig.htm' },
+    { id: 'oci-oke-pods',  role: 'spoke', label: 'OKE: Pods (VCN-native pod networking)', name: 'oke-pods', min: 24, rec: 19, max: 16, on: false, soft: true, doc: 'ContEng/Concepts/contengpodnetworking_topic-OCI_CNI_plugin.htm', tip: 'Every Pod takes a VCN address, up to 256 per node. Oracle’s example uses a /19' },
+    { id: 'oci-oke-lb',    role: 'spoke', label: 'OKE: service load balancers', name: 'oke-lb', min: 29, rec: 24, on: false, soft: true, doc: 'ContEng/Concepts/contengnetworkconfig.htm' },
+  ];
   // One template per cloud: the dialog, placement and checks are shared.
   const TEMPLATES = {
-    azure: { cloud: 'azure', net: 'VNet', svcs: AZURE_SVCS, docBase: LEARN, maxNet: 8, title: 'Azure hub-and-spoke with service subnets',
+    azure: { cloud: 'azure', net: 'VNet', svcs: AZURE_SVCS, docBase: LEARN, docName: 'Microsoft Learn', hubWhat: 'services', maxNet: 8, title: 'Azure hub-and-spoke with service subnets',
       sub: 'Pick the Azure services you need. Each one gets a subnet of its own, named and sized for it: the hub VNet holds the shared services (gateway, firewall, Bastion, DNS), and each spoke VNet holds workloads. Sizes start at Microsoft’s recommendation; the menus never go below the minimum. Applying replaces the IPv4 plan, and Undo brings it back.',
       singleTitle: 'Azure VNet with service subnets',
       singleSub: 'Pick the Azure services you need. Each one gets a subnet of its own in this VNet, with the name or delegation Azure requires and a size from Microsoft’s recommendation; the menus never go below the minimum. Need shared services in a hub instead? Convert to hub and spoke, and your choices carry over. Applying replaces the IPv4 plan, and Undo brings it back.' },
-    aws: { cloud: 'aws', net: 'VPC', svcs: AWS_SVCS, docBase: 'https://docs.aws.amazon.com/', maxNet: 16, zones: true, title: 'AWS hub-and-spoke with service subnets',
+    aws: { cloud: 'aws', net: 'VPC', svcs: AWS_SVCS, docBase: 'https://docs.aws.amazon.com/', docName: 'AWS docs', hubWhat: 'network: inspection and egress', maxNet: 16, zones: true,
+      zoneWord: 'Availability Zones', zoneOne: 'Availability Zone', zoneCol: 'Zone', zoneDefault: 'us-east-1a, us-east-1b, us-east-1c', title: 'AWS hub-and-spoke with service subnets',
       sub: 'Pick the AWS services you need. Each gets a subnet of its own in every Availability Zone: the hub VPC holds the shared network (Transit Gateway attachments, Network Firewall, central NAT), and each spoke VPC holds workloads, all joined by a Transit Gateway. VPCs can be /16 at most. Applying replaces the IPv4 plan, and Undo brings it back.',
       singleTitle: 'AWS VPC with service subnets',
       singleSub: 'Pick the AWS services you need. Each gets a subnet of its own in every Availability Zone of this VPC, sized from AWS guidance. A VPC can be /16 at most. Need a shared network hub instead? Convert to hub and spoke, and your choices carry over. Applying replaces the IPv4 plan, and Undo brings it back.' },
+    gcp: { cloud: 'gcp', net: 'VPC', svcs: GCP_SVCS, docBase: 'https://cloud.google.com/', docName: 'Google Cloud docs', hubWhat: 'network: appliances and shared services', maxNet: 8, zones: true,
+      zoneWord: 'Regions', zoneOne: 'region', zoneCol: 'Region', zoneDefault: 'us-central1',
+      title: 'Google Cloud hub-and-spoke with service subnets',
+      sub: 'Pick the Google Cloud services you need. Each gets a subnet of its own in every region you list: the hub VPC holds network appliances and shared services, and each spoke VPC holds workloads, joined by VPC Network Peering. Peering isn’t transitive, so spokes reach each other only through an appliance in the hub. Applying replaces the IPv4 plan, and Undo brings it back.',
+      singleTitle: 'Google Cloud VPC with service subnets',
+      singleSub: 'Pick the Google Cloud services you need. Each gets a subnet of its own in every region you list, sized from Google’s guidance; the GKE Pod and Service ranges become secondary ranges on the GKE node subnet in the Terraform export. Need a shared hub instead? Convert to hub and spoke, and your choices carry over. Applying replaces the IPv4 plan, and Undo brings it back.' },
+    oci: { cloud: 'oci', net: 'VCN', svcs: OCI_SVCS, docBase: 'https://docs.oracle.com/en-us/iaas/Content/', docName: 'Oracle docs', hubWhat: 'network: firewall and shared services', maxNet: 16,
+      title: 'Oracle Cloud hub-and-spoke with service subnets',
+      sub: 'Pick the OCI services you need. Each gets a regional subnet of its own: the hub VCN holds the Network Firewall and shared services, and each spoke VCN holds workloads, all attached to a DRG (Dynamic Routing Gateway). A VCN can be /16 at most. Oracle gives few minimum sizes, so most sizes follow its examples. Applying replaces the IPv4 plan, and Undo brings it back.',
+      singleTitle: 'Oracle Cloud VCN with service subnets',
+      singleSub: 'Pick the OCI services you need. Each gets a regional subnet of its own in this VCN. A VCN can be /16 at most, and Oracle gives few minimum sizes, so most sizes follow its examples. Need a shared hub instead? Convert to hub and spoke, and your choices carry over. Applying replaces the IPv4 plan, and Undo brings it back.' },
   };
   const dict = (pairs) => Object.assign(Object.create(null), Object.fromEntries(pairs));  // no prototype: "constructor" isn't a key
-  const SVCS = [...AZURE_SVCS, ...AWS_SVCS];
+  const SVCS = [...AZURE_SVCS, ...AWS_SVCS, ...GCP_SVCS, ...OCI_SVCS];
   const SVC_BY_ID = dict(SVCS.map((s) => [s.id, s]));
   const AZ_FIXED = dict(AZURE_SVCS.filter((s) => s.fixed).map((s) => [s.name.toLowerCase(), s]));
   // The cloud service a subnet is dedicated to: its d field, or a required Azure name such as AzureBastionSubnet.
@@ -1818,7 +1874,7 @@
   const blockOf = (ip) => state.blocks.findIndex((b) => inBlock(ip, b.network, b.mask));
   const blockClash = (addr, mask, skip = -1) => state.blocks.find((b, i) => i !== skip && overlaps(addr, mask, b.network, b.mask));
   // Peering: state.peers is null (never set up) or a list of [cidr, cidr] pairs of base networks, hub first.
-  const PEER_CLOUDS = ['azure', 'aws'];
+  const PEER_CLOUDS = ['azure', 'aws', 'gcp', 'oci'];
   const blockByCidr = (c) => state.blocks.find((b) => blockCidr(b) === c);
   const cleanPo = (po) => {
     const p = po && typeof po === 'object' ? po : {};
@@ -3691,7 +3747,7 @@
   });
 
   // =====================================================================
-  // Cloud hub-and-spoke templates (Azure, AWS)
+  // Cloud hub-and-spoke templates (Azure, AWS, Google Cloud, Oracle Cloud)
   // =====================================================================
   // tplState[cloud]: { hub: { size, svcs: { id: mask | null } }, spokes: [{ name, size, svcs }], single: { name, svcs } }.
   // size is 'auto' or a mask. tplLayout: 'single' (one network holding every service, the default) or 'hub'.
@@ -3732,7 +3788,7 @@
     const sp = parseCidr($('azSpace').value);
     if (!sp || !/\//.test($('azSpace').value)) return { errors: ['Enter the address space as a network with a prefix length, like 10.0.0.0/16.'], notes };
     const zones = tplZones();
-    if (tpl.zones && (zones.length < 1 || zones.length > 6)) return { errors: ['List 1 to 6 Availability Zones, like us-east-1a, us-east-1b, us-east-1c.'], notes };
+    if (tpl.zones && (zones.length < 1 || zones.length > 6)) return { errors: [`List 1 to 6 ${tpl.zoneWord}, like ${tpl.zoneDefault}.`], notes };
     const single = tplLayout === 'single';
     const vnets = single
       ? [{ role: 'single', label: st.single.name.trim().slice(0, 40) || tpl.net, cfg: st.single }]
@@ -3746,7 +3802,7 @@
         const mask = v.cfg.svcs[x.id];
         if (!inRole(x, v.role) || mask == null) return;
         if (x.minAz && zones.length < x.minAz) short.add(x.label);
-        zones.forEach((z, zi) => v.reqs.push({ svc: x, idx, zi, zone: z, mask, name: z ? `${x.name}-${z}` : x.name }));
+        (x.once ? [''] : zones).forEach((z, zi) => v.reqs.push({ svc: x, idx, zi, zone: z, mask, name: z ? `${x.name}-${z}` : x.name }));
       });
       v.reqs.sort((x, y) => x.mask - y.mask || x.idx - y.idx || x.zi - y.zi);
       const need = azNeed(v.reqs);
@@ -3789,7 +3845,7 @@
     for (const v of res.vnets) {
       html += `<h4>${esc(v.label)} <span class="mono">${cidrStr(v.addr, v.mask)}</span></h4>`;
       if (!v.reqs.length) { html += '<div class="stat-line">No subnets ticked.</div>'; continue; }
-      html += `<div class="table-wrap"><table><thead><tr><th>Subnet</th><th>Name</th>${tpl.zones ? '<th>Zone</th>' : ''}<th>For</th><th class="num">Usable</th></tr></thead><tbody>`;
+      html += `<div class="table-wrap"><table><thead><tr><th>Subnet</th><th>Name</th>${tpl.zones ? `<th>${tpl.zoneCol}</th>` : ''}<th>For</th><th class="num">Usable</th></tr></thead><tbody>`;
       for (const r of [...v.reqs].sort((x, y) => x.addr - y.addr)) {
         html += `<tr><td class="mono"><b>${cidrStr(r.addr, r.mask)}</b></td><td class="mono">${esc(r.name)}</td>${tpl.zones ? `<td class="mono">${esc(r.zone)}</td>` : ''}<td>${esc(r.svc.label)}${r.svc.deleg ? ` <span class="tag muted">${esc(r.svc.deleg)}</span>` : ''}</td><td class="num mono">${fmt(hostInfo(r.addr, r.mask, tpl.cloud).hosts)}</td></tr>`;
       }
@@ -3854,10 +3910,10 @@
         cb.type = 'checkbox'; cb.checked = cfg.svcs[x.id] != null;
         cb.dataset.svc = x.id;
         const txt = document.createElement('span');
-        txt.innerHTML = `${esc(x.label)}<br><span class="nm mono">${esc(x.name)}${tpl.zones ? '-&lt;zone&gt;' : ''}${x.deleg ? ' · ' + esc(x.deleg) : ''}</span>`;
+        txt.innerHTML = `${esc(x.label)}<br><span class="nm mono">${esc(x.name)}${tpl.zones && !x.once ? `-&lt;${tpl.zoneCol.toLowerCase()}&gt;` : ''}${x.deleg ? ' · ' + esc(x.deleg) : ''}</span>`;
         lab.append(cb, txt);
-        lab.title = (x.tip ? x.tip + '. ' : '') + `${x.soft ? 'Smallest offered' : 'Minimum'} /${x.min}, recommended /${x.rec}${tpl.zones ? ', in each Availability Zone' : ''}`;
-        const sel = azSizeSel(cfg.svcs[x.id] ?? x.rec, Math.max(16, x.rec - 3), x.min, false);
+        lab.title = (x.tip ? x.tip + '. ' : '') + `${x.soft ? 'Smallest offered' : 'Minimum'} /${x.min}, recommended /${x.rec}${tpl.zones && !x.once ? `, in each ${tpl.zoneOne}` : ''}`;
+        const sel = azSizeSel(cfg.svcs[x.id] ?? x.rec, x.max ?? Math.max(16, x.rec - 3), x.min, false);
         sel.disabled = !cb.checked;
         sel.setAttribute('aria-label', `${x.label} subnet size`);
         sel.dataset.svc = x.id;
@@ -3867,7 +3923,7 @@
         if (x.doc) {
           const a = document.createElement('a');
           a.href = tpl.docBase + x.doc; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'docs';
-          a.title = `${tpl.cloud === 'aws' ? 'AWS docs' : 'Microsoft Learn'}: ${x.label} subnet requirements`;
+          a.title = `${tpl.docName}: ${x.label} subnet requirements`;
           row.appendChild(a);
         } else {
           const gap = document.createElement('span');   // keeps the size menus lined up
@@ -3886,10 +3942,10 @@
     $('azSub').textContent = single ? tpl.singleSub : tpl.sub;
     $('azSpaceL').textContent = single ? `${tpl.net} address space` : 'Address space for the hub and spokes';
     $('azAddSpoke').textContent = single ? 'Convert to hub and spoke' : 'Add spoke';
-    $('azAddSpoke').title = single ? `Move the shared services (gateway, firewall, Bastion, DNS) into a hub ${tpl.net} and the rest into a spoke, keeping what you ticked` : `Add another spoke ${tpl.net}`;
+    $('azAddSpoke').title = single ? `Move the shared ${tpl.hubWhat.replace(/^network: /, '')} into a hub ${tpl.net} and the rest into a spoke, keeping what you ticked` : `Add another spoke ${tpl.net}`;
     if (single) card(`${tpl.net} (all services)`, st.single, 'single');
     else {
-      card(`Hub ${tpl.net} (shared ${tpl.cloud === 'aws' ? 'network: inspection and egress' : 'services'})`, st.hub, 'hub');
+      card(`Hub ${tpl.net} (shared ${tpl.hubWhat})`, st.hub, 'hub');
       st.spokes.forEach((x, i) => card(`Spoke ${tpl.net} ${i + 1} (workloads)`, x, 'spoke', i));
     }
     azPreview();
@@ -3897,13 +3953,14 @@
   const openAz = (cloud = 'azure') => {
     tpl = TEMPLATES[cloud];
     if (!tplState[cloud]) {
-      tplState[cloud] = { hub: { size: 'auto', svcs: tplDefaults('hub') }, spokes: [tplNewSpoke(1)], single: { name: TEMPLATES[cloud].net, svcs: null }, space: '10.0.0.0/16' };
+      tplState[cloud] = { hub: { size: 'auto', svcs: tplDefaults('hub') }, spokes: [tplNewSpoke(1)], single: { name: TEMPLATES[cloud].net, svcs: null }, space: '10.0.0.0/16', zones: TEMPLATES[cloud].zoneDefault || '' };
       tplState[cloud].single.svcs = Object.fromEntries(TEMPLATES[cloud].svcs.map((x) => [x.id, x.on ? x.rec : null]));
       // Use the current base network as the address space when it's big enough to be one.
       if (state.blocks.length === 1 && state.mask <= 16) tplState[cloud].space = blockCidr(blk());
     }
     $('azSpace').value = tplState[cloud].space;
     $('azZonesF').hidden = !tpl.zones;
+    if (tpl.zones) { $('azZonesL').textContent = tpl.zoneWord; $('azZones').value = tplState[cloud].zones; $('azZones').title = `Each subnet is made once per ${tpl.zoneOne}`; }
     $('azCloud').value = cloud;
     $('azReplace').hidden = !planInUse();
     azRender();
@@ -3917,13 +3974,14 @@
   // and hidden on Google Cloud and Oracle, which have no wizard.
   function tplSync() {
     const c = settings.cloud, b = $('tplBtn');
-    b.hidden = !['std', 'azure', 'aws'].includes(c);
-    b.lastChild.textContent = c === 'std' ? 'On-prem network wizard…' : c === 'aws' ? 'AWS subnet wizard…' : 'Azure subnet wizard…';
+    const who = { azure: 'Azure', aws: 'AWS', gcp: 'Google Cloud', oci: 'Oracle Cloud' }[c];
+    b.hidden = c !== 'std' && !who;
+    b.lastChild.textContent = c === 'std' ? 'On-prem network wizard…' : `${who} subnet wizard…`;
     b.title = c === 'std'
       ? 'Tick the networks a site needs (management, servers, staff, Wi-Fi, voice, guest…) and get each one sized, named and given a VLAN ID. Applying it replaces the current IPv4 plan.'
-      : `Pick the ${c === 'aws' ? 'AWS' : 'Azure'} services you need (gateway, firewall, Bastion, delegated subnets…) and get a ${c === 'aws' ? 'VPC' : 'VNet'}, or a hub and spokes, with a correctly named, correctly sized subnet for each. Applying it replaces the current IPv4 plan.`;
+      : `Pick the ${who} services you need and get a ${NET_WORD[c]}, or a hub and spokes, with a correctly sized subnet for each. Applying it replaces the current IPv4 plan.`;
   }
-  $('tplBtn').addEventListener('click', () => (settings.cloud === 'std' ? openSite() : openAz(settings.cloud === 'aws' ? 'aws' : 'azure')));
+  $('tplBtn').addEventListener('click', () => (settings.cloud === 'std' ? openSite() : openAz(TEMPLATES[settings.cloud] ? settings.cloud : 'azure')));
 
   // ---------- On-prem network wizard ----------
   // Typical networks for a site. on: ticked to start with. Device counts and VLAN IDs are starting points to edit.
@@ -4051,7 +4109,7 @@
   });
   $('azCloud').addEventListener('change', () => openAz($('azCloud').value));
   $('azSpace').addEventListener('input', () => { tplState[tpl.cloud].space = $('azSpace').value; azPreview(); });
-  $('azZones').addEventListener('input', azPreview);
+  $('azZones').addEventListener('input', () => { tplState[tpl.cloud].zones = $('azZones').value; azPreview(); });
   $('azLayout').addEventListener('change', () => { tplSetLayout($('azLayout').value); azRender(); });
   $('azAddSpoke').addEventListener('click', () => {
     if (tplLayout === 'single') { tplSetLayout('hub'); azRender(); return; }
@@ -4156,6 +4214,8 @@
     const clouds = new Set(pairs.map(([x]) => x.cloud));
     $('peerAz').hidden = !clouds.has('azure');
     $('peerAws').hidden = !clouds.has('aws');
+    $('peerGcp').hidden = !clouds.has('gcp');
+    $('peerOci').hidden = !clouds.has('oci');
     $('peerSave').disabled = !pairs.length;
   };
   const openPeer = () => {
@@ -4985,15 +5045,56 @@
           out.push('}', '');
         }
       }
+      // Peered VCNs: one DRG (Dynamic Routing Gateway) with each of them attached.
+      const joined = [...new Set(netPairs().flat())];
+      if (joined.length) {
+        out.push('# Peering: every VCN attaches to one DRG (Dynamic Routing Gateway).', 'resource "oci_core_drg" "main" {', '  compartment_id = var.compartment_id', '  display_name   = "drg-main"', '}', '');
+        for (const v of joined) out.push(`resource "oci_core_drg_attachment" "${v.id}" {`, '  drg_id       = oci_core_drg.main.id', `  display_name = "drg-attach-${v.slug}"`, '', '  network_details {', `    id   = oci_core_vcn.${v.id}.id`, '    type = "VCN"', '  }', '}', '');
+        out.push('# Next: in each subnet’s route table, send the other VCNs’ ranges to the DRG; with a hub Network Firewall, route the', '# DRG’s spoke traffic to the hub VCN attachment and on to the firewall (OCI docs: hub-and-spoke routing with a DRG).');
+      }
     } else {
-      const nm = makeNamer('tf'), gn = makeNamer('gcp');
+      const nm = memo(makeNamer('tf')), gn = memo(makeNamer('gcp'));
       out.push('variable "region" {', '  type = string', '}', '');
-      out.push('resource "google_compute_network" "main" {', '  name                    = "vpc-main"', '  auto_create_subnetworks = false', '}', '');
-      for (const x of nets.flatMap((v) => v.items)) {
-        if (x.group) out.push(`# Group: ${x.group}`);
-        out.push(`resource "google_compute_subnetwork" "${nm(x)}" {`, `  name          = "${gn(x)}"`, `  ip_cidr_range = "${x.key}"`, '  region        = var.region', '  network       = google_compute_network.main.id');
-        if (x.meta.o || x.meta.n) out.push(`  description   = "${hq(x.meta.o || x.meta.n)}"`);
-        out.push('}', '');
+      // One VPC per base network. A subnet's Zone column holds its region (the wizard repeats subnets per region).
+      for (const v of nets) {
+        out.push(`resource "google_compute_network" "${v.id}" {`, `  name                    = "vpc-${v.slug}"`, '  auto_create_subnetworks = false', '}', '');
+        const svcId = (x) => (svcOf(x.meta) || {}).id;
+        const second = v.items.filter((x) => (svcOf(x.meta) || {}).secondary);
+        const psa = v.items.filter((x) => svcId(x) === 'gcp-psa');
+        const used = new Set();
+        for (const x of v.items) {
+          const svc = svcOf(x.meta);
+          if (svc && (svc.secondary || svc.id === 'gcp-psa')) continue;
+          if (x.group) out.push(`# Group: ${x.group}`);
+          out.push(`resource "google_compute_subnetwork" "${nm(x)}" {`, `  name          = "${gn(x)}"`, `  ip_cidr_range = "${x.key}"`, `  region        = ${x.meta.z ? `"${hq(x.meta.z)}"` : 'var.region'}`, `  network       = google_compute_network.${v.id}.id`);
+          if (x.meta.o || x.meta.n) out.push(`  description   = "${hq(x.meta.o || x.meta.n)}"`);
+          if (svc && svc.purpose) out.push(`  purpose       = "${svc.purpose}"`, ...(svc.purpose.endsWith('_MANAGED_PROXY') ? ['  role          = "ACTIVE"'] : []));
+          if (svc && svc.id === 'gcp-gke') {
+            // The GKE Pod and Service ranges in the same region become this subnet's secondary ranges.
+            for (const y of second.filter((y) => !used.has(y) && (y.meta.z || '') === (x.meta.z || ''))) {
+              used.add(y);
+              out.push('', '  secondary_ip_range {', `    range_name    = "${svcOf(y.meta).secondary}"`, `    ip_cidr_range = "${y.key}"`, '  }');
+            }
+          }
+          out.push('}', '');
+        }
+        for (const y of second.filter((y) => !used.has(y))) out.push(`# ${y.key} (${hq(y.meta.n || svcOf(y.meta).name)}): add it as a secondary range on your GKE node subnet${y.meta.z ? ` in ${y.meta.z}` : ''}.`, '');
+        if (psa.length) {
+          // Private services access: a global range for Google's managed services, and the connection that uses it.
+          for (const x of psa) out.push(`resource "google_compute_global_address" "${nm(x)}" {`, `  name          = "${gn(x)}"`, '  purpose       = "VPC_PEERING"', '  address_type  = "INTERNAL"', `  address       = "${ntoa(x.addr)}"`, `  prefix_length = ${x.mask}`, `  network       = google_compute_network.${v.id}.id`, '}', '');
+          out.push(`resource "google_service_networking_connection" "${v.id}_psa" {`, `  network                 = google_compute_network.${v.id}.id`, '  service                 = "servicenetworking.googleapis.com"', `  reserved_peering_ranges = [${psa.map((x) => `google_compute_global_address.${nm(x)}.name`).join(', ')}]`, '}', '');
+        }
+      }
+      // VPC Network Peering: one resource per direction. In hub and spoke the hub exports its custom routes
+      // (for a firewall appliance) and the spokes import them. Google runs one peering change at a time per VPC.
+      const pairs = netPairs(), hubC = state.peers ? (state.po.m === 'hub' ? state.po.h : '') : (pairs[0] ? pairs[0][0].base : '');
+      for (const [a, b] of pairs) {
+        const viaHub = a.base === hubC;
+        out.push(`resource "google_compute_network_peering" "${a.id}_to_${b.id}" {`, `  name                 = "peer-${a.slug}-to-${b.slug}"`, `  network              = google_compute_network.${a.id}.self_link`, `  peer_network         = google_compute_network.${b.id}.self_link`);
+        if (viaHub) out.push('  export_custom_routes = true');
+        out.push('}', '', `resource "google_compute_network_peering" "${b.id}_to_${a.id}" {`, `  name                 = "peer-${b.slug}-to-${a.slug}"`, `  network              = google_compute_network.${b.id}.self_link`, `  peer_network         = google_compute_network.${a.id}.self_link`);
+        if (viaHub) out.push('  import_custom_routes = true');
+        out.push(`  depends_on           = [google_compute_network_peering.${a.id}_to_${b.id}]`, '}', '');
       }
     }
     return out.join('\n');
