@@ -632,8 +632,21 @@
   #exFmtBtn { min-width: 240px; max-width: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; }
   #exFmtBtn { align-items: center; }
   #exFmtIco { display: inline-flex; }
-  #exFmtBtn.empty #exFmtCur { color: var(--muted); }
-  #exFmtCur { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Nothing chosen: a blue ring that pulses to draw the eye. Chosen: solid green, the logo on a white tile. */
+  #exFmtBtn.empty { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); font-weight: 600; animation: fmt-glow 1.8s ease-out infinite; }
+  #exFmtBtn.empty:hover { background: var(--accent-weak); filter: brightness(1.04); }
+  #exFmtBtn.empty[aria-expanded="true"] { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+  @keyframes fmt-glow {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+    70%, 100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 0%, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) { #exFmtBtn.empty { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); } }
+  #exFmtBtn:not(.empty) { border-color: var(--ok); background: var(--ok); color: var(--accent-text); font-weight: 600; }
+  #exFmtBtn:not(.empty):hover { background: var(--ok); filter: brightness(1.08); }
+  #exFmtIco:not(:empty) { padding: 2px 1px; border-radius: 5px; background: #fff; color: #161a22; }
+  #exFmtIco .fm-badge { color: #5d6573; border-color: #cfd4dc; }
+  #exFmtIco .glyph { color: #5d6573; }
+  #exFmtCur { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fmenu-pop { position: absolute; left: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 260px; max-height: min(70vh, 560px); overflow-y: auto; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
   .fmenu-pop[hidden], .fmenu-sub[hidden] { display: none; }
   .fmenu-pop .fm-head { padding: 8px 10px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }

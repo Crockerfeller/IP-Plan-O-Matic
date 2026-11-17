@@ -1480,6 +1480,7 @@ T.ubiquitiAndFormatMenu = async () => {
   check('fmt menu: every item has an icon', qa('.fmenu [role^=menuitem]').every((b) => b.querySelector('.fm-ico')), qa('.fmenu [role^=menuitem]').filter((b) => !b.querySelector('.fm-ico')).map((b) => b.textContent));
   check('fmt menu: brand logos and badges', q('#exFmtMenu [data-fmt="cisco"] svg.fm-ico path') && q('#exFmtMenu ~ .fmenu-sub [data-fmt="unifi"] svg.fm-ico') && q('#exFmtMenu ~ .fmenu-sub [data-fmt="cfn-aws"] .fm-badge').textContent === 'AWS');
   check('fmt menu: starts with nothing chosen', $('exFmt').value === '' && $('exFmtCur').textContent === 'Choose a format…' && $('exOut').value === '' && $('exCopy').disabled && $('exDl').disabled && $('exMsg').textContent.includes('Choose a format'), [$('exFmt').value, $('exFmtCur').textContent]);
+  check('fmt menu: empty button glows', $('exFmtBtn').classList.contains('empty') && W.getComputedStyle($('exFmtBtn')).animationName === 'fmt-glow', W.getComputedStyle($('exFmtBtn')).animationName);
   check('fmt menu: nothing ticked yet', !q('.fmenu [aria-checked="true"]') && $('exFmtIco').innerHTML === '');
   click('#exFmtBtn');
   check('fmt menu: opens', !pop.hidden && $('exFmtBtn').getAttribute('aria-expanded') === 'true');
@@ -1495,6 +1496,9 @@ T.ubiquitiAndFormatMenu = async () => {
   check('fmt menu: submenu items laid out like the list', cs(cfnB).display === 'flex' && labOff(cfnB) === labOff(q('#exFmtMenu [data-fmt="cisco"]')), [cs(cfnB).display, labOff(cfnB), labOff(q('#exFmtMenu [data-fmt="cisco"]'))]);
   check('fmt menu: only the chosen item shows a tick', cs(cfnB.querySelector('.fm-tick')).visibility === 'hidden' && cs(q('.fmenu-sub [data-fmt="bicep"] .fm-tick')).visibility === 'visible');
   click('#exFmtBtn');
+  $('exFmtBtn').style.transition = 'none';   // transitions don't run in the hidden test frame; read the final colour
+  check('fmt menu: chosen button is solid green, no glow', W.getComputedStyle($('exFmtBtn')).animationName === 'none' && W.getComputedStyle($('exFmtBtn')).backgroundColor === W.getComputedStyle($('exFmtBtn')).borderTopColor, ['animationName', 'backgroundColor', 'borderTopColor'].map((k) => W.getComputedStyle($('exFmtBtn'))[k]));
+  $('exFmtBtn').style.transition = '';
   check('fmt menu: button shows the icon once chosen', !!q('#exFmtIco .fm-ico') && !$('exFmtBtn').classList.contains('empty') && !$('exCopy').disabled);
   check('fmt menu: chosen item and its parent ticked', q('#exFmtMenu ~ .fmenu-sub [data-fmt="bicep"]').getAttribute('aria-checked') === 'true' && azure.querySelector('.fm-tick').style.visibility === 'visible');
   // A real mouse hovers before it clicks: the hover opens the submenu and the click must not shut it.
