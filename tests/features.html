@@ -1487,6 +1487,26 @@ T.ubiquitiAndFormatMenu = async () => {
   click(azure.nextElementSibling.querySelector('[data-fmt="bicep"]'));
   check('fmt menu: pick sets the format and closes', $('exFmt').value === 'bicep' && pop.hidden && $('exFmtCur').textContent === 'Bicep: Azure' && $('exOut').value.includes('Microsoft.Network/virtualNetworks'), $('exFmtCur').textContent);
   check('fmt menu: chosen item and its parent ticked', q('#exFmtMenu [data-fmt="bicep"]').getAttribute('aria-checked') === 'true' && azure.querySelector('.fm-tick').style.visibility === 'visible');
+  // A real mouse hovers before it clicks: the hover opens the submenu and the click must not shut it.
+  const hover = (el) => el.dispatchEvent(new W.PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+  click('#exFmtBtn');
+  const aws = qa('#exFmtMenu .fm-parent')[0], gcp = qa('#exFmtMenu .fm-parent')[2];
+  check('fmt menu: reopening shows the current format’s submenu', !qa('#exFmtMenu .fm-parent')[1].nextElementSibling.hidden);
+  hover(aws); await sleep(300);
+  check('fmt menu: hover opens the submenu', !aws.nextElementSibling.hidden);
+  click(aws);
+  check('fmt menu: click after hover keeps it open', !aws.nextElementSibling.hidden, aws.getAttribute('aria-expanded'));
+  click(aws);
+  check('fmt menu: a second click closes it', aws.nextElementSibling.hidden);
+  hover(gcp); hover(aws);
+  check('fmt menu: hovering another parent waits before switching', !gcp.nextElementSibling.hidden && aws.nextElementSibling.hidden);
+  hover(aws.nextElementSibling.querySelector('button') || gcp);
+  hover(gcp.nextElementSibling.querySelector('button')); await sleep(300);
+  check('fmt menu: reaching the submenu cancels the switch', !gcp.nextElementSibling.hidden && aws.nextElementSibling.hidden);
+  hover(aws); await sleep(300);
+  check('fmt menu: resting on another parent switches', !aws.nextElementSibling.hidden && gcp.nextElementSibling.hidden);
+  click(aws); click(aws.nextElementSibling.querySelector('[data-fmt="cfn-aws"]'));
+  check('fmt menu: hover, click, pick', $('exFmt').value === 'cfn-aws' && $('exFmtMenu').hidden, $('exFmt').value);
   select('#exFmt', 'mikrotik');
   check('fmt menu: follows the select', $('exFmtCur').textContent === 'MikroTik RouterOS' && q('#exFmtMenu [data-fmt="bicep"]').getAttribute('aria-checked') === 'false');
   // UniFi

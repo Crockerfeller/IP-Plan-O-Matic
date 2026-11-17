@@ -5465,7 +5465,7 @@
     sub.style.top = `${Math.max(8, Math.min(r.top - 5, innerHeight - hgt - 8))}px`;
   };
   const fmtOpen = (open, focus) => {
-    if (!open) for (const o of fmtSubs()) fmtSub(o.previousElementSibling, false);
+    if (!open) { clearTimeout(hoverTimer); for (const o of fmtSubs()) fmtSub(o.previousElementSibling, false); }
     fmtPop.hidden = !open; $('exFmtBtn').setAttribute('aria-expanded', String(open));
     if (open && focus) {
       // Start on the chosen format, opening its submenu.
@@ -5485,24 +5485,43 @@
   fmtSync();
   $('exFmtBtn').addEventListener('click', (e) => { e.stopPropagation(); fmtOpen(fmtPop.hidden, true); });
   $('exFmtBtn').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); fmtOpen(true, true); } });
+  // With a mouse, hovering a parent has already opened its submenu, so the click that usually follows
+  // must keep it open, not toggle it shut. A click without a hover first (touch, keyboard) toggles.
+  let hoverOpened = null, hoverAt = 0, hoverTimer = 0;
   fmtPop.addEventListener('click', (e) => {
     e.stopPropagation();
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.classList.contains('fm-parent')) { fmtSub(b, b.nextElementSibling.hidden); if (!b.nextElementSibling.hidden && e.detail === 0) b.nextElementSibling.querySelector('button').focus(); return; }
+    if (b.classList.contains('fm-parent')) {
+      clearTimeout(hoverTimer);
+      const sub = b.nextElementSibling, fresh = hoverOpened === b && performance.now() - hoverAt < 1500;
+      hoverOpened = null;
+      fmtSub(b, sub.hidden || fresh);
+      if (!sub.hidden && e.detail === 0) sub.querySelector('button').focus();
+      return;
+    }
     pickFmt(b.dataset.fmt);
   });
   const pickFmt = (v) => {
     fmtOpen(false); $('exFmtBtn').focus();
     if ($('exFmt').value !== v) { $('exFmt').value = v; $('exFmt').dispatchEvent(new Event('change')); }
   };
-  // Hovering a parent opens its submenu, on a pointer that can hover.
+  // Hovering a parent opens its submenu, on a pointer that can hover. Moving to another item waits a moment
+  // first, so a diagonal path from a parent to its submenu can cross the next item without switching.
+  const hoverTo = (b) => {
+    const open = fmtSubs().find((o) => !o.hidden);
+    if (b.classList.contains('fm-parent')) {
+      if (!b.nextElementSibling.hidden) return;
+      fmtSub(b, true); hoverOpened = b; hoverAt = performance.now();
+    } else if (open) fmtSub(open.previousElementSibling, false);
+  };
   fmtPop.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse' || narrow()) return;
+    clearTimeout(hoverTimer);
     const b = e.target.closest('button');
-    if (!b || b.closest('.fmenu-sub')) return;
-    if (b.classList.contains('fm-parent')) { if (b.nextElementSibling.hidden) fmtSub(b, true); }
-    else for (const o of fmtSubs()) if (!o.hidden) fmtSub(o.previousElementSibling, false);
+    if (!b || b.closest('.fmenu-sub')) return;   // inside the open submenu: keep it
+    if (fmtSubs().some((o) => !o.hidden && o.previousElementSibling !== b)) hoverTimer = setTimeout(() => hoverTo(b), 250);
+    else hoverTo(b);
   });
   fmtPop.addEventListener('keydown', (e) => {
     e.stopPropagation();
