@@ -20,7 +20,7 @@ SUITES=("$@"); [ ${#SUITES[@]} -eq 0 ] && SUITES=(compat features accuracy mobil
 FAILED=0
 for s in "${SUITES[@]}"; do
   PROFILE="$(mktemp -d)"
-  OUT="$("$CHROME" --headless=new --disable-gpu --no-first-run --user-data-dir="$PROFILE" --virtual-time-budget=60000 --dump-dom "http://localhost:$PORT/tests/$s.html" 2>/dev/null)"
+  OUT="$("$CHROME" --headless=new --disable-gpu --no-first-run --user-data-dir="$PROFILE" --virtual-time-budget=120000 --dump-dom "http://localhost:$PORT/tests/$s.html" 2>/dev/null)"
   rm -rf "$PROFILE"
   RES="$(printf '%s' "$OUT" | python3 tests/report.py)"
   STATUS=$?

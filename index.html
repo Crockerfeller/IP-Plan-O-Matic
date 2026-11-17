@@ -347,10 +347,24 @@
     width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
     border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
   }
-  dialog#azDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  dialog#azDlg::backdrop, dialog#siteDlg::backdrop { background: rgba(10, 14, 22, .45); }
+  dialog#siteDlg {
+    width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: var(--shadow);
+  }
+  #siteDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .site-wrap { margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .site-tbl { width: 100%; font-size: 13px; }
+  .site-tbl th { position: static; }
+  .site-tbl td { padding: 4px 8px; vertical-align: middle; }
+  .site-tbl input[type="text"] { width: 100%; min-width: 150px; }
+  .site-tbl input[type="number"] { width: 76px; text-align: right; }
+  .site-tbl tr.off td:not(:first-child) { opacity: .45; }
+  .site-tbl .site-cidr { font-family: var(--mono, ui-monospace, monospace); white-space: nowrap; }
+  .site-tbl .site-cidr.err { color: var(--danger); font-family: inherit; }
   #azDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
   /* Apply stays in reach: the footer sticks to the dialog's bottom edge while the services and preview scroll. */
-  #azDlg .az-foot { position: sticky; bottom: -16px; z-index: 1; align-items: center; margin: 12px -16px -16px; padding: 12px 16px;
+  :is(#azDlg, #siteDlg) .az-foot { position: sticky; bottom: -16px; z-index: 1; align-items: center; margin: 12px -16px -16px; padding: 12px 16px;
     background: var(--panel); border-top: 1px solid var(--border); }
   .az-sum { margin-right: auto; color: var(--muted); font-size: 13px; }
   .az-sum.err { color: var(--danger); font-weight: 600; }
@@ -935,6 +949,36 @@
     <div class="row dlg-foot az-foot">
       <span class="az-sum" id="azSum"></span>
       <button type="button" class="primary" id="azApply">Apply to plan</button>
+    </div>
+  </dialog>
+
+  <dialog id="siteDlg" aria-labelledby="siteTtl">
+    <div class="dlg-head">
+      <h2 id="siteTtl">On-prem network wizard</h2>
+      <button type="button" class="icon" id="siteClose" aria-label="Close">✕</button>
+    </div>
+    <p class="sub">Tick the networks this site needs and roughly how many devices each will have. Each gets a subnet sized to fit with room to grow, its name and a VLAN ID, placed largest first inside the address space.</p>
+    <p class="msg show info" id="siteReplace" hidden>Applying this replaces the current IPv4 plan for this base network. Undo brings it back.</p>
+    <div class="row">
+      <div class="field">
+        <label for="siteSpace">Address space for the site</label>
+        <input type="text" id="siteSpace" spellcheck="false" value="10.10.0.0/16" style="width:170px" title="The base network the subnets are placed in">
+      </div>
+      <div class="field">
+        <label for="siteHead">Growth headroom %</label>
+        <input type="number" id="siteHead" value="25" min="0" max="1000" style="width:110px" title="Extra room on top of each device count before sizing (not for point-to-point links of 2 devices)">
+      </div>
+      <button type="button" id="siteAdd">Add network</button>
+    </div>
+    <div class="table-wrap site-wrap">
+      <table class="site-tbl">
+        <thead><tr><th>Use</th><th>Network</th><th class="num">Devices</th><th class="num">VLAN</th><th>Subnet</th></tr></thead>
+        <tbody id="siteBody"></tbody>
+      </table>
+    </div>
+    <div class="row dlg-foot az-foot">
+      <span class="az-sum" id="siteSum" aria-live="polite"></span>
+      <button type="button" class="primary" id="siteApply">Apply to plan</button>
     </div>
   </dialog>
 
@@ -3148,6 +3192,7 @@
     $('gwField').hidden = settings.cloud !== 'std';
     $('gwPos').title = 'Which address in each subnet is the router/gateway';
     $('v6Net').value = v6Key(v6.net, v6.mask);
+    tplSync();
   };
 
   const showColumn = (key) => {
@@ -3525,6 +3570,32 @@
       toast('Base network set to 10.10.0.0/22 for the example');
     }
   });
+  // Size each request for its host count (plus headroom) and place them largest first, each in the smallest free
+  // subnet that holds it. Shared by Auto-plan (VLSM) and the on-prem network wizard. reqs: [{ name, hosts, vlan, idx }].
+  // "fill" keeps the current tree and treats named, VLAN-tagged or in-use/reserved subnets as taken.
+  const vlsmFit = (reqs, { headroom, minM, mode, network, mask }) => {
+    for (const r of reqs) {
+      // not hosts * 1.1: 100 * 1.1 is 110.00000000000001. exact: no headroom (a point-to-point link is always 2).
+      r.need = r.exact ? r.hosts : Math.ceil((r.hosts * (100 + headroom)) / 100);
+      r.mask = null;
+      for (let m = minM; m >= mask; m--) if (hostInfo(0, m).hosts >= r.need) { r.mask = m; break; }
+    }
+    const tooBig = reqs.filter((r) => r.mask === null);
+    if (tooBig.length) return { tooBig, placed: [], failed: [], free: [], root: null, needTotal: 0, sorted: [] };
+    const sorted = [...reqs].sort((a, b) => a.mask - b.mask || a.idx - b.idx);
+    const root = mode === 'fill' ? cloneTree(state.root) : { c: null };
+    const taken = new Set();
+    const occupied = (k) => {
+      if (taken.has(k)) return true;
+      if (mode !== 'fill') return false;
+      const m = getMeta(k);
+      return !!(m.s || m.n || m.v);
+    };
+    bestFit(root, network, mask, sorted, occupied, taken);
+    const placed = sorted.filter((r) => r.addr !== null), failed = sorted.filter((r) => r.addr === null);
+    const free = freeLeavesOf(root, network, mask, 32, occupied);
+    return { tooBig, placed, failed, free, root, sorted, needTotal: placed.reduce((t, r) => t + size(r.mask), 0) };
+  };
   $('vlsmRun').addEventListener('click', () => {
     const out = $('vlsmOut');
     $('vlsmApply').hidden = true;
@@ -3553,32 +3624,13 @@
 
     const headroom = Math.max(0, Number($('vlsmHead').value) || 0);
     const minM = settings.cloud === 'std' ? Number($('vlsmSmall').value) : CLOUDS[settings.cloud].min;
-    for (const r of reqs) {
-      r.need = Math.ceil((r.hosts * (100 + headroom)) / 100);   // not hosts * 1.1: 100 * 1.1 is 110.00000000000001
-      r.mask = null;
-      for (let m = minM; m >= state.mask; m--) if (hostInfo(0, m).hosts >= r.need) { r.mask = m; break; }
-    }
-    const tooBig = reqs.filter((r) => r.mask === null);
-    if (tooBig.length) {
-      out.innerHTML = `<div class="msg show error">${tooBig.map((r) => `${esc(r.name)} needs ${fmt(r.need)} hosts, which is more than ${cidrStr(state.network, state.mask)} can hold.`).join('<br>')}</div>`;
+    const mode = $('vlsmMode').value;
+    const fit = vlsmFit(reqs, { headroom, minM, mode, network: state.network, mask: state.mask });
+    if (fit.tooBig.length) {
+      out.innerHTML = `<div class="msg show error">${fit.tooBig.map((r) => `${esc(r.name)} needs ${fmt(r.need)} hosts, which is more than ${cidrStr(state.network, state.mask)} can hold.`).join('<br>')}</div>`;
       return;
     }
-    const mode = $('vlsmMode').value;
-    const sorted = [...reqs].sort((a, b) => a.mask - b.mask || a.idx - b.idx);
-    // Best fit: largest request first, each into the smallest free subnet that holds it (lowest address on ties).
-    // "Fill" keeps the current tree and treats named, VLAN-tagged or in-use/reserved subnets as taken.
-    const root = mode === 'fill' ? cloneTree(state.root) : { c: null };
-    const taken = new Set();
-    const occupied = (k) => {
-      if (taken.has(k)) return true;
-      if (mode !== 'fill') return false;
-      const m = getMeta(k);
-      return !!(m.s || m.n || m.v);
-    };
-    bestFit(root, state.network, state.mask, sorted, occupied, taken);
-    const placed = sorted.filter((r) => r.addr !== null), failed = sorted.filter((r) => r.addr === null);
-    const free = freeLeavesOf(root, state.network, state.mask, 32, occupied);
-    const needTotal = placed.reduce((t, r) => t + size(r.mask), 0);
+    const { root, placed, failed, free, needTotal } = fit;
     vlsmPlan = placed.length ? { placed, root, mode, active: state.active, base: cidrStr(state.network, state.mask), before: stateHash() } : null;
 
     let html = '';
@@ -3857,7 +3909,142 @@
   };
   // Something a template or import would replace: more than one network, any division, or any name or status.
   const planInUse = () => state.blocks.length > 1 || !!state.root.c || Object.keys(state.meta).length > 0;
-  $('tplBtn').addEventListener('click', () => openAz(settings.cloud === 'aws' ? 'aws' : 'azure'));
+  // The wizard button follows the Platform: the on-prem wizard on Standard, the Azure or AWS one on those clouds,
+  // and hidden on Google Cloud and Oracle, which have no wizard.
+  function tplSync() {
+    const c = settings.cloud, b = $('tplBtn');
+    b.hidden = !['std', 'azure', 'aws'].includes(c);
+    b.lastChild.textContent = c === 'std' ? 'On-prem network wizard…' : c === 'aws' ? 'AWS subnet wizard…' : 'Azure subnet wizard…';
+    b.title = c === 'std'
+      ? 'Tick the networks a site needs (management, servers, staff, Wi-Fi, voice, guest…) and get each one sized, named and given a VLAN ID. Applying it replaces the current IPv4 plan.'
+      : `Pick the ${c === 'aws' ? 'AWS' : 'Azure'} services you need (gateway, firewall, Bastion, delegated subnets…) and get a ${c === 'aws' ? 'VPC' : 'VNet'}, or a hub and spokes, with a correctly named, correctly sized subnet for each. Applying it replaces the current IPv4 plan.`;
+  }
+  $('tplBtn').addEventListener('click', () => (settings.cloud === 'std' ? openSite() : openAz(settings.cloud === 'aws' ? 'aws' : 'azure')));
+
+  // ---------- On-prem network wizard ----------
+  // Typical networks for a site. on: ticked to start with. Device counts and VLAN IDs are starting points to edit.
+  const SITE_PRESETS = [
+    ['Network management', 30, 10, true, 'Switches, access points, UPSs and other network gear'],
+    ['Servers', 50, 20, true],
+    ['Staff (wired)', 100, 30, true],
+    ['Staff Wi-Fi', 150, 40, true],
+    ['Voice (VoIP phones)', 50, 50, true],
+    ['Guest Wi-Fi', 100, 60, true, 'Internet only: keep it away from everything else'],
+    ['Printers', 20, 70, false],
+    ['IoT / building systems', 50, 80, false, 'HVAC, door access, sensors, smart TVs'],
+    ['Security cameras', 30, 90, false],
+    ['DMZ', 10, 100, false, 'Servers reachable from the internet'],
+    ['Storage (iSCSI / NFS)', 10, 110, false],
+    ['Hypervisor / vMotion', 10, 120, false],
+    ['Out-of-band management', 20, 130, false, 'iDRAC, iLO, IPMI and console servers'],
+    ['Lab / test', 50, 140, false],
+    ['WAN / ISP link', 2, '', false, 'Point-to-point link to the ISP or another site'],
+  ];
+  let siteRows = null;   // [{ on, name, hosts, vlan, tip }]: kept while the page is open
+  let siteFit = null;
+  const siteReqs = () => siteRows.map((r, idx) => ({ ...r, idx })).filter((r) => r.on)
+    .map((r) => ({ name: r.name.trim() || `Network ${r.idx + 1}`, hosts: Number(r.hosts), vlan: String(r.vlan).trim() ? String(+r.vlan) : '', idx: r.idx, exact: Number(r.hosts) <= 2 }));
+  const siteRender = () => {
+    $('siteBody').innerHTML = siteRows.map((r, i) => `<tr data-i="${i}"${r.on ? '' : ' class="off"'}>` +
+      `<td><input type="checkbox" class="site-on" aria-label="Use ${esc(r.name)}"${r.on ? ' checked' : ''}></td>` +
+      `<td><input type="text" class="site-name" value="${esc(r.name)}" aria-label="Network name"${r.tip ? ` title="${esc(r.tip)}"` : ''}></td>` +
+      `<td class="num"><input type="number" class="site-hosts" min="1" value="${esc(r.hosts)}" aria-label="Devices on ${esc(r.name)}"></td>` +
+      `<td class="num"><input type="number" class="site-vlan" min="1" max="4094" value="${esc(r.vlan)}" aria-label="VLAN for ${esc(r.name)}" placeholder="none"></td>` +
+      '<td class="site-cidr"></td></tr>').join('');
+    siteCalc();
+  };
+  // Plan the ticked networks into the address space and show each one's subnet, or what's wrong.
+  const siteCalc = () => {
+    siteFit = null;
+    const cells = [...$('siteBody').querySelectorAll('tr')].map((tr) => tr.querySelector('.site-cidr'));
+    cells.forEach((c) => { c.textContent = ''; c.classList.remove('err'); });
+    const sum = $('siteSum'), bad = (msg) => { sum.textContent = msg; sum.classList.add('err'); $('siteApply').disabled = true; };
+    sum.classList.remove('err');
+    const sp = parseCidr($('siteSpace').value.trim());
+    if (!sp) return bad('Enter the address space as a network with its prefix length, like 10.10.0.0/16.');
+    const space = { addr: netAddr(sp.addr, sp.mask), mask: sp.mask };
+    const clash = blockClash(space.addr, space.mask, state.active);
+    if (clash) return bad(`${cidrStr(space.addr, space.mask)} overlaps ${blockCidr(clash)}, another base network in this plan.`);
+    const reqs = siteReqs();
+    for (const r of reqs) {
+      if (!Number.isInteger(r.hosts) || r.hosts < 1) { cells[r.idx].textContent = 'Needs a device count'; cells[r.idx].classList.add('err'); return bad(`${r.name}: enter how many devices it will have.`); }
+      if (r.vlan && !validVlan(r.vlan)) { cells[r.idx].textContent = 'VLAN 1–4094'; cells[r.idx].classList.add('err'); return bad(`${r.name}: a VLAN ID is 1–4094.`); }
+    }
+    if (!reqs.length) return bad('Tick at least one network.');
+    const headroom = Math.max(0, Number($('siteHead').value) || 0);
+    const run = (mask) => vlsmFit(reqs.map((r) => ({ ...r })), { headroom, minM: 30, mode: 'replace', network: space.addr, mask });
+    const fit = run(space.mask);
+    for (const r of fit.tooBig) { cells[r.idx].textContent = 'Too big for the space'; cells[r.idx].classList.add('err'); }
+    for (const r of fit.failed) { cells[r.idx].textContent = 'Doesn’t fit'; cells[r.idx].classList.add('err'); }
+    for (const r of fit.placed) cells[r.idx].textContent = `${cidrStr(r.addr, r.mask)}  (${fmt(hostInfo(r.addr, r.mask).hosts)} usable)`;
+    if (fit.tooBig.length || fit.failed.length) {
+      // Say how big the space would need to be.
+      let need = null;
+      for (let m = space.mask - 1; m >= 8 && need === null; m--) { const f = vlsmFit(reqs.map((r) => ({ ...r })), { headroom, minM: 30, mode: 'replace', network: 0, mask: m }); if (!f.tooBig.length && !f.failed.length) need = m; }
+      return bad(`These don’t fit in ${cidrStr(space.addr, space.mask)}${need !== null ? `: it needs a /${need} or larger` : ''}. Use a bigger space, fewer devices or less headroom.`);
+    }
+    let smallest = space.mask;
+    for (let m = space.mask + 1; m <= 30; m++) { const f = run(m); if (f.tooBig.length || f.failed.length) break; smallest = m; }
+    const dupV = [...new Set(reqs.map((r) => r.vlan).filter((v, i, a) => v && a.indexOf(v) !== i))];
+    const parts = [`${fit.placed.length} subnets use ${fmt(fit.needTotal)} of ${fmt(size(space.mask))} addresses (${((fit.needTotal / size(space.mask)) * 100).toFixed(1)}%)`];
+    if (smallest > space.mask) parts.push(`they’d fit in a /${smallest}`);
+    if (dupV.length) parts.push(`VLAN ${dupV.join(', ')} is used twice`);
+    const same = space.addr === state.network && space.mask === state.mask;
+    if (!same) parts.push(`the base network becomes ${cidrStr(space.addr, space.mask)}`);
+    sum.textContent = parts.join('; ') + '.';
+    $('siteApply').disabled = false;
+    siteFit = { fit, space, headroom };
+  };
+  const openSite = () => {
+    if (!siteRows) siteRows = SITE_PRESETS.map(([name, hosts, vlan, on, tip]) => ({ name, hosts, vlan, on, tip: tip || '' }));
+    // Start from the current base network when it's big enough to hold a site; otherwise suggest a /16.
+    $('siteSpace').value = state.mask <= 20 ? blockCidr(blk()) : '10.10.0.0/16';
+    $('siteReplace').hidden = !(state.root.c || blockMetaKeys().length);
+    siteRender();
+    $('siteDlg').showModal();
+  };
+  $('siteBody').addEventListener('input', (e) => {
+    const tr = e.target.closest('tr'), r = siteRows[+tr.dataset.i];
+    if (e.target.classList.contains('site-on')) { r.on = e.target.checked; tr.classList.toggle('off', !r.on); }
+    else if (e.target.classList.contains('site-name')) r.name = e.target.value;
+    else if (e.target.classList.contains('site-hosts')) r.hosts = e.target.value;
+    else if (e.target.classList.contains('site-vlan')) r.vlan = e.target.value;
+    siteCalc();
+  });
+  for (const id of ['siteSpace', 'siteHead']) $(id).addEventListener('input', siteCalc);
+  $('siteAdd').addEventListener('click', () => {
+    const used = new Set(siteRows.map((r) => +r.vlan).filter(Boolean));
+    let v = 150; while (used.has(v)) v += 10;
+    siteRows.push({ name: '', hosts: 20, vlan: v, on: true, tip: '' });
+    siteRender();
+    $('siteBody').lastElementChild.querySelector('.site-name').focus();
+  });
+  $('siteClose').addEventListener('click', () => $('siteDlg').close());
+  $('siteDlg').addEventListener('click', (e) => { if (e.target === $('siteDlg')) $('siteDlg').close(); });
+  $('siteApply').addEventListener('click', () => {
+    siteCalc();
+    if (!siteFit) return;
+    const { fit, space } = siteFit;
+    checkpoint();
+    clearBlockMeta();
+    if (space.addr !== state.network || space.mask !== state.mask) {
+      const oldC = blockCidr(blk());
+      state.network = space.addr; state.mask = space.mask;
+      renamePeers(oldC, blockCidr(blk()));
+    }
+    state.root = fit.root;
+    for (const r of fit.placed) {
+      const k = cidrStr(r.addr, r.mask);
+      setMeta(k, 'n', r.name);
+      setMeta(k, 'v', r.vlan);
+      setMeta(k, 's', 'used');
+      setMeta(k, 'o', `${r.hosts} device${r.hosts > 1 ? 's' : ''} planned`);
+    }
+    $('siteDlg').close();
+    syncControls(); update();
+    showTab('plan');
+    toast(`Applied ${fit.placed.length} subnets`, UNDO);
+  });
   $('azCloud').addEventListener('change', () => openAz($('azCloud').value));
   $('azSpace').addEventListener('input', () => { tplState[tpl.cloud].space = $('azSpace').value; azPreview(); });
   $('azZones').addEventListener('input', azPreview);
