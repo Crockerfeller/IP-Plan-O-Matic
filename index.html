@@ -632,6 +632,7 @@
   #exFmtBtn { min-width: 240px; max-width: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; }
   #exFmtBtn { align-items: center; }
   #exFmtIco { display: inline-flex; }
+  #exFmtBtn.empty #exFmtCur { color: var(--muted); }
   #exFmtCur { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fmenu-pop { position: absolute; left: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 260px; max-height: min(70vh, 560px); overflow-y: auto; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
   .fmenu-pop[hidden], .fmenu-sub[hidden] { display: none; }
@@ -1272,7 +1273,8 @@
         <div class="field">
           <label id="exFmtLbl" for="exFmtBtn">Format</label>
           <!-- The select holds the choice; the menu below is how people pick it (a select can't nest submenus). -->
-          <select id="exFmt" hidden tabindex="-1" aria-hidden="true">
+          <select id="exFmt" hidden tabindex="-1" aria-hidden="true" autocomplete="off">
+            <option value="" selected>Choose a format…</option>
             <optgroup label="Infrastructure as code">
             <option value="tf-aws">Terraform: AWS</option>
             <option value="cfn-aws">CloudFormation: AWS (YAML)</option>
@@ -1284,7 +1286,7 @@
             <option value="ansible">Ansible variables (YAML)</option>
             </optgroup>
             <optgroup label="Router / firewall config">
-            <option value="cisco" selected>Cisco IOS / IOS-XE</option>
+            <option value="cisco">Cisco IOS / IOS-XE</option>
             <option value="arista">Arista EOS</option>
             <option value="junos">Juniper Junos</option>
             <option value="mikrotik">MikroTik RouterOS</option>
@@ -1311,7 +1313,7 @@
             </optgroup>
           </select>
           <div class="fmenu">
-            <button type="button" id="exFmtBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="exFmtMenu" aria-labelledby="exFmtLbl exFmtBtn"><span id="exFmtIco"></span><span id="exFmtCur">Cisco IOS / IOS-XE</span> <span aria-hidden="true">▾</span></button>
+            <button type="button" id="exFmtBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="exFmtMenu" aria-labelledby="exFmtLbl exFmtBtn"><span id="exFmtIco"></span><span id="exFmtCur">Choose a format…</span> <span aria-hidden="true">▾</span></button>
             <div class="fmenu-pop" id="exFmtMenu" role="menu" aria-labelledby="exFmtLbl" hidden></div>
           </div>
         </div>
@@ -1325,8 +1327,8 @@
         </div>
         <label class="check" id="exDhcpL"><input type="checkbox" id="exDhcp" checked> DHCP pools</label>
         <div class="actions">
-          <button type="button" id="exCopy">Copy</button>
-          <button type="button" class="primary" id="exDl">Download</button>
+          <button type="button" id="exCopy" disabled>Copy</button>
+          <button type="button" class="primary" id="exDl" disabled>Download</button>
         </div>
       </div>
       <div class="msg" id="exMsg" style="margin-top:10px"></div>
@@ -5368,6 +5370,13 @@
   const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv', svg: 'image/svg+xml', hosts: 'text/csv', unifi: 'text/x-shellscript' };
   const renderExport = () => {
     const f = $('exFmt').value;
+    $('exCopy').disabled = $('exDl').disabled = !f;
+    if (!f) {
+      // Nothing chosen yet (every page load starts here): no output until a format is picked.
+      $('exDhcpL').hidden = true; $('exImg').hidden = true; $('exOut').hidden = false; $('exOut').value = '';
+      showMsg('exMsg', 'Choose a format to see the export.', 'info');
+      return;
+    }
     const whole = f === 'json' || f === 'csv' || f === 'xlsx' || f === 'hosts';
     $('exInc').disabled = whole;
     $('exDhcpL').hidden = !DHCP_FMTS.includes(f);
@@ -5461,6 +5470,7 @@
   // Static markup only: every value comes from the tables above.
   const fmtIcon = (key) => {
     const k = FMT_ICON[key];
+    if (!k) return '';
     if (BRAND[k]) return `<svg class="fm-ico" viewBox="${BRAND_VB[k] || '0 0 24 24'}" aria-hidden="true"${BRAND[k][0] ? ` style="color:${BRAND[k][0]}"` : ''}><path fill="currentColor" d="${BRAND[k][1]}"/></svg>`;
     if (GLYPH[k]) return `<svg class="fm-ico glyph" viewBox="0 0 24 24" aria-hidden="true">${GLYPH[k]}</svg>`;
     return `<span class="fm-ico fm-badge" aria-hidden="true">${k}</span>`;
@@ -5517,7 +5527,7 @@
     fmtPop.hidden = !open; $('exFmtBtn').setAttribute('aria-expanded', String(open));
     if (open && focus) {
       // Start on the chosen format, opening its submenu.
-      const cur = fmtWrap.querySelector('[data-fmt][aria-checked="true"]');
+      const cur = fmtWrap.querySelector('[data-fmt][aria-checked="true"]') || fmtPop.querySelector('button');
       const sub = cur.closest('.fmenu-sub');
       if (sub) fmtSub(parentOf.get(sub), true);
       cur.scrollIntoView({ block: 'nearest' }); cur.focus();
@@ -5527,6 +5537,7 @@
     const v = $('exFmt').value;
     $('exFmtCur').textContent = fmtText(v);
     $('exFmtIco').innerHTML = fmtIcon(v);
+    $('exFmtBtn').classList.toggle('empty', !v);
     for (const b of fmtWrap.querySelectorAll('[data-fmt]')) b.setAttribute('aria-checked', String(b.dataset.fmt === v));
     for (const [b, sub] of subOf) b.querySelector('.fm-tick').style.visibility = sub.querySelector(`[data-fmt="${v}"]`) ? 'visible' : '';
   };

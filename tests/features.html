@@ -1475,12 +1475,12 @@ T.ubiquitiAndFormatMenu = async () => {
   check('fmt menu: IaC section first', pop.querySelector('.fm-head').textContent === 'Infrastructure as code', pop.querySelector('.fm-head').textContent);
   const parents = qa('#exFmtMenu .fm-parent').map((b) => b.querySelector('.fm-lab').textContent);
   check('fmt menu: cloud and Ubiquiti submenus', parents.join('|') === 'Amazon Web Services|Microsoft Azure|Google Cloud|Oracle Cloud (OCI)|Ubiquiti', parents);
-  const opts = qa('#exFmt option').map((o) => o.value), items = qa('.fmenu [data-fmt]').map((b) => b.dataset.fmt);
+  const opts = qa('#exFmt option').map((o) => o.value).filter(Boolean), items = qa('.fmenu [data-fmt]').map((b) => b.dataset.fmt);
   check('fmt menu: every format once', items.length === opts.length && [...items].sort().join() === [...opts].sort().join(), [items, opts]);
   check('fmt menu: every item has an icon', qa('.fmenu [role^=menuitem]').every((b) => b.querySelector('.fm-ico')), qa('.fmenu [role^=menuitem]').filter((b) => !b.querySelector('.fm-ico')).map((b) => b.textContent));
   check('fmt menu: brand logos and badges', q('#exFmtMenu [data-fmt="cisco"] svg.fm-ico path') && q('#exFmtMenu ~ .fmenu-sub [data-fmt="unifi"] svg.fm-ico') && q('#exFmtMenu ~ .fmenu-sub [data-fmt="cfn-aws"] .fm-badge').textContent === 'AWS');
-  check('fmt menu: button shows the icon', !!q('#exFmtIco svg'));
-  check('fmt menu: default still Cisco', $('exFmt').value === 'cisco' && $('exFmtCur').textContent === 'Cisco IOS / IOS-XE', $('exFmtCur').textContent);
+  check('fmt menu: starts with nothing chosen', $('exFmt').value === '' && $('exFmtCur').textContent === 'Choose a format…' && $('exOut').value === '' && $('exCopy').disabled && $('exDl').disabled && $('exMsg').textContent.includes('Choose a format'), [$('exFmt').value, $('exFmtCur').textContent]);
+  check('fmt menu: nothing ticked yet', !q('.fmenu [aria-checked="true"]') && $('exFmtIco').innerHTML === '');
   click('#exFmtBtn');
   check('fmt menu: opens', !pop.hidden && $('exFmtBtn').getAttribute('aria-expanded') === 'true');
   const azure = qa('#exFmtMenu .fm-parent')[1];
@@ -1495,6 +1495,7 @@ T.ubiquitiAndFormatMenu = async () => {
   check('fmt menu: submenu items laid out like the list', cs(cfnB).display === 'flex' && labOff(cfnB) === labOff(q('#exFmtMenu [data-fmt="cisco"]')), [cs(cfnB).display, labOff(cfnB), labOff(q('#exFmtMenu [data-fmt="cisco"]'))]);
   check('fmt menu: only the chosen item shows a tick', cs(cfnB.querySelector('.fm-tick')).visibility === 'hidden' && cs(q('.fmenu-sub [data-fmt="bicep"] .fm-tick')).visibility === 'visible');
   click('#exFmtBtn');
+  check('fmt menu: button shows the icon once chosen', !!q('#exFmtIco .fm-ico') && !$('exFmtBtn').classList.contains('empty') && !$('exCopy').disabled);
   check('fmt menu: chosen item and its parent ticked', q('#exFmtMenu ~ .fmenu-sub [data-fmt="bicep"]').getAttribute('aria-checked') === 'true' && azure.querySelector('.fm-tick').style.visibility === 'visible');
   // A real mouse hovers before it clicks: the hover opens the submenu and the click must not shut it.
   const hover = (el) => el.dispatchEvent(new W.PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
