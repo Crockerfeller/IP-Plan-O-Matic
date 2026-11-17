@@ -478,8 +478,11 @@ T.exports2 = async () => {
   t = gen('panos');
   check('panos', t.includes('units <PARENT_IF>.10 tag 10') && t.includes('ip 10.0.0.1/24') && t.includes('ip-pool 10.0.0.2-10.0.0.254'), t.slice(0, 700));
   t = gen('pfsense');
-  const xml = new W.DOMParser().parseFromString('<root>' + t.replace(/^<\?xml[^>]*\?>/, '') + '</root>', 'application/xml');
-  check('pfsense xml well-formed', !xml.querySelector('parsererror') && xml.querySelectorAll('vlan').length === 2 && xml.querySelector('opt1 ipaddr').textContent === '10.0.0.1', t.slice(0, 900));
+  check('pfsense: php script with settings', t.startsWith('<?php') && t.includes("$parent  = 'PARENT_IF';") && t.includes('$dry_run = false;') && t.includes("require_once('interfaces.inc');"), t.slice(0, 1500));
+  check('pfsense: plan rows', /\n  \[10, 'SERVERS', '10\.0\.0\.1', 24, '10\.0\.0\.2', '10\.0\.0\.254'\],   \/\/ 10\.0\.0\.0\/24 Servers\n/.test(t), t.slice(1500, 2500));
+  check('pfsense: adds, saves and applies', t.includes("config_set_path('vlans/vlan', $vlans);") && t.includes('write_config(') && t.includes('interface_vlan_configure($a[1]);') && t.includes('services_dhcpd_configure();') && t.includes('filter_configure();'), t.slice(-900));
+  check('pfsense: only PHP, no stray close tag', (t.match(/\?>/g) || []).length === 0, t);
+  check('pfsense: .php download hint', $('exMsg').textContent.includes('Execute PHP Commands'), $('exMsg').textContent);
   t = gen('ansible');
   check('ansible yaml', t.startsWith('---') && t.includes('  - name: "Servers"') && t.includes('    vlan: 10') && t.includes('  - name: "Wifi'), t.slice(0, 600));
   t = gen('md');
@@ -671,7 +674,7 @@ T.hardening = async () => {
   check('link bad vlan dropped', r0.querySelector('input.vlan').value === '', r0.querySelector('input.vlan').value);
   check('link bad status dropped', r0.querySelector('select.status').value === 'free');
   click('#tb-export'); select('#exInc', 'all');
-  for (const f of ['cisco', 'junos', 'mikrotik', 'arista', 'tf-aws']) {
+  for (const f of ['cisco', 'junos', 'mikrotik', 'arista', 'tf-aws', 'pfsense', 'edgeos', 'unifi']) {
     select('#exFmt', f);
     check(`${f}: no injected line from link`, !/^(username|ip route)/m.test($('exOut').value), $('exOut').value);
   }
