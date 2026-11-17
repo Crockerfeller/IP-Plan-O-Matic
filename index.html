@@ -59,7 +59,7 @@
     "Undo and redo",
     "Overlap checker and route summarization",
     "IPv6 prefix planning with nibble splits, auto-planning by count and ULA generator",
-    "Export to Cisco IOS, Arista EOS, Juniper Junos, MikroTik, FortiGate, Palo Alto PAN-OS, pfSense/OPNsense, Terraform, Ansible, Excel, CSV, JSON, Markdown and HTML",
+    "Export to Cisco IOS, Arista EOS, Juniper Junos, MikroTik, FortiGate, Ubiquiti UniFi and EdgeRouter, Palo Alto PAN-OS, pfSense/OPNsense, Terraform, Ansible, Excel, CSV, JSON, Markdown and HTML",
     "Availability-zone subnet layouts for cloud VPCs",
     "IPv6 overlap checking, route summarization and ip6.arpa reverse zones",
     "Keyboard shortcuts",
@@ -627,6 +627,28 @@
   .menu-pop[hidden] { display: none; }
   .menu-pop.left { right: auto; left: 0; }
   .menu-pop button { border: 0; text-align: left; height: 34px; }
+  /* Export format picker: sections, with a pop-out submenu per cloud provider (inline on a phone) */
+  .fmenu { position: relative; }
+  #exFmtBtn { min-width: 240px; max-width: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; }
+  #exFmtCur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fmenu-pop { position: absolute; left: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 260px; max-height: min(70vh, 560px); overflow-y: auto; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+  .fmenu-pop[hidden], .fmenu-sub[hidden] { display: none; }
+  .fmenu-pop .fm-head { padding: 8px 10px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .fmenu-pop .fm-head:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .fmenu-pop button { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; border: 0; text-align: left; white-space: nowrap; }
+  .fmenu-pop button .fm-lab { flex: 1; }
+  .fmenu-pop button .fm-tick { width: 1em; visibility: hidden; }
+  .fmenu-pop button[aria-checked="true"] .fm-tick { visibility: visible; }
+  .fmenu-pop button[aria-checked="true"] { font-weight: 600; }
+  .fm-group { position: relative; }
+  .fmenu-sub { position: fixed; z-index: 21; display: flex; flex-direction: column; min-width: 220px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+  .fm-group > button[aria-expanded="true"] { background: var(--bg); }
+  @media (max-width: 640px) {
+    #exFmtBtn { min-width: 0; width: 100%; }
+    .fmenu-pop { min-width: 0; width: min(320px, calc(100vw - 32px)); }
+    .fmenu-sub { position: static; box-shadow: none; border: 0; border-left: 2px solid var(--border); border-radius: 0; margin-left: 14px; min-width: 0; }
+    .fmenu-pop button { white-space: normal; height: auto; min-height: 34px; }
+  }
   kbd { font-family: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
 
   .result { margin-top: 12px; display: grid; gap: 10px; font-size: 13px; }
@@ -1085,7 +1107,7 @@
             <div class="menu-pop" id="exMenu" role="menu" hidden>
               <button type="button" role="menuitem" id="csvBtn" title="Copy the columns shown below as CSV">Copy CSV</button>
               <button type="button" role="menuitem" id="printBtn" title="Print or save as PDF">Print or save as PDF</button>
-              <button type="button" role="menuitem" id="exMoreBtn" title="Terraform, Cisco, Juniper, MikroTik, JSON and more">More formats…</button>
+              <button type="button" role="menuitem" id="exMoreBtn" title="Terraform, Cisco, Juniper, MikroTik, UniFi, JSON and more">More formats…</button>
             </div>
           </div>
         </div>
@@ -1240,29 +1262,32 @@
   <section id="tab-export" role="tabpanel" aria-labelledby="tb-export" hidden>
     <div class="card pad">
       <h2>Export</h2>
-      <p class="sub">Generate router, firewall or cloud config, a spreadsheet, or a table for your docs from the current plan. Cisco, Arista, Junos and MikroTik also get IPv6 addresses for /64s (and longer) on the IPv6 tab that have a VLAN, a name or are in use; they join the IPv4 interface with the same VLAN. Placeholders like <span class="mono">&lt;INTERFACE&gt;</span> need filling in. Always review config before applying it to a device.</p>
+      <p class="sub">Generate router, firewall or cloud config, a spreadsheet, or a table for your docs from the current plan. Cisco, Arista, Junos, MikroTik and EdgeRouter also get IPv6 addresses for /64s (and longer) on the IPv6 tab that have a VLAN, a name or are in use; they join the IPv4 interface with the same VLAN. Placeholders like <span class="mono">&lt;INTERFACE&gt;</span> need filling in. Always review config before applying it to a device.</p>
       <div class="row">
         <div class="field">
-          <label for="exFmt">Format</label>
-          <select id="exFmt">
+          <label id="exFmtLbl" for="exFmtBtn">Format</label>
+          <!-- The select holds the choice; the menu below is how people pick it (a select can't nest submenus). -->
+          <select id="exFmt" hidden tabindex="-1" aria-hidden="true">
+            <optgroup label="Infrastructure as code">
+            <option value="tf-aws">Terraform: AWS</option>
+            <option value="cfn-aws">CloudFormation: AWS (YAML)</option>
+            <option value="tf-azure">Terraform: Azure</option>
+            <option value="bicep">Bicep: Azure</option>
+            <option value="az-ps">Azure CLI script (PowerShell)</option>
+            <option value="tf-gcp">Terraform: Google Cloud</option>
+            <option value="tf-oci">Terraform: Oracle Cloud (OCI)</option>
+            <option value="ansible">Ansible variables (YAML)</option>
+            </optgroup>
             <optgroup label="Router / firewall config">
-            <option value="cisco">Cisco IOS / IOS-XE</option>
+            <option value="cisco" selected>Cisco IOS / IOS-XE</option>
             <option value="arista">Arista EOS</option>
             <option value="junos">Juniper Junos</option>
             <option value="mikrotik">MikroTik RouterOS</option>
             <option value="fortigate">Fortinet FortiGate</option>
             <option value="panos">Palo Alto PAN-OS (set commands)</option>
             <option value="pfsense">pfSense / OPNsense (config.xml)</option>
-            </optgroup>
-            <optgroup label="Infrastructure as code">
-            <option value="tf-aws">Terraform: AWS</option>
-            <option value="tf-azure">Terraform: Azure</option>
-            <option value="tf-gcp">Terraform: Google Cloud</option>
-            <option value="tf-oci">Terraform: Oracle Cloud (OCI)</option>
-            <option value="bicep">Bicep: Azure</option>
-            <option value="az-ps">Azure CLI script (PowerShell)</option>
-            <option value="cfn-aws">CloudFormation: AWS (YAML)</option>
-            <option value="ansible">Ansible variables (YAML)</option>
+            <option value="unifi">Ubiquiti UniFi Network (API script)</option>
+            <option value="edgeos">Ubiquiti EdgeRouter (EdgeOS)</option>
             </optgroup>
             <optgroup label="IPAM tools">
             <option value="netbox">NetBox: prefixes (CSV import)</option>
@@ -1280,6 +1305,10 @@
             <option value="svg">Image: SVG (address map and table)</option>
             </optgroup>
           </select>
+          <div class="fmenu">
+            <button type="button" id="exFmtBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="exFmtMenu" aria-labelledby="exFmtLbl exFmtBtn"><span id="exFmtCur">Cisco IOS / IOS-XE</span> <span aria-hidden="true">▾</span></button>
+            <div class="fmenu-pop" id="exFmtMenu" role="menu" aria-labelledby="exFmtLbl" hidden></div>
+          </div>
         </div>
         <div class="field">
           <label for="exInc">Include</label>
@@ -1412,7 +1441,7 @@
       <li><b>Address info:</b> RFC 1918 private, CGNAT, link-local, documentation, multicast and other special ranges, plus the reverse DNS (in-addr.arpa) zone.</li>
       <li><b>IPv6 prefix planner:</b> split a /48 or /56 by bit or nibble, give each prefix a name, VLAN, status and notes, auto-plan by count (like twelve /56s for sites), and generate a random ULA.</li>
       <li><b>Saved plans and offline use:</b> save named plans in your browser, export them as a backup, and install the app to use it without a connection.</li>
-      <li><b>Export:</b> Cisco IOS / IOS-XE, Juniper Junos, MikroTik RouterOS, Terraform for AWS, Azure, Google Cloud and Oracle Cloud, CSV and JSON, with optional DHCP pools.</li>
+      <li><b>Export:</b> Cisco IOS / IOS-XE, Juniper Junos, MikroTik RouterOS, Ubiquiti UniFi and EdgeRouter, Terraform for AWS, Azure, Google Cloud and Oracle Cloud, CSV and JSON, with optional DHCP pools.</li>
     </ul>
 
     <h3>Accuracy and privacy</h3>
@@ -4903,7 +4932,7 @@
   // base / platform / tree describe the first base network, so version-2 importers still work.
 
   // ---------- More vendors ----------
-  const DHCP_FMTS = ['cisco', 'arista', 'junos', 'mikrotik', 'fortigate', 'panos', 'pfsense'];
+  const DHCP_FMTS = ['cisco', 'arista', 'junos', 'mikrotik', 'fortigate', 'panos', 'pfsense', 'unifi', 'edgeos'];
   const genArista = (list, dhcp) => {
     const v6x = v6ForExport();
     const out = ['! Generated by IP Plan-O-Matic for Arista EOS. Review before applying.', '! Replace <INTERFACE> and <DHCP_SERVER> placeholders.', '!'];
@@ -5257,8 +5286,81 @@
     img.src = url;
   });
 
-  const EXT = { cisco: 'txt', arista: 'txt', junos: 'txt', mikrotik: 'rsc', fortigate: 'conf', panos: 'txt', pfsense: 'xml', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', ansible: 'yml', csv: 'csv', json: 'json', xlsx: 'xlsx', md: 'md', html: 'html', bicep: 'bicep', 'az-ps': 'ps1', 'cfn-aws': 'yaml', netbox: 'csv', 'netbox-vlans': 'csv', phpipam: 'csv', png: 'png', svg: 'svg', hosts: 'csv' };
-  const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv', svg: 'image/svg+xml', hosts: 'text/csv' };
+  // ---------- Ubiquiti ----------
+  // UniFi Network: one network per VLAN, created through the Network application's API (the same call its Settings > Networks page makes).
+  const shq = (s) => String(s).replace(/'/g, `'\\''`);   // inside a single-quoted shell string
+  const genUnifi = (list, dhcp) => {
+    const out = ['#!/usr/bin/env bash',
+      '# Generated by IP Plan-O-Matic for Ubiquiti UniFi Network. Review before running.',
+      '# Creates each subnet with a VLAN as a network (Settings > Networks) on a UniFi OS console:',
+      '# Dream Machine, Cloud Gateway, Dream Router, Cloud Key Gen2 or UniFi OS Server, running Network 9 or later.',
+      '# Make an API key in UniFi Network under Settings > Control Plane > Integrations, then run:',
+      '#   UNIFI_HOST=192.168.1.1 UNIFI_API_KEY=your-key bash subnet-plan-unifi.sh',
+      '# DRY_RUN=1 prints each request instead of sending it. UNIFI_SITE picks a site other than "default".',
+      '# Networks whose name or VLAN already exists are refused by UniFi; the script carries on with the rest.',
+      'set -u',
+      'HOST="${UNIFI_HOST:?Set UNIFI_HOST to the console address}"',
+      'KEY="${UNIFI_API_KEY:-}"',
+      'API="https://$HOST/proxy/network/api/s/${UNIFI_SITE:-default}/rest/networkconf"',
+      'add() {',
+      '  echo "== $1"',
+      '  if [ "${DRY_RUN:-0}" = 1 ]; then echo "POST $API"; echo "$2"; return; fi',
+      '  [ -n "$KEY" ] || { echo "Set UNIFI_API_KEY (or DRY_RUN=1)"; exit 1; }',
+      '  # -k: consoles use a self-signed certificate',
+      `  curl -sSk -X POST "$API" -H "X-API-KEY: $KEY" -H 'Content-Type: application/json' -H 'Accept: application/json' --data "$2"; echo`,
+      '}', ''];
+    const vl = list.filter((x) => x.meta.v && x.info.uF !== null && x.mask <= 30);
+    const skipped = list.length - vl.length;
+    if (!vl.length) { out.push('# Nothing to export: give your subnets a VLAN ID first (UniFi’s untagged network is the Default one).'); return out.join('\n'); }
+    if (skipped) out.push(`# ${skipped} subnet${skipped > 1 ? 's' : ''} left out: UniFi networks need a VLAN ID, and a /30 or larger.`, '');
+    const names = new Set();
+    for (const x of vl) {
+      const { info, meta } = x;
+      let name = (meta.n || `VLAN ${meta.v}`).replace(/\s+/g, ' ').trim().slice(0, 64), u = name, i = 2;
+      while (names.has(u.toLowerCase())) u = `${name.slice(0, 60)} ${i++}`;
+      names.add(u.toLowerCase());
+      const conf = { name: u, purpose: 'corporate', networkgroup: 'LAN', enabled: true, ip_subnet: `${ntoa(routerIp(info))}/${x.mask}`, vlan_enabled: true, vlan: Number(meta.v) };
+      const pr = dhcp && poolRange(info);
+      if (pr) Object.assign(conf, { dhcpd_enabled: true, dhcpd_start: ntoa(pr[0]), dhcpd_stop: ntoa(pr[1]), dhcpd_leasetime: 86400 });
+      else conf.dhcpd_enabled = false;
+      out.push(`add '${shq(`${u} (${x.key}, VLAN ${meta.v})`)}' '${shq(JSON.stringify(conf))}'`);
+    }
+    return out.join('\n');
+  };
+  // EdgeRouter (EdgeOS / Vyatta): set commands for configure mode.
+  const genEdgeos = (list, dhcp) => {
+    const nm = makeNamer('upper');
+    const v6x = v6ForExport();
+    const sq = (s) => String(s).replace(/'/g, '').slice(0, 64);
+    const out = ['# Generated by IP Plan-O-Matic for Ubiquiti EdgeRouter (EdgeOS). Review before committing.',
+      '# Paste into the CLI, then check with "compare" before "commit" and "save".',
+      '# Replace <PARENT_IF> with the trunk port (eth1...). On a switch0 port group use "interfaces switch switch0 vif" instead.',
+      '# Replace <INTERFACE> for subnets without a VLAN, and <DNS_SERVER> in the DHCP pools.', '', 'configure', ''];
+    const ifOf = (vlan) => (vlan ? `ethernet <PARENT_IF> vif ${vlan}` : 'ethernet <INTERFACE>');
+    for (const x of list) {
+      const { info, meta } = x;
+      out.push(`# ===== ${x.key}${meta.n ? '  ' + meta.n : ''}`);
+      if (info.uF === null) { out.push('# skipped: no usable addresses on this platform', ''); continue; }
+      const r = routerIp(info), ifc = `set interfaces ${ifOf(meta.v)}`;
+      out.push(`${ifc} address ${ntoa(r)}/${x.mask}`, `${ifc} description '${sq(meta.n || x.key)}'`, ...v6x.lines(meta.v, (ip) => `${ifc} address ${ip}`));
+      const pr = dhcp && poolRange(info);
+      if (pr) {
+        const d = `set service dhcp-server shared-network-name ${nm(x)}`;
+        out.push(`${d} authoritative enable`, `${d} subnet ${x.key} default-router ${ntoa(r)}`, `${d} subnet ${x.key} dns-server <DNS_SERVER>`,
+          `${d} subnet ${x.key} lease 86400`, `${d} subnet ${x.key} start ${ntoa(pr[0])} stop ${ntoa(pr[1])}`);
+      }
+      out.push('');
+    }
+    for (const p6 of v6x.rest()) {
+      const ifc = `set interfaces ${ifOf(p6.meta.v)}`;
+      out.push(`# ===== ${p6.k}${p6.meta.n ? '  ' + p6.meta.n : ''} (IPv6)`, `${ifc} address ${p6.ip}`, `${ifc} description '${sq(p6.meta.n || p6.k)}'`, '');
+    }
+    out.push('compare', '# commit', '# save', '# exit');
+    return out.join('\n');
+  };
+
+  const EXT = { cisco: 'txt', arista: 'txt', junos: 'txt', mikrotik: 'rsc', fortigate: 'conf', panos: 'txt', pfsense: 'xml', 'tf-aws': 'tf', 'tf-azure': 'tf', 'tf-gcp': 'tf', 'tf-oci': 'tf', ansible: 'yml', csv: 'csv', json: 'json', xlsx: 'xlsx', md: 'md', html: 'html', bicep: 'bicep', 'az-ps': 'ps1', 'cfn-aws': 'yaml', netbox: 'csv', 'netbox-vlans': 'csv', phpipam: 'csv', png: 'png', svg: 'svg', hosts: 'csv', unifi: 'sh', edgeos: 'txt' };
+  const MIME = { json: 'application/json', csv: 'text/csv', md: 'text/markdown', html: 'text/html', pfsense: 'application/xml', ansible: 'text/yaml', 'cfn-aws': 'text/yaml', netbox: 'text/csv', 'netbox-vlans': 'text/csv', phpipam: 'text/csv', svg: 'image/svg+xml', hosts: 'text/csv', unifi: 'text/x-shellscript' };
   const renderExport = () => {
     const f = $('exFmt').value;
     const whole = f === 'json' || f === 'csv' || f === 'xlsx' || f === 'hosts';
@@ -5290,7 +5392,7 @@
       if (note) showMsg('exMsg', note, 'info');
       const dhcp = $('exDhcp').checked;
       const gen = { cisco: genCisco, arista: genArista, junos: genJunos, mikrotik: genMikrotik, fortigate: genFortigate, panos: genPanos, pfsense: genPfsense, ansible: genAnsible, md: genMarkdown, html: genHtml,
-        'az-ps': genAzCli, bicep: genBicep, 'cfn-aws': genCfn, netbox: genNetbox, 'netbox-vlans': genNetboxVlans, phpipam: genPhpipam }[f];
+        'az-ps': genAzCli, bicep: genBicep, 'cfn-aws': genCfn, netbox: genNetbox, 'netbox-vlans': genNetboxVlans, phpipam: genPhpipam, unifi: genUnifi, edgeos: genEdgeos }[f];
       text = gen ? gen(list, dhcp) : genTf(list, f);
       const how = {
         'az-ps': 'Paste into Azure Cloud Shell (PowerShell) or run as a .ps1 after “az login”. Set $ResourceGroup and $Location at the top; $DryRun = $true prints the commands first.',
@@ -5298,6 +5400,8 @@
         'cfn-aws': 'Deploy with “aws cloudformation deploy” or upload it in the CloudFormation console.',
         netbox: 'In NetBox: IPAM → Prefixes → Import. Base networks come in as containers. If the plan has VLANs, import “NetBox: VLANs” first so the VLAN column matches.',
         'netbox-vlans': list.some((x) => x.meta.v) ? 'In NetBox: IPAM → VLANs → Import. Import these before the prefixes.' : 'No subnets in this export have a VLAN, so there are no VLANs to import.',
+        unifi: 'Run it on a computer that can reach your UniFi console: UNIFI_HOST=<console address> UNIFI_API_KEY=<key> bash subnet-plan-unifi.sh. Make the key in UniFi Network under Settings > Control Plane > Integrations. Only subnets with a VLAN ID become networks.',
+        edgeos: 'Paste into the EdgeRouter CLI (SSH or the CLI button in the web UI). It ends with “compare” so you can check the changes, then type commit and save.',
         phpipam: 'In phpIPAM: Administration → Subnets → Import (or Import / export on a section). Create the section “IP Plan-O-Matic” first, or rename it in the file, and match the columns when asked.',
       }[f];
       if (how && !note) showMsg('exMsg', how, 'info');
@@ -5305,6 +5409,118 @@
     $('exOut').value = text;
   };
   for (const id of ['exFmt', 'exInc', 'exDhcp']) $(id).addEventListener('change', renderExport);
+
+  // ---------- Format menu: sections, with a pop-out submenu per cloud provider and for Ubiquiti ----------
+  const FMT_MENU = [
+    ['Infrastructure as code', [
+      ['Amazon Web Services', [['tf-aws', 'Terraform'], ['cfn-aws', 'CloudFormation (YAML)']]],
+      ['Microsoft Azure', [['tf-azure', 'Terraform'], ['bicep', 'Bicep'], ['az-ps', 'Azure CLI script (PowerShell)']]],
+      ['Google Cloud', [['tf-gcp', 'Terraform']]],
+      ['Oracle Cloud (OCI)', [['tf-oci', 'Terraform']]],
+      ['ansible'],
+    ]],
+    ['Router / firewall config', [['cisco'], ['arista'], ['junos'], ['mikrotik'], ['fortigate'], ['panos'], ['pfsense'],
+      ['Ubiquiti', [['unifi', 'UniFi Network (API script)'], ['edgeos', 'EdgeRouter (EdgeOS)']]]]],
+    ['IPAM tools', [['netbox'], ['netbox-vlans'], ['phpipam']]],
+    ['Spreadsheets, documents and images', [['xlsx'], ['csv'], ['hosts'], ['json'], ['md'], ['html'], ['png'], ['svg']]],
+  ];
+  const fmtText = (v) => $('exFmt').querySelector(`option[value="${v}"]`).textContent;
+  const fmtPop = $('exFmtMenu');
+  const fmtItem = (v, label) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.dataset.fmt = v;
+    b.innerHTML = '<span class="fm-tick" aria-hidden="true">✓</span><span class="fm-lab"></span>';
+    b.querySelector('.fm-lab').textContent = label || fmtText(v);
+    return b;
+  };
+  for (const [head, items] of FMT_MENU) {
+    const h = document.createElement('div');
+    h.className = 'fm-head'; h.setAttribute('role', 'presentation'); h.textContent = head;
+    const grp = document.createElement('div');
+    grp.setAttribute('role', 'group'); grp.setAttribute('aria-label', head);
+    fmtPop.append(h, grp);
+    for (const it of items) {
+      if (!Array.isArray(it[1])) { grp.append(fmtItem(it[0], it[1])); continue; }
+      const wrap = document.createElement('div'), b = document.createElement('button'), sub = document.createElement('div');
+      wrap.className = 'fm-group';
+      b.type = 'button'; b.className = 'fm-parent'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false');
+      b.innerHTML = '<span class="fm-tick" aria-hidden="true">✓</span><span class="fm-lab"></span><span aria-hidden="true">▸</span>';
+      b.querySelector('.fm-lab').textContent = it[0];
+      sub.className = 'fmenu-sub'; sub.setAttribute('role', 'menu'); sub.setAttribute('aria-label', it[0]); sub.hidden = true;
+      for (const [v, label] of it[1]) sub.append(fmtItem(v, label));
+      wrap.append(b, sub); grp.append(wrap);
+    }
+  }
+  const narrow = () => matchMedia('(max-width: 640px)').matches;
+  const fmtSubs = () => [...fmtPop.querySelectorAll('.fmenu-sub')];
+  const fmtSub = (b, open) => {
+    const sub = b.nextElementSibling;
+    if (open) for (const o of fmtSubs()) if (o !== sub && !o.hidden) fmtSub(o.previousElementSibling, false);
+    sub.hidden = !open; b.setAttribute('aria-expanded', String(open));
+    if (!open || narrow()) { sub.style.left = sub.style.top = ''; if (open) sub.lastElementChild.scrollIntoView({ block: 'nearest' }); return; }
+    // Pop out beside the item, on whichever side has room, kept on screen.
+    const r = b.getBoundingClientRect(), w = sub.offsetWidth, hgt = sub.offsetHeight;
+    const right = r.right + 4 + w <= innerWidth - 8;
+    sub.style.left = `${right ? r.right + 4 : Math.max(8, r.left - 4 - w)}px`;
+    sub.style.top = `${Math.max(8, Math.min(r.top - 5, innerHeight - hgt - 8))}px`;
+  };
+  const fmtOpen = (open, focus) => {
+    if (!open) for (const o of fmtSubs()) fmtSub(o.previousElementSibling, false);
+    fmtPop.hidden = !open; $('exFmtBtn').setAttribute('aria-expanded', String(open));
+    if (open && focus) {
+      // Start on the chosen format, opening its submenu.
+      const cur = fmtPop.querySelector('[aria-checked="true"]');
+      const sub = cur.closest('.fmenu-sub');
+      if (sub) fmtSub(sub.previousElementSibling, true);
+      cur.scrollIntoView({ block: 'nearest' }); cur.focus();
+    }
+  };
+  const fmtSync = () => {
+    const v = $('exFmt').value;
+    $('exFmtCur').textContent = fmtText(v);
+    for (const b of fmtPop.querySelectorAll('[data-fmt]')) b.setAttribute('aria-checked', String(b.dataset.fmt === v));
+    for (const b of fmtPop.querySelectorAll('.fm-parent')) b.querySelector('.fm-tick').style.visibility = b.nextElementSibling.querySelector(`[data-fmt="${v}"]`) ? 'visible' : '';
+  };
+  $('exFmt').addEventListener('change', fmtSync);
+  fmtSync();
+  $('exFmtBtn').addEventListener('click', (e) => { e.stopPropagation(); fmtOpen(fmtPop.hidden, true); });
+  $('exFmtBtn').addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); fmtOpen(true, true); } });
+  fmtPop.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.classList.contains('fm-parent')) { fmtSub(b, b.nextElementSibling.hidden); if (!b.nextElementSibling.hidden && e.detail === 0) b.nextElementSibling.querySelector('button').focus(); return; }
+    pickFmt(b.dataset.fmt);
+  });
+  const pickFmt = (v) => {
+    fmtOpen(false); $('exFmtBtn').focus();
+    if ($('exFmt').value !== v) { $('exFmt').value = v; $('exFmt').dispatchEvent(new Event('change')); }
+  };
+  // Hovering a parent opens its submenu, on a pointer that can hover.
+  fmtPop.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse' || narrow()) return;
+    const b = e.target.closest('button');
+    if (!b || b.closest('.fmenu-sub')) return;
+    if (b.classList.contains('fm-parent')) { if (b.nextElementSibling.hidden) fmtSub(b, true); }
+    else for (const o of fmtSubs()) if (!o.hidden) fmtSub(o.previousElementSibling, false);
+  });
+  fmtPop.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    const a = document.activeElement, sub = a.closest('.fmenu-sub');
+    // Arrows move within the current level: the submenu, or the top level (skipping submenu items).
+    const level = sub ? [...sub.querySelectorAll('button')] : [...fmtPop.querySelectorAll('button')].filter((b) => !b.closest('.fmenu-sub'));
+    const i = level.indexOf(a);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = level[(i + (e.key === 'ArrowDown' ? 1 : level.length - 1)) % level.length]; n.scrollIntoView({ block: 'nearest' }); n.focus(); }
+    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); level[e.key === 'Home' ? 0 : level.length - 1].focus(); }
+    else if (e.key === 'ArrowRight' && a.classList.contains('fm-parent')) { e.preventDefault(); fmtSub(a, true); a.nextElementSibling.querySelector('button').focus(); }
+    else if ((e.key === 'ArrowLeft' || e.key === 'Escape') && sub) { e.preventDefault(); const p = sub.previousElementSibling; fmtSub(p, false); p.focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); fmtOpen(false); $('exFmtBtn').focus(); }
+    else if (e.key === 'Tab') fmtOpen(false);
+  });
+  document.addEventListener('click', (e) => { if (!fmtPop.hidden && !e.target.closest('.fmenu')) fmtOpen(false); });
+  // Phones resize as the address bar hides, so keep the menu open and just move an open submenu.
+  addEventListener('resize', () => { for (const o of fmtSubs()) if (!o.hidden) fmtSub(o.previousElementSibling, true); });
+  fmtPop.addEventListener('scroll', () => { for (const o of fmtSubs()) if (!o.hidden) fmtSub(o.previousElementSibling, true); });
   $('exCopy').addEventListener('click', async () => {
     if ($('exFmt').value === 'png') {
       // Copy the picture itself where the browser can; the promise keeps Safari's copy inside the click.

@@ -1462,6 +1462,57 @@ T.updateCheck = async () => {
   check('update: link text restored', $('updBtn').textContent.includes('Check for updates'));
   W.fetch = real; confirmAnswer = true;
 };
+T.ubiquitiAndFormatMenu = async () => {
+  await load('../index.html#10.0.0.0/24');
+  divideRow(0); divideRow(0);
+  const rows = qa('#body tr');
+  type(rows[0].querySelector('input'), "Bob's LAN"); type(rows[0].querySelector('input.vlan'), '10');
+  type(rows[1].querySelector('input'), 'IoT'); type(rows[1].querySelector('input.vlan'), '20');
+  type(rows[2].querySelector('input'), 'Uplink');
+  click('#tb-export'); select('#exInc', 'all');
+  // The menu: Infrastructure as code first, a submenu per cloud, Ubiquiti under routers.
+  const pop = $('exFmtMenu');
+  check('fmt menu: IaC section first', pop.querySelector('.fm-head').textContent === 'Infrastructure as code', pop.querySelector('.fm-head').textContent);
+  const parents = qa('#exFmtMenu .fm-parent').map((b) => b.querySelector('.fm-lab').textContent);
+  check('fmt menu: cloud and Ubiquiti submenus', parents.join('|') === 'Amazon Web Services|Microsoft Azure|Google Cloud|Oracle Cloud (OCI)|Ubiquiti', parents);
+  const opts = qa('#exFmt option').map((o) => o.value), items = qa('#exFmtMenu [data-fmt]').map((b) => b.dataset.fmt);
+  check('fmt menu: every format once, in order', items.join() === opts.join(), [items, opts]);
+  check('fmt menu: default still Cisco', $('exFmt').value === 'cisco' && $('exFmtCur').textContent === 'Cisco IOS / IOS-XE', $('exFmtCur').textContent);
+  click('#exFmtBtn');
+  check('fmt menu: opens', !pop.hidden && $('exFmtBtn').getAttribute('aria-expanded') === 'true');
+  const azure = qa('#exFmtMenu .fm-parent')[1];
+  check('fmt menu: submenus start closed', azure.nextElementSibling.hidden);
+  click(azure);
+  check('fmt menu: submenu pops out', !azure.nextElementSibling.hidden && azure.getAttribute('aria-expanded') === 'true');
+  click(azure.nextElementSibling.querySelector('[data-fmt="bicep"]'));
+  check('fmt menu: pick sets the format and closes', $('exFmt').value === 'bicep' && pop.hidden && $('exFmtCur').textContent === 'Bicep: Azure' && $('exOut').value.includes('Microsoft.Network/virtualNetworks'), $('exFmtCur').textContent);
+  check('fmt menu: chosen item and its parent ticked', q('#exFmtMenu [data-fmt="bicep"]').getAttribute('aria-checked') === 'true' && azure.querySelector('.fm-tick').style.visibility === 'visible');
+  select('#exFmt', 'mikrotik');
+  check('fmt menu: follows the select', $('exFmtCur').textContent === 'MikroTik RouterOS' && q('#exFmtMenu [data-fmt="bicep"]').getAttribute('aria-checked') === 'false');
+  // UniFi
+  select('#exFmt', 'unifi');
+  let t = $('exOut').value;
+  check('unifi: script header', t.startsWith('#!/usr/bin/env bash') && t.includes('/proxy/network/api/s/${UNIFI_SITE:-default}/rest/networkconf') && t.includes('X-API-KEY: $KEY'), t.slice(0, 1200));
+  check('unifi: network with vlan and dhcp', t.includes(`add 'Bob'\\''s LAN (10.0.0.0/26, VLAN 10)' '{"name":"Bob'\\''s LAN","purpose":"corporate","networkgroup":"LAN","enabled":true,"ip_subnet":"10.0.0.1/26","vlan_enabled":true,"vlan":10,"dhcpd_enabled":true,"dhcpd_start":"10.0.0.2","dhcpd_stop":"10.0.0.62"`), t);
+  check('unifi: subnet without vlan left out', !t.includes('Uplink') && t.includes('1 subnet left out'), t);
+  check('unifi: dhcp toggle shown', !$('exDhcpL').hidden && $('exMsg').textContent.includes('UNIFI_API_KEY'));
+  $('exDhcp').checked = false; $('exDhcp').dispatchEvent(new W.Event('change'));
+  check('unifi: no dhcp', $('exOut').value.includes('"vlan":20,"dhcpd_enabled":false}'), $('exOut').value);
+  $('exDhcp').checked = true; $('exDhcp').dispatchEvent(new W.Event('change'));
+  // EdgeRouter
+  select('#exFmt', 'edgeos');
+  t = $('exOut').value;
+  check('edgeos: vif address and description', t.includes('set interfaces ethernet <PARENT_IF> vif 10 address 10.0.0.1/26') && t.includes("set interfaces ethernet <PARENT_IF> vif 10 description 'Bobs LAN'"), t);
+  check('edgeos: plain interface', t.includes('set interfaces ethernet <INTERFACE> address 10.0.0.129/25'), t);
+  check('edgeos: dhcp pool', t.includes('set service dhcp-server shared-network-name IOT subnet 10.0.0.64/26 start 10.0.0.66 stop 10.0.0.126') && t.includes('shared-network-name IOT subnet 10.0.0.64/26 default-router 10.0.0.65'), t);
+  check('edgeos: configure then compare', t.includes('\nconfigure\n') && t.includes('\ncompare\n'), t.slice(-200));
+  const names = [], orig = W.URL.createObjectURL, origClick = W.HTMLAnchorElement.prototype.click;
+  W.URL.createObjectURL = () => 'blob:x'; W.HTMLAnchorElement.prototype.click = function () { names.push(this.download); };
+  for (const f of ['unifi', 'edgeos']) { select('#exFmt', f); click('#exDl'); }
+  W.HTMLAnchorElement.prototype.click = origClick; W.URL.createObjectURL = orig;
+  check('ubiquiti: file names', names.join(' ') === 'subnet-plan-unifi.sh subnet-plan-edgeos.txt', names);
+  click('#tb-plan');
+};
 (async () => {
   const only = new URLSearchParams(location.search).get('t');
   for (const [k, fn] of Object.entries(T)) {
