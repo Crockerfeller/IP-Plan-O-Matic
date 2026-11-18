@@ -1,5 +1,5 @@
 # Test, build and deploy the site to GitHub Pages.
-# Every push to main runs the browser test suites against the built site and checks every export format with its
+# Every push to main runs the browser test suites against the built site (Chrome, plus WebKit and Firefox) and checks every export format with its
 # real tool (terraform, bicep, cfn-lint, php, pwsh, shellcheck); only if all of that passes is it deployed.
 # Pull requests run the tests without deploying.
 # One-time setup: repo Settings → Pages → Build and deployment → Source: "GitHub Actions".
@@ -43,6 +43,22 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
+  # The same suites in Safari's engine (WebKit) and Firefox, through Playwright (tests/browsers.mjs).
+  browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - name: Install WebKit and Firefox
+        run: npx playwright install --with-deps webkit firefox
+      - name: Run the test suites in WebKit and Firefox
+        run: npm run test:browsers
+
   # Every export format checked by the tool that would consume it (tests/check_exports.py).
   exports:
     runs-on: ubuntu-latest
@@ -66,7 +82,7 @@ jobs:
         run: python3 tests/check_exports.py --require-all
 
   deploy:
-    needs: [test, lint, exports]
+    needs: [test, lint, browsers, exports]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

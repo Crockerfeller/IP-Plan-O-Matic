@@ -31,7 +31,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 ## Accurate and private
 
 - **No ads, no tracking, no cookies, no sign-up.** Your plan stays in your browser.
-- **Tested:** the math is checked against Python's `ipaddress` library on hundreds of random IPv4 and IPv6 networks, and every export is checked by the tool that would use it (`terraform validate`, `bicep build`, `cfn-lint`, `php -l`, `shellcheck` and more). See [`tests/`](tests/).
+- **Tested in Chrome, Safari (WebKit) and Firefox:** the math is checked against Python's `ipaddress` library on hundreds of random IPv4 and IPv6 networks, and every export is checked by the tool that would use it (`terraform validate`, `bicep build`, `cfn-lint`, `php -l`, `shellcheck` and more). See [`tests/`](tests/).
 
 ## Guides
 

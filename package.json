@@ -1,15 +1,17 @@
 {
   "name": "ip-plan-o-matic",
   "private": true,
-  "description": "Development tools only (linting). The site itself has no build step and no dependencies.",
+  "description": "Development tools only (linting, cross-browser tests). The site itself has no build step and no dependencies.",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:browsers": "node tests/browsers.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "eslint": "10.15.0",
     "eslint-plugin-html": "8.2.1",
-    "globals": "17.14.0"
+    "globals": "17.14.0",
+    "playwright": "1.65.1"
   }
 }

@@ -26,7 +26,7 @@ export default [
     },
   },
   { files: ['**/*.html'], plugins: { html } },
-  { files: ['eslint.config.mjs'], languageOptions: { sourceType: 'module', globals: globals.node } },
+  { files: ['eslint.config.mjs', 'tests/*.mjs'], languageOptions: { sourceType: 'module', globals: globals.node } },
   { files: ['sw.js'], languageOptions: { globals: globals.serviceworker } },
   // lib.js defines helpers for the test pages, so its top-level names are "unused" here.
   { files: ['tests/lib.js'], rules: { 'no-unused-vars': ['error', { vars: 'local', caughtErrors: 'none' }] } },
