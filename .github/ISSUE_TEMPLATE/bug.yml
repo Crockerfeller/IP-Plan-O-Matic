@@ -1,0 +1,36 @@
+name: Report a problem
+description: Something in IP Plan-O-Matic is wrong or doesn't work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Base network 10.0.0.0/16
+        2. Divide the first row twice
+        3. Export as Terraform
+  - type: input
+    id: plan
+    attributes:
+      label: Plan link (optional)
+      description: >-
+        The page link holds your whole plan, so it can show the problem exactly. Only share it if the
+        addresses and names in it can be public: issues are visible to everyone.
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: From the footer (for example "Build 970470a"). The Report a problem link fills it in.
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Safari on iPhone, Chrome 131 on Windows, …

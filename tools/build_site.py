@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ZIP_NAME = 'IP-Plan-O-Matic.zip'
 # Repo files that are not part of the site.
 SKIP_DIRS = ('.github/', 'tools/', 'tests/')
-SKIP_FILES = {'README.md', '.gitignore', '.gitattributes', 'package.json', 'package-lock.json', 'eslint.config.mjs'}
+SKIP_FILES = {'README.md', 'CHANGELOG.md', '.gitignore', '.gitattributes', 'package.json', 'package-lock.json', 'eslint.config.mjs'}
 # Site files left out of the download: crawler and search-console files mean nothing in a local copy.
 NOT_IN_ZIP = {'robots.txt', 'sitemap.xml', 'google5649ac4e891e9f10.html', 'version.json', ZIP_NAME}
 STAMPED = ('index.html', 'sw.js')

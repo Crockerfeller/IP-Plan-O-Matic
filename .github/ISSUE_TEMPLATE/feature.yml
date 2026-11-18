@@ -1,0 +1,21 @@
+name: Suggest a feature
+description: An idea for something IP Plan-O-Matic should do, or do better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: The job you're doing and where the app gets in the way. This matters more than the exact solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How you picture it working, if you have an idea. An export format, a cloud rule, a screen…
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: A sample of the output you'd want, or a link to the tool's documentation, if it helps.

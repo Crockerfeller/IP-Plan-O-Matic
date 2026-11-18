@@ -51,6 +51,10 @@ Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/dep
 
 The build (`python3 tools/build_site.py _site`) stamps `index.html` and `sw.js` with the commit hash and date, writes `version.json`, and packs `IP-Plan-O-Matic.zip`. The page shows its build above the Reload button and in the footer. It checks `version.json` now and then, and turns Reload green when a newer build is live. A downloaded copy has **Check for updates** in the footer, which compares it with the live site and offers the new zip.
 
+## What's new and feedback
+
+[`CHANGELOG.md`](CHANGELOG.md) lists what changed, by date; the app's footer links to it as **What's new**. Found a problem or have an idea? Use [Report a problem](https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=bug.yml) or [Suggest a feature](https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=feature.yml) (the footer has both links, and Report a problem fills in your build number), or message [@wangooroo on X](https://x.com/wangooroo).
+
 ## License
 
 [MIT](LICENSE): you're free to use, change and share the code, including commercially, as long as the copyright notice stays with it. The license covers the code, not the name: if you publish a modified version, please give it a different name than "IP Plan-O-Matic".

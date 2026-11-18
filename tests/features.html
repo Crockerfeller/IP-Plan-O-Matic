@@ -1681,6 +1681,18 @@ T.fonts = async () => {
   const ok = await Promise.all(shell.map((f) => fetch('../' + f, { cache: 'no-store' }).then((r) => r.ok)));
   check('fonts: service worker caches the font files, and they exist', shell.length === 3 && ok.every(Boolean), shell);
 };
+T.feedback = async () => {
+  await load('../index.html#10.0.0.0/24');
+  const links = [...D.querySelectorAll('footer.site .meta a')].map((a) => [a.textContent.trim(), a.getAttribute('href')]);
+  const by = Object.fromEntries(links);
+  check('feedback: footer links What’s new to the changelog', /\/blob\/main\/CHANGELOG\.md$/.test(by['What’s new'] || ''), links);
+  check('feedback: footer links the feature form', /\/issues\/new\?template=feature\.yml$/.test(by['Suggest a feature'] || ''), links);
+  const bug = new URL(D.getElementById('bugLink').href);
+  const stamped = !/^Dev build/.test(D.getElementById('ver').textContent);
+  check('feedback: Report a problem opens the bug form' + (stamped ? ' with the build filled in' : ''),
+    bug.pathname.endsWith('/issues/new') && bug.searchParams.get('template') === 'bug.yml'
+      && (!stamped || /^Build [0-9a-f]{7} · \d{4}-\d\d-\d\d$/.test(bug.searchParams.get('build') || '')), bug.href);
+};
 (async () => {
   const only = new URLSearchParams(location.search).get('t');
   for (const [k, fn] of Object.entries(T)) {

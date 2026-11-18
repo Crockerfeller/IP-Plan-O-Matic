@@ -1532,7 +1532,7 @@
 
     <h3>Accuracy and privacy</h3>
     <p>Every release is checked by an automated test suite that runs the real page in a browser. The subnet math is compared with Python’s <span class="mono">ipaddress</span> library on hundreds of random IPv4 and IPv6 networks and route lists, cloud reserved-address counts are checked for every platform, and random VLSM plans are verified to be aligned and overlap-free. The <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic/tree/main/tests">tests are public</a>.</p>
-    <p>There are no ads, no analytics and no cookies, and you never need an account. Your plan stays in your browser: in the page link, and in local storage if you save it. The only outside requests are for the web fonts and the version number in the footer.</p>
+    <p>There are no ads, no analytics and no cookies, and you never need an account. Your plan stays in your browser: in the page link, and in local storage if you save it. The page loads nothing from other sites: even the fonts are served with it. The only request it makes on its own is to check this site for a newer build.</p>
 
     <h3>Guides</h3>
     <p>Short, accurate references: the <a href="learn/cidr-cheat-sheet.html">CIDR cheat sheet</a>, <a href="learn/how-many-hosts-in-a-subnet.html">how many hosts are in a subnet</a>, <a href="learn/vlsm-subnetting.html">VLSM explained</a>, <a href="learn/private-ip-address-ranges.html">private IP ranges</a>, <a href="learn/ipv6-subnetting.html">IPv6 subnetting</a>, and subnet sizing for <a href="learn/aws-vpc-subnet-sizing.html">AWS</a>, <a href="learn/azure-vnet-subnet-sizing.html">Azure</a>, <a href="learn/google-cloud-vpc-subnet-sizing.html">Google Cloud</a> and <a href="learn/oracle-cloud-vcn-subnet-sizing.html">Oracle Cloud</a>. <a href="learn/">All guides →</a></p>
@@ -1575,7 +1575,7 @@
       </div>
       <span class="tip-note">Free forever. If it saved you time please consider a tip:<br>in the X app, <b>Money → Send → @wangooroo</b></span>
     </div>
-    <div class="meta"><a href="learn/">Subnetting guides</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span><a href="#" id="updBtn" class="no-print" hidden> · Check for updates</a></div>
+    <div class="meta"><a href="learn/">Subnetting guides</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic/blob/main/CHANGELOG.md" title="What changed, by date">What’s new</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=bug.yml" id="bugLink" title="Opens a form on GitHub (needs a GitHub account; or message me on X)">Report a problem</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=feature.yml" title="Opens a form on GitHub (needs a GitHub account; or message me on X)">Suggest a feature</a> · <a href="https://github.com/Crockerfeller/IP-Plan-O-Matic">Source on GitHub</a> · <a href="https://x.com/wangooroo" rel="me">@wangooroo on X</a><span class="ver" id="ver" hidden></span><a href="#" id="updBtn" class="no-print" hidden> · Check for updates</a></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -7247,6 +7247,8 @@
     a.textContent = STAMPED ? `Build ${short(BUILD.sha)} · ${BUILD.date}` : 'Dev build';
     a.title = STAMPED ? 'The commit this page was built from' : 'This copy wasn’t built by the deploy, so it has no build number';
     ver.replaceChildren(a);
+    // The problem form gets the build number filled in.
+    if (STAMPED) $('bugLink').href = `https://github.com/${REPO}/issues/new?template=bug.yml&build=${encodeURIComponent('Build ' + short(BUILD.sha) + ' · ' + BUILD.date)}`;
     ver.hidden = false;
     el.classList.toggle('ready', !!newBuild);
     rb.classList.toggle('ready', !!newBuild);
