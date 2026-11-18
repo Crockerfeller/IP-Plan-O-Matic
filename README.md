@@ -43,13 +43,13 @@ Network engineers, sysadmins, cloud architects, homelabbers, and CCNA / Network+
 
 ## Run locally
 
-It's a single `index.html` with no build step. Open it in a browser. (`package.json` is only for the linter: `npm install`, then `npm run lint` runs ESLint. The site doesn't use it.) Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`. A copy run straight from the repo is a **dev build**: it shows "dev" instead of a build number.
+There's no build step: `index.html` (the page), `app.css` and `app.js` (one plain script, not a module, so a downloaded copy works opened straight from disk). Open `index.html` in a browser. (`package.json` is only for development tools: `npm install`, then `npm run lint` runs ESLint and `npm run typecheck` checks `app.js` with TypeScript, using JSDoc hints where needed. The site doesn't use them.) Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`. A copy run straight from the repo is a **dev build**: it shows "dev" instead of a build number.
 
 ## Versions and deploys
 
 Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): the test suites run against the built site, every export is checked with its real tool, and only if all of that passes is it deployed to GitHub Pages. Pull requests run the tests without deploying.
 
-The build (`python3 tools/build_site.py _site`) stamps `index.html` and `sw.js` with the commit hash and date, writes `version.json`, and packs `IP-Plan-O-Matic.zip`. The page shows its build above the Reload button and in the footer. It checks `version.json` now and then, and turns Reload green when a newer build is live. A downloaded copy has **Check for updates** in the footer, which compares it with the live site and offers the new zip.
+The build (`python3 tools/build_site.py _site`) stamps `index.html`, `app.js` and `sw.js` with the commit hash and date (the page asks for `app.css` and `app.js` with the build in `?v=`, so a new page never runs with an old cached script), writes `version.json`, and packs `IP-Plan-O-Matic.zip`. The page shows its build above the Reload button and in the footer. It checks `version.json` now and then, and turns Reload green when a newer build is live. A downloaded copy has **Check for updates** in the footer, which compares it with the live site and offers the new zip.
 
 ## What's new and feedback
 

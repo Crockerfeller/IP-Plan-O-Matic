@@ -4,7 +4,7 @@
     python3 tools/build_site.py _site                  # what GitHub Actions deploys
     python3 tools/build_site.py _site --include-tests  # what tests/run.sh serves
 
-Copies the site files from the working tree, replaces the build placeholders in index.html and sw.js with the
+Copies the site files from the working tree, replaces the build placeholders in index.html, app.js and sw.js with the
 commit hash and date (and the app's lastmod in sitemap.xml with the date), writes version.json (what the page polls to spot a newer build) and packs
 IP-Plan-O-Matic.zip (what "Check for updates" offers to downloaded copies).
 """
@@ -20,10 +20,10 @@ ROOT = Path(__file__).resolve().parent.parent
 ZIP_NAME = 'IP-Plan-O-Matic.zip'
 # Repo files that are not part of the site.
 SKIP_DIRS = ('.github/', 'tools/', 'tests/')
-SKIP_FILES = {'README.md', 'CHANGELOG.md', '.gitignore', '.gitattributes', 'package.json', 'package-lock.json', 'eslint.config.mjs'}
+SKIP_FILES = {'README.md', 'CHANGELOG.md', '.gitignore', '.gitattributes', 'package.json', 'package-lock.json', 'eslint.config.mjs', 'tsconfig.json'}
 # Site files left out of the download: crawler and search-console files mean nothing in a local copy.
 NOT_IN_ZIP = {'robots.txt', 'sitemap.xml', 'google5649ac4e891e9f10.html', 'version.json', ZIP_NAME}
-STAMPED = ('index.html', 'sw.js')
+STAMPED = ('index.html', 'app.js', 'sw.js')
 
 
 def git(*args):

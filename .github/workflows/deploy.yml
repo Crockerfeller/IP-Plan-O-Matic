@@ -31,6 +31,7 @@ jobs:
         run: tests/run.sh
 
   # ESLint: likely bugs in the app's script, the guides, the service worker and the tests (eslint.config.mjs).
+  # TypeScript checks app.js's types (tsconfig.json); nothing is compiled.
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -42,6 +43,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
 
   # The same suites in Safari's engine (WebKit) and Firefox, through Playwright (tests/browsers.mjs), and the
   # accessibility scan (tests/a11y.mjs).

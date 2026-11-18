@@ -5,6 +5,9 @@ const CACHE = 'ipom-%%BUILD_SHA%%';
 const SHELL = [
   './',
   './index.html',
+  // The page asks for these with its build in ?v=, so a new page never gets an old copy from the cache.
+  './app.css?v=%%BUILD_SHA%%',
+  './app.js?v=%%BUILD_SHA%%',
   './manifest.webmanifest',
   './favicon.svg',
   './favicon.ico',

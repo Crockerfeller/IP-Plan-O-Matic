@@ -1,6 +1,6 @@
 // ESLint: catches likely bugs (undefined names, unreachable code, duplicate keys...). Style rules are off on purpose.
 // Run with `npm run lint` (after `npm install`). CI runs it on every push.
-// Lints the script inside index.html and the HTML guides/tests (eslint-plugin-html), plus the standalone .js files.
+// Lints app.js, sw.js and the other .js files, plus the scripts inside the HTML guides and tests (eslint-plugin-html).
 import js from '@eslint/js';
 import html from 'eslint-plugin-html';
 import globals from 'globals';

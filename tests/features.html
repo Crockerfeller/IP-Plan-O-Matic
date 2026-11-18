@@ -1681,6 +1681,22 @@ T.fonts = async () => {
   const ok = await Promise.all(shell.map((f) => fetch('../' + f, { cache: 'no-store' }).then((r) => r.ok)));
   check('fonts: service worker caches the font files, and they exist', shell.length === 3 && ok.every(Boolean), shell);
 };
+// index.html, app.css and app.js are one build: the page asks for its CSS and JS with the build in ?v=, and the
+// service worker caches exactly those URLs, so a new page can never run with an old script from the cache.
+T.assets = async () => {
+  await load('../index.html#10.0.0.0/24');
+  const v = await builtVersion();
+  const tag = v ? v.sha : '%%BUILD_SHA%%';
+  const css = [...D.querySelectorAll('link[rel=stylesheet]')].map((l) => l.getAttribute('href')).filter((h) => /^app\.css/.test(h));
+  const js = [...D.querySelectorAll('script[src]')].map((x) => x.getAttribute('src'));
+  check('assets: page loads app.css and app.js tagged with its build', css.join() === `app.css?v=${tag}` && js.join() === `app.js?v=${tag}`, [css, js]);
+  check('assets: no inline script or style left in the page', !D.querySelector('script:not([src]):not([type="application/ld+json"]), style'));
+  check('assets: app styles and script are applied', W.getComputedStyle(D.querySelector('footer.site')).display === 'flex' && D.documentElement.dataset.ready === '1');
+  const sw = await fetch('../sw.js', { cache: 'no-store' }).then((r) => r.text());
+  check('assets: service worker caches the same URLs', sw.includes(`'./app.css?v=${tag}'`) && sw.includes(`'./app.js?v=${tag}'`));
+  const ok = await Promise.all([`../app.css?v=${tag}`, `../app.js?v=${tag}`].map((u) => fetch(u, { cache: 'no-store' }).then((r) => r.ok)));
+  check('assets: both files are served', ok.every(Boolean), ok);
+};
 T.feedback = async () => {
   await load('../index.html#10.0.0.0/24');
   const links = [...D.querySelectorAll('footer.site .meta a')].map((a) => [a.textContent.trim(), a.getAttribute('href')]);

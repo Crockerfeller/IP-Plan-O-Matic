@@ -470,10 +470,10 @@ page('aws-vpc-subnet-sizing', 'AWS VPC subnet sizing: reserved IPs, CIDR limits 
      ])
 
 # ---------------------------------------------------------------- Azure
-# The service subnet catalog is read from the app (AZURE_SVCS in index.html), so the guide and the
+# The service subnet catalog is read from the app (AZURE_SVCS in app.js), so the guide and the
 # Azure / AWS subnet wizard always agree on names, delegations and sizes.
 def azure_services():
-    src = (ROOT / 'index.html').read_text()
+    src = (ROOT / 'app.js').read_text()
     block = src[src.index('const AZURE_SVCS = ['):]
     block = block[:block.index('\n  ];')]
     out = []
