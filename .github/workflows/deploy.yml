@@ -1,5 +1,6 @@
 # Test, build and deploy the site to GitHub Pages.
-# Every push to main runs the browser test suites against the built site; only if they all pass is it deployed.
+# Every push to main runs the browser test suites against the built site and checks every export format with its
+# real tool (terraform, bicep, cfn-lint, php, pwsh, shellcheck); only if all of that passes is it deployed.
 # Pull requests run the tests without deploying.
 # One-time setup: repo Settings → Pages → Build and deployment → Source: "GitHub Actions".
 name: Test and deploy
@@ -27,8 +28,30 @@ jobs:
       - name: Run the test suites (headless Chrome)
         run: tests/run.sh
 
+  # Every export format checked by the tool that would consume it (tests/check_exports.py).
+  exports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Install the checkers
+        # Already on the runner: Google Chrome, PowerShell (pwsh), PHP, ShellCheck.
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet cfn-lint pyyaml openpyxl
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL -o "$RUNNER_TEMP/bin/bicep" https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x "$RUNNER_TEMP/bin/bicep"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Check every export with its real tool
+        run: python3 tests/check_exports.py --require-all
+
   deploy:
-    needs: test
+    needs: [test, exports]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

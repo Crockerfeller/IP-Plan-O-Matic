@@ -31,7 +31,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 ## Accurate and private
 
 - **No ads, no tracking, no cookies, no sign-up.** Your plan stays in your browser.
-- **Tested:** the math is checked against Python's `ipaddress` library on hundreds of random IPv4 and IPv6 networks. See [`tests/`](tests/).
+- **Tested:** the math is checked against Python's `ipaddress` library on hundreds of random IPv4 and IPv6 networks, and every export is checked by the tool that would use it (`terraform validate`, `bicep build`, `cfn-lint`, `php -l`, `shellcheck` and more). See [`tests/`](tests/).
 
 ## Guides
 
@@ -47,7 +47,7 @@ It's a single `index.html` with no build step. Open it in a browser. Offline sup
 
 ## Versions and deploys
 
-Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): the test suites run against the built site, and only if they all pass is it deployed to GitHub Pages. Pull requests run the tests without deploying.
+Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): the test suites run against the built site, every export is checked with its real tool, and only if all of that passes is it deployed to GitHub Pages. Pull requests run the tests without deploying.
 
 The build (`python3 tools/build_site.py _site`) stamps `index.html` and `sw.js` with the commit hash and date, writes `version.json`, and packs `IP-Plan-O-Matic.zip`. The page shows its build above the Reload button and in the footer. It checks `version.json` now and then, and turns Reload green when a newer build is live. A downloaded copy has **Check for updates** in the footer, which compares it with the live site and offers the new zip.
 

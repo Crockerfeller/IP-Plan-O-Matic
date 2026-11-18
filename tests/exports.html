@@ -1,0 +1,97 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Export files</title><iframe id="f" style="width:1400px;height:900px"></iframe><pre id="out">running</pre>
+<script src="lib.js"></script>
+<script>
+// Builds realistic plans (on-prem, Azure, AWS, Google Cloud, Oracle Cloud) and saves every export format through the
+// real Download button. tests/check_exports.py reads the files from #out and runs each one through its real tool
+// (terraform validate, bicep build, cfn-lint, php -l, bash -n, PowerShell's parser, YAML/CSV/XML parsers...).
+const files = {};
+const toB64 = async (blob) => { const b = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+// Names that break naive quoting in shells, PHP, PowerShell, YAML, HCL, CSV and HTML.
+const NASTY = `O'Brien "Lab" & <Ops> $(id) \`x\` ; #1 \\ 50% {a} ${'${x}'} é`;
+
+// Click Download for each format and keep what the page hands to the browser.
+async function saveAll(scenario, formats) {
+  let got = null, last = null;
+  const origURL = W.URL.createObjectURL, origClick = W.HTMLAnchorElement.prototype.click;
+  // Keep each blob, but hand back a real URL: the PNG step draws the SVG through one.
+  W.URL.createObjectURL = (b) => { last = b; return origURL.call(W.URL, b); };
+  W.HTMLAnchorElement.prototype.click = function () { got = { blob: last, name: this.download }; };
+  click('#tb-export'); select('#exInc', 'all');
+  for (const f of formats) {
+    got = null; last = null;
+    select('#exFmt', f);
+    click('#exDl');
+    for (let i = 0; i < 50 && !(got && got.name); i++) await sleep(50);   // PNG is drawn asynchronously
+    check(`${scenario}: ${f} downloads`, !!(got && got.name && got.blob.size > 0), f);
+    if (got && got.name) files[`${scenario}/${f}/${got.name}`] = await toB64(got.blob);
+  }
+  W.URL.createObjectURL = origURL; W.HTMLAnchorElement.prototype.click = origClick;
+  click('#tb-plan');
+}
+const formatsIn = () => [...$('exFmt').options].map((o) => o.value).filter(Boolean);
+const cloudWiz = (p) => { select('#platform', p); click('#tplBtn'); };
+const tick = (id) => qa(`#azVnets input[type=checkbox][data-svc="${id}"]`).forEach((b) => { if (!b.checked) b.click(); });
+const nameRow = (i, v) => type(qa('#body tr')[i].querySelector('input'), v);
+
+(async () => {
+  try {
+    // ---- On-prem site: VLANs, DHCP, IPv6, IP assignments, an awkward name. Every format.
+    await load('../index.html#192.168.0.0/24');
+    const every = formatsIn();
+    click('#tplBtn'); type('#siteSpace', '10.10.0.0/22');
+    qa('#siteBody .site-on').forEach((c, i) => { if (i === 14 && !c.checked) { c.checked = true; c.dispatchEvent(new W.Event('input', { bubbles: true })); } });
+    click('#siteApply'); await sleep(50);
+    nameRow(0, NASTY);
+    const hb = qa('#body tr')[1].querySelector('.hosts-btn'); hb.click(); await sleep(30);
+    $('hAddName').value = 'printer "1"'; $('hAddMac').value = 'aa:bb:cc:dd:ee:01'; $('hAddNote').value = NASTY; $('hostsAdd').requestSubmit(); await sleep(30);
+    $('hostsDlg').close();
+    click('#tb-v6'); $('v6Net').value = '2001:db8:0:10::/60'; $('v6Form').requestSubmit(); await sleep(30);
+    qa('#v6Body tr')[0].querySelectorAll('.v6-btns button')[1].click();
+    type(qa('#v6Body tr')[0].querySelector('input'), 'Servers v6'); type(qa('#v6Body tr')[0].querySelector('input.vlan'), '10');
+    click('#tb-plan');
+    check('onprem: plan built', qa('#body tr').length >= 6, snap().rows);
+    await saveAll('onprem', every);
+
+    // ---- Azure: hub and two spokes, gateway transit, firewall route tables and NSGs.
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('azure'); select('#azLayout', 'hub'); click('#azAddSpoke'); click('#azApply'); await sleep(50);
+    click('#peerBtn'); $('peerGw').click(); click('#peerSave'); await sleep(50);
+    click('#tb-export'); select('#exFmt', 'bicep'); $('exAzRt').checked = true; $('exAzNsg').checked = true; click('#tb-plan');
+    await saveAll('azure-hub', ['tf-azure', 'bicep', 'az-ps', 'ansible', 'json']);
+    // ---- Azure: one VNet, a nasty name on a subnet.
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('azure'); click('#azApply'); await sleep(50);
+    nameRow(qa('#body tr').length - 1, NASTY);
+    await saveAll('azure-single', ['tf-azure', 'bicep', 'az-ps']);
+
+    // ---- AWS: one VPC across zones, and hub and spoke.
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('aws'); click('#azApply'); await sleep(50);
+    nameRow(0, NASTY);
+    await saveAll('aws-single', ['tf-aws', 'cfn-aws']);
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('aws'); select('#azLayout', 'hub'); click('#azApply'); await sleep(50);
+    await saveAll('aws-hub', ['tf-aws', 'cfn-aws']);
+
+    // ---- Google Cloud: two regions with GKE and private services access; then hub and spoke.
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('gcp'); type('#azZones', 'us-central1, europe-west1');
+    for (const id of ['gcp-gke', 'gcp-gke-pods', 'gcp-gke-svc', 'gcp-psa']) tick(id);
+    click('#azApply'); await sleep(50);
+    await saveAll('gcp-single', ['tf-gcp']);
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('gcp'); select('#azLayout', 'hub'); type('#azSpace', '10.0.0.0/14'); click('#azApply'); await sleep(50);
+    await saveAll('gcp-hub', ['tf-gcp']);
+
+    // ---- Oracle Cloud: one VCN with a nasty name, then hub and spoke with a DRG.
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('oci'); click('#azApply'); await sleep(50);
+    nameRow(0, NASTY);
+    await saveAll('oci-single', ['tf-oci']);
+    await load('../index.html#192.168.0.0/24');
+    cloudWiz('oci'); select('#azLayout', 'hub'); click('#azApply'); await sleep(50);
+    await saveAll('oci-hub', ['tf-oci']);
+  } catch (e) { failures++; results.push(`FAIL threw ${e.stack}`); }
+  done({ files });
+})();
+</script>
