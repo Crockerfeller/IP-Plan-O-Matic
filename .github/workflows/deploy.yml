@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+      - name: Guides match their generator
+        run: python3 tools/build_learn.py --check
       - name: Run the test suites (headless Chrome)
         run: tests/run.sh
 

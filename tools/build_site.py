@@ -5,7 +5,7 @@
     python3 tools/build_site.py _site --include-tests  # what tests/run.sh serves
 
 Copies the site files from the working tree, replaces the build placeholders in index.html and sw.js with the
-commit hash and date, writes version.json (what the page polls to spot a newer build) and packs
+commit hash and date (and the app's lastmod in sitemap.xml with the date), writes version.json (what the page polls to spot a newer build) and packs
 IP-Plan-O-Matic.zip (what "Check for updates" offers to downloaded copies).
 """
 import argparse
@@ -57,6 +57,9 @@ def main():
         if '%%BUILD_SHA%%' not in text:
             sys.exit(f'{f}: no %%BUILD_SHA%% placeholder to stamp')
         p.write_text(text.replace('%%BUILD_SHA%%', sha).replace('%%BUILD_DATE%%', date), encoding='utf-8')
+    # The sitemap's lastmod for the app itself is the commit date (tools/build_learn.py leaves a placeholder).
+    sm = out / 'sitemap.xml'
+    sm.write_text(sm.read_text(encoding='utf-8').replace('%%BUILD_DATE%%', date), encoding='utf-8')
 
     (out / 'version.json').write_text(json.dumps({'sha': sha, 'date': date}) + '\n', encoding='utf-8')
 

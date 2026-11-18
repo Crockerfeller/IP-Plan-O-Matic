@@ -19,6 +19,12 @@ tests/run.sh accuracy        # one suite
 
 Needs Python 3 and Google Chrome (`CHROME=/path/to/chrome` to point elsewhere). You can also serve the repo (`python3 -m http.server`) and open `http://localhost:8000/tests/features.html` in a browser to watch a suite run. Served that way the page is a dev build, so the version tests only check the "dev" label.
 
+Check that the committed guides match their generator (CI runs this before the suites):
+
+```bash
+python3 tools/build_learn.py --check
+```
+
 Check the exports (separate from `run.sh`, because it needs the tools above):
 
 ```bash

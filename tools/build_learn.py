@@ -8,6 +8,15 @@ so the guides can't drift from the real subnet math. Run from the repo root:
 
 It rewrites learn/*.html, learn/learn.css, sitemap.xml and the guide cards on the
 app's Guides tab (between the guides:start / guides:end markers in index.html).
+
+A page whose only change would be its date is left alone, so dateModified (and the
+page's sitemap lastmod) moves only when the page really changes. The app's own
+sitemap lastmod is %%BUILD_DATE%%, which tools/build_site.py stamps at deploy.
+
+    python3 tools/build_learn.py --check
+
+writes nothing and exits 1 if any generated file differs from what is committed
+(CI runs this, so the guides can't drift from the generator).
 """
 import base64
 import datetime
@@ -16,11 +25,30 @@ import ipaddress
 import json
 import pathlib
 import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LEARN = ROOT / 'learn'
 SITE = 'https://crockerfeller.github.io/IP-Plan-O-Matic/'
 TODAY = datetime.date.today().isoformat()
+CHECK = '--check' in sys.argv[1:]
+STALE = []    # --check: files that differ from what the generator makes
+DATES = {}    # page URL -> its dateModified (kept from the file when only the date would change)
+DATE_RE = re.compile(r'"dateModified": "(\d{4}-\d{2}-\d{2})"')
+
+
+def write(path, text):
+    """Write a generated file, unless it is unchanged apart from its dateModified. Returns the date it carries."""
+    old = path.read_text(encoding='utf-8') if path.exists() else None
+    m = DATE_RE.search(old or '')
+    if old is not None and m and DATE_RE.sub(f'"dateModified": "{m.group(1)}"', text) == old:
+        return m.group(1)
+    if old != text:
+        if CHECK:
+            STALE.append(path.relative_to(ROOT))
+        else:
+            path.write_text(text, encoding='utf-8')
+    return TODAY
 
 # Plan link captured from the app: the Auto-plan tab's "Cloud AZ example", applied (compact link form).
 AWS_AZ_PLAN = '10.20.0.0/16/29.f4f49300/~ndDdCoIwGMbxWxnPsdq7pWE77ji6hW0OEiqjaUHivYdRUTb8Otx78PuPp4aBhLo5BDhC1uAUCYooooWg9n2CxO6SX1VpmTqfWeVCq1wZcoUAd0j8HNzzYDMEKCCxtTZzLCYiti9c6dAErwBfDRd0t6CnFJZiuGC6BTOlEKdtIf4UKn3IzZyBRPJvr3vt8dN47IR67fGj-Gze2snb3qhSaeXsnFW48OlcpL3--GV8vhj4_fhtvvSmeQA'
@@ -221,7 +249,7 @@ def page(slug, title, description, body, h1=None, faq=None, listed=True):
 </body>
 </html>
 '''
-    (LEARN / ('index.html' if slug == 'index' else slug + '.html')).write_text(doc)
+    DATES[url] = write(LEARN / ('index.html' if slug == 'index' else slug + '.html'), doc)
     if slug != 'index' and listed:
         PAGES.append((slug, h1 or title, description))
 
@@ -244,7 +272,7 @@ def try_box(text, href, label='Open in the planner →'):
 
 
 LEARN.mkdir(exist_ok=True)
-(LEARN / 'learn.css').write_text(CSS)
+write(LEARN / 'learn.css', CSS)
 
 # ---------------------------------------------------------------- CIDR cheat sheet
 rows = []
@@ -856,15 +884,22 @@ page('index', 'Subnetting guides: CIDR, VLSM, IPv6 and cloud subnet sizing',
 
 # ---------------------------------------------------------------- Guides tab in the app
 app_html = ROOT / 'index.html'
-src = app_html.read_text()
+src = app_html.read_text(encoding='utf-8')
 start, end = '<!-- guides:start -->', '<!-- guides:end -->'
 if start in src and end in src:
     cards = ''.join(f'        <li><a href="learn/{s}.html"><b>{esc(t)}</b><span>{esc(d)}</span></a></li>\n' for s, t, d in PAGES)
     src = src[:src.index(start) + len(start)] + '\n' + cards + src[src.index(end):]
-    app_html.write_text(src)
+    write(app_html, src)
 
 # ---------------------------------------------------------------- Sitemap
 urls = [SITE, SITE + 'learn/'] + [SITE + f'learn/{s}.html' for s, _, _ in PAGES] + [SITE + f'learn/{s}.html' for s, _, _ in PREFIX_PAGES]
-(ROOT / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-                                  ''.join(f'  <url>\n    <loc>{u}</loc>\n    <lastmod>{TODAY}</lastmod>\n  </url>\n' for u in urls) + '</urlset>\n')
-print(f'Built {len(PAGES) + len(PREFIX_PAGES) + 1} pages in {LEARN}')
+write(ROOT / 'sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      ''.join(f'  <url>\n    <loc>{u}</loc>\n    <lastmod>{DATES.get(u, "%%BUILD_DATE%%")}</lastmod>\n  </url>\n' for u in urls) + '</urlset>\n')
+if CHECK:
+    if STALE:
+        print('These generated files are out of date. Run python3 tools/build_learn.py and commit the result:')
+        print('\n'.join(f'  {f}' for f in STALE))
+        sys.exit(1)
+    print(f'Guides are up to date ({len(PAGES) + len(PREFIX_PAGES) + 1} pages)')
+else:
+    print(f'Built {len(PAGES) + len(PREFIX_PAGES) + 1} pages in {LEARN}')
