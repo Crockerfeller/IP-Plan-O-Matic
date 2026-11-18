@@ -67,7 +67,7 @@ def find_chrome():
 
 def export_files():
     """Build the site, serve it, let tests/exports.html download every format, return {path: bytes}."""
-    with tempfile.TemporaryDirectory() as site, tempfile.TemporaryDirectory() as profile:
+    with tempfile.TemporaryDirectory() as site:
         subprocess.run([sys.executable, str(ROOT / 'tools/build_site.py'), site, '--include-tests'], check=True, stdout=subprocess.DEVNULL)
         with socket.socket() as s:
             s.bind(('127.0.0.1', 0))
@@ -76,17 +76,28 @@ def export_files():
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             time.sleep(1)
-            dom = subprocess.run([find_chrome(), '--headless=new', '--disable-gpu', '--no-first-run', f'--user-data-dir={profile}',
-                                  '--virtual-time-budget=180000', '--dump-dom', f'http://127.0.0.1:{port}/tests/exports.html'],
-                                 capture_output=True, text=True, timeout=600).stdout
+            # Chrome sometimes hands back the page before the script has finished. Try again with a fresh profile,
+            # and say what came back each time, so a real failure can be told from a race.
+            for attempt in range(1, 4):
+                with tempfile.TemporaryDirectory() as profile:
+                    p = subprocess.run([find_chrome(), '--headless=new', '--disable-gpu', '--no-first-run', f'--user-data-dir={profile}',
+                                        '--virtual-time-budget=180000', '--dump-dom', f'http://127.0.0.1:{port}/tests/exports.html'],
+                                       capture_output=True, text=True, timeout=600)
+                m = re.search(r'<pre id="out">(.*?)</pre>', p.stdout, re.S)
+                text = html.unescape(m.group(1)) if m else None
+                try:
+                    d = json.loads(text)
+                    break
+                except Exception:
+                    print(f'  attempt {attempt}: exports.html did not finish (Chrome exit {p.returncode}, '
+                          f'{len(p.stdout)} bytes of page, #out: {(text or "missing")[:200]!r})', flush=True)
+                    for line in p.stderr.strip().splitlines()[-15:]:
+                        print('      ' + line, flush=True)
+            else:
+                sys.exit('  NO RESULT: tests/exports.html did not finish')
         finally:
             server.terminate()
             server.wait()
-    m = re.search(r'<pre id="out">(.*?)</pre>', dom, re.S)
-    try:
-        d = json.loads(html.unescape(m.group(1)))
-    except Exception:
-        sys.exit('  NO RESULT: tests/exports.html did not finish')
     for r in d['results']:
         if not r.startswith('PASS'):
             report('FAIL', r[5:])
