@@ -44,18 +44,23 @@ jobs:
       - run: npm run lint
 
   # The same suites in Safari's engine (WebKit) and Firefox, through Playwright (tests/browsers.mjs).
+  # Runs in Playwright's own image, which has both browsers and their system libraries, so nothing is downloaded
+  # (installing them with --with-deps on the runner can hang). Keep the tag equal to the playwright version in
+  # package.json; tests/browsers.mjs checks they match.
   browsers:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+    env:
+      HOME: /root   # Firefox refuses to run as root with a HOME owned by another user (GitHub's default)
     steps:
+      # git before checkout, so the checkout is a real repository (the build stamps the commit hash).
+      - name: Python and git, for the site build and the test server
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends python3 git ca-certificates > /dev/null
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: npm
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: npm ci
-      - name: Install WebKit and Firefox
-        run: npx playwright install --with-deps webkit firefox
       - name: Run the test suites in WebKit and Firefox
         run: npm run test:browsers
 

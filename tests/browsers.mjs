@@ -6,7 +6,7 @@
 //
 // Needs `npm install` and `npx playwright install webkit firefox` once, and python3 for the build and server.
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -21,6 +21,14 @@ const browsers = args.filter((a) => a in BROWSERS);
 const suites = args.filter((a) => SUITES.includes(a));
 const bad = args.filter((a) => !(a in BROWSERS) && !SUITES.includes(a));
 if (bad.length) { console.error(`Unknown: ${bad.join(', ')}. Browsers: ${Object.keys(BROWSERS).join(', ')}. Suites: ${SUITES.join(', ')}.`); process.exit(2); }
+
+// CI runs this in mcr.microsoft.com/playwright:vX.Y.Z, whose browsers only work with that playwright version.
+const pwVersion = JSON.parse(readFileSync(join(ROOT, 'node_modules/playwright/package.json'), 'utf8')).version;
+const image = /mcr\.microsoft\.com\/playwright:v([\d.]+)/.exec(readFileSync(join(ROOT, '.github/workflows/deploy.yml'), 'utf8'));
+if (image && image[1] !== pwVersion) {
+  console.error(`playwright is ${pwVersion} but .github/workflows/deploy.yml uses the playwright:v${image[1]} image. Change the image tag to v${pwVersion}.`);
+  process.exit(2);
+}
 
 const freePort = () => new Promise((res) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => res(port)); }); });
 
