@@ -2,7 +2,6 @@
    The deploy (tools/build_site.py) writes the commit hash into CACHE, so every build gets a fresh cache and the
    old one is deleted when the new worker activates. */
 const CACHE = 'ipom-%%BUILD_SHA%%';
-const FONT_CACHE = 'ipom-fonts-v1';
 const SHELL = [
   './',
   './index.html',
@@ -14,6 +13,9 @@ const SHELL = [
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
+  './fonts/fonts.css',
+  './fonts/space-grotesk-600-latin.woff2',
+  './fonts/jetbrains-mono-400-latin.woff2',
 ];
 
 self.addEventListener('install', (e) => {
@@ -23,7 +25,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== FONT_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -38,14 +40,6 @@ self.addEventListener('fetch', (e) => {
   if (req.mode !== 'navigate' && (req.cache === 'reload' || req.cache === 'no-store')) return;
   const url = new URL(req.url);
 
-  // Google Fonts: cache first, so the app looks the same offline.
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      if (res.ok || res.type === 'opaque') putIn(FONT_CACHE, req, res.clone());
-      return res;
-    })));
-    return;
-  }
   // Anything else off-site goes straight to the network.
   if (url.origin !== self.location.origin) return;
   // The build's version file and download are never served from the cache.

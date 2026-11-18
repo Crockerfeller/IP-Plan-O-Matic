@@ -1663,6 +1663,23 @@ T.gcpOciWizards = async () => {
   check('oci tf: DRG with both VCNs attached', t.includes('resource "oci_core_drg" "main"') && /resource "oci_core_drg_attachment" "hub" \{[\s\S]*?network_details \{\n    id   = oci_core_vcn\.hub\.id\n    type = "VCN"/.test(t) && t.includes('resource "oci_core_drg_attachment" "spoke_workload"'), t.slice(-1500));
   check('oci tf: firewall subnet in the hub', /display_name   = "firewall"/.test(t), t.slice(0, 1500));
 };
+// Fonts are self-hosted: nothing is fetched from Google, and both fonts load from fonts/.
+T.fonts = async () => {
+  await load('../index.html#10.0.0.0/24');
+  await D.fonts.ready;
+  const loaded = await Promise.all([D.fonts.load('600 30px "Space Grotesk"'), D.fonts.load('400 12px "JetBrains Mono"')]);
+  check('fonts: Space Grotesk and JetBrains Mono load', loaded.every((l) => l.length > 0) && D.fonts.check('600 30px "Space Grotesk"') && D.fonts.check('400 12px "JetBrains Mono"'), loaded.map((l) => l.length));
+  const offsite = W.performance.getEntriesByType('resource').map((r) => r.name).filter((u) => new URL(u).origin !== W.location.origin);
+  check('fonts: app makes no off-site requests', offsite.length === 0, offsite);
+  const ext = /fonts\.(googleapis|gstatic)\.com/;
+  const pages = ['../index.html', '../learn/index.html', '../learn/slash-24-subnet.html', '../learn/subnetting-practice.html', '../sw.js'];
+  const texts = await Promise.all(pages.map((p) => fetch(p, { cache: 'no-store' }).then((r) => r.text())));
+  check('fonts: no Google Fonts links in the app, guides or service worker', texts.every((t) => !ext.test(t)), pages.filter((p, i) => ext.test(texts[i])));
+  const sw = texts[4];
+  const shell = [...sw.matchAll(/'\.\/(fonts\/[^']+)'/g)].map((m) => m[1]);
+  const ok = await Promise.all(shell.map((f) => fetch('../' + f, { cache: 'no-store' }).then((r) => r.ok)));
+  check('fonts: service worker caches the font files, and they exist', shell.length === 3 && ok.every(Boolean), shell);
+};
 (async () => {
   const only = new URLSearchParams(location.search).get('t');
   for (const [k, fn] of Object.entries(T)) {

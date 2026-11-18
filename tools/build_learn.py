@@ -197,8 +197,7 @@ def page(slug, title, description, body, h1=None, faq=None, listed=True):
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="../fonts/fonts.css" rel="stylesheet">
 <link rel="stylesheet" href="learn.css">
 <script>try {{ const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; }} catch (e) {{}}</script>
 <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
