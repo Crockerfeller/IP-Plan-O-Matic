@@ -1,13 +1,15 @@
 {
   "name": "ip-plan-o-matic",
   "private": true,
-  "description": "Development tools only (linting, cross-browser tests). The site itself has no build step and no dependencies.",
+  "description": "Development tools only (linting, cross-browser and accessibility tests). The site itself has no build step and no dependencies.",
   "license": "MIT",
   "scripts": {
     "lint": "eslint .",
-    "test:browsers": "node tests/browsers.mjs"
+    "test:browsers": "node tests/browsers.mjs",
+    "test:a11y": "node tests/a11y.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "eslint": "10.15.0",
     "eslint-plugin-html": "8.2.1",

@@ -26,7 +26,7 @@ IP Plan-O-Matic is a free, browser-based **subnet calculator**, **VLSM calculato
 - **Export:** Cisco IOS / IOS-XE, Arista EOS, Juniper Junos, MikroTik RouterOS, FortiGate, Palo Alto PAN-OS, pfSense (a PHP script that adds the VLANs), OPNsense (an API script for VLANs and Kea DHCP), Ubiquiti UniFi (an API script) and EdgeRouter (EdgeOS), Terraform (AWS, Azure, GCP, OCI), Bicep, CloudFormation, an Azure CLI script for PowerShell (Azure exports add route tables through Azure Firewall and, optionally, an NSG per subnet), Ansible, NetBox and phpIPAM imports, Excel, CSV, JSON, Markdown and HTML tables, a PNG or SVG image of the address map and subnet table, with optional DHCP pools and IPv6 interface addresses. Import JSON or CSV, or your existing networks from the AWS, Azure, Google Cloud or Oracle Cloud command line.
 - **Save and share:** the whole plan is stored in a compact URL, so you can bookmark it or send it. You can also save named plans in your browser and export them all as a backup. Your working plan is kept automatically.
 - **Works offline:** installable as an app (PWA); after the first visit it runs without a connection.
-- Light and dark themes, works on phones, print-friendly.
+- Light and dark themes, works on phones, print-friendly. Checked for accessibility (WCAG 2.2 AA rules with axe-core) in both themes.
 
 ## Accurate and private
 

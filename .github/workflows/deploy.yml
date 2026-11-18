@@ -43,7 +43,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
-  # The same suites in Safari's engine (WebKit) and Firefox, through Playwright (tests/browsers.mjs).
+  # The same suites in Safari's engine (WebKit) and Firefox, through Playwright (tests/browsers.mjs), and the
+  # accessibility scan (tests/a11y.mjs).
   # Runs in Playwright's own image, which has both browsers and their system libraries, so nothing is downloaded
   # (installing them with --with-deps on the runner can hang). Keep the tag equal to the playwright version in
   # package.json; tests/browsers.mjs checks they match.
@@ -63,6 +64,8 @@ jobs:
       - run: npm ci
       - name: Run the test suites in WebKit and Firefox
         run: npm run test:browsers
+      - name: Accessibility (axe-core, WCAG 2.2 AA, light and dark)
+        run: npm run test:a11y
 
   # Every export format checked by the tool that would consume it (tests/check_exports.py).
   exports:

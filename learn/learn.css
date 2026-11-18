@@ -1,8 +1,8 @@
 /* Guides for IP Plan-O-Matic. Colors match the app. */
 :root {
   --bg: #f5f6f8; --panel: #ffffff; --text: #161a22; --muted: #5d6573; --border: #e2e5eb;
-  --accent: #2f6fed; --accent-text: #ffffff; --accent-weak: #e9effd; --row-hover: #f3f6fa;
-  --ok: #1d8a4e; --ok-weak: #e3f4ea; --warn: #9a6400; --warn-weak: #fdf2d8;
+  --accent: #2b65d8; --accent-text: #ffffff; --accent-weak: #e9effd; --row-hover: #f3f6fa;
+  --ok: #1a7b45; --ok-weak: #e3f4ea; --warn: #976200; --warn-weak: #fdf2d8;
   --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 4px 16px rgba(16, 24, 40, .06);
   --ink: #0F1B2D; --mid: #4A5A70; --brand: #0B7A6E;
   color-scheme: light;

@@ -99,7 +99,7 @@
     --text: #161a22;
     --muted: #5d6573;
     --border: #e2e5eb;
-    --accent: #2f6fed;
+    --accent: #2b65d8;
     --accent-text: #ffffff;
     --accent-weak: #e9effd;
     --row-hover: #f3f6fa;
@@ -107,9 +107,9 @@
     --hl-border: #e8b931;
     --danger: #c62f2f;
     --danger-weak: #fdecec;
-    --ok: #1d8a4e;
+    --ok: #1a7b45;
     --ok-weak: #e3f4ea;
-    --warn: #9a6400;
+    --warn: #976200;
     --warn-weak: #fdf2d8;
     --bar-s: 72%;
     --bar-l: 88%;
@@ -361,7 +361,7 @@
   .site-tbl td { padding: 4px 8px; vertical-align: middle; }
   .site-tbl input[type="text"] { width: 100%; min-width: 150px; }
   .site-tbl input[type="number"] { width: 76px; text-align: right; }
-  .site-tbl tr.off td:not(:first-child) { opacity: .45; }
+  .site-tbl tr.off td:not(:first-child) { opacity: .65; }   /* dimmed, but still readable (4.5:1) */
   .site-tbl .site-cidr { font-family: var(--mono, ui-monospace, monospace); white-space: nowrap; }
   .site-tbl .site-cidr.err { color: var(--danger); font-family: inherit; }
   #azDlg .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
@@ -616,17 +616,22 @@
     font-weight: 600;
     user-select: none;
   }
-  td.bar.leaf { opacity: .55; }
+  /* Smallest subnets: a paler bar, but the text keeps full contrast. */
+  td.bar.leaf { background: hsl(var(--h) var(--bar-s) var(--bar-l) / .55); }
   td.bar.joinable { cursor: pointer; }
-  td.bar.joinable:hover, td.bar.joinable:focus-visible {
+  td.bar.joinable:hover, td.bar.joinable:has(.bar-join:focus-visible) {
     background: hsl(var(--h) var(--bar-s) var(--bar-l-hover));
     outline: 2px solid var(--hl-border); outline-offset: -2px;
   }
   td.bar .hint { display: block; font-size: 10px; font-weight: 500; opacity: 0; text-transform: uppercase; letter-spacing: .05em; height: 0; overflow: visible; }
-  td.bar.joinable:hover .hint, td.bar.joinable:focus-visible .hint { opacity: .8; }
+  td.bar.joinable:hover .hint, td.bar.joinable:has(.bar-join:focus-visible) .hint { opacity: .8; }
+  /* The join button looks like the bar's text; the cell shows its focus. */
+  td.bar .bar-join { height: auto; min-width: 24px; min-height: 24px; padding: 0; margin: 0; border: 0; border-radius: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+  td.bar .bar-join:focus-visible { outline: none; }
   .split-fix { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13px; }
   .warnings .tag button.small { margin-left: 6px; padding: 1px 8px; font-size: 12px; }
-  td.bar .gedit { height: auto; padding: 0 3px; margin-left: 2px; border: 0; background: none; color: inherit; font-size: 11px; opacity: .5; vertical-align: baseline; }
+  /* Under the size, on its own line: a full 24px touch target without widening the bar. */
+  td.bar .gedit { display: block; height: auto; min-width: 24px; min-height: 24px; padding: 0 3px; margin: 2px auto 0; border: 0; background: none; color: inherit; font-size: 11px; opacity: .5; vertical-align: baseline; }
   td.bar:hover .gedit, td.bar .gedit:focus-visible { opacity: 1; }
   td.bar .gedit::before { content: '✎'; }   /* drawn by CSS so the bar's text (and copied rows) stay unchanged */
   td.bar .gedit:hover { background: none; text-decoration: underline; }
@@ -1141,7 +1146,7 @@
           <div class="cidr">
             <input type="text" id="network" form="netForm" value="192.168.0.0" spellcheck="false" inputmode="decimal" placeholder="10.0.0.0">
             <span class="slash">/</span>
-            <input type="number" id="mask" form="netForm" value="24" min="0" max="32">
+            <input type="number" id="mask" form="netForm" value="24" min="0" max="32" aria-label="Prefix length (the number after the slash)">
           </div>
         </div>
         <div class="field">
@@ -1406,7 +1411,7 @@
         </div>
       </div>
       <div class="msg" id="exMsg" style="margin-top:10px"></div>
-      <textarea class="out" id="exOut" readonly spellcheck="false" style="margin-top:12px"></textarea>
+      <textarea class="out" id="exOut" readonly spellcheck="false" style="margin-top:12px" aria-label="Export preview"></textarea>
       <img class="ex-img" id="exImg" alt="Preview of the plan image" hidden>
     </div>
 
@@ -1424,7 +1429,7 @@
         </dl>
       </details>
       <div class="row">
-        <input type="file" id="imFile" accept=".json,.csv,.txt,application/json,text/csv">
+        <input type="file" id="imFile" accept=".json,.csv,.txt,application/json,text/csv" aria-label="Choose a JSON or CSV file to import">
       </div>
       <textarea id="imText" spellcheck="false" style="margin-top:10px; min-height:110px" placeholder="…or paste JSON / CSV here&#10;Subnet,Name,VLAN,Status&#10;10.20.0.0/24,Servers,10,used&#10;10.20.1.0/25,Staff,20,used"></textarea>
       <div class="row" style="margin-top:10px">
@@ -2986,12 +2991,10 @@
           td.className = 'bar joinable';
           td.style.setProperty('--h', hueFor(anc.mask));
           td.rowSpan = span;
-          td.tabIndex = 0;
-          td.setAttribute('role', 'button');
           const gkey = cidrStr(anc.addr, anc.mask), gname = getMeta(gkey).n || '';
           td.title = `Join ${span} subnets into ${gname ? gname + ' (' + gkey + ')' : gkey}`;
-          td.setAttribute('aria-label', td.title);
-          td.innerHTML = (gname ? `<span class="gname">${esc(gname)}</span>` : '') + `/${anc.mask}<span class="hint">join</span>`;
+          // A real button joins; the rename button sits beside it (not inside, where screen readers can't reach it).
+          td.innerHTML = `<button type="button" class="bar-join" aria-label="${esc(td.title)}">${gname ? `<span class="gname">${esc(gname)}</span>` : ''}/${anc.mask}</button><span class="hint" aria-hidden="true">join</span>`;
           // Name or rename the group, except on the base network's own bar (its name is on the network card).
           if (anc.mask > state.mask) {
             const ed = document.createElement('button');
@@ -3008,13 +3011,10 @@
           };
           td.addEventListener('mouseenter', () => hl(true));
           td.addEventListener('mouseleave', () => hl(false));
-          td.addEventListener('focus', () => hl(true));
-          td.addEventListener('blur', () => hl(false));
+          td.addEventListener('focusin', () => hl(true));
+          td.addEventListener('focusout', () => hl(false));
           const doJoin = () => { checkpoint(); anc.node.c = null; update(); toast(`Joined ${span} subnets into ${cidrStr(anc.addr, anc.mask)}`, UNDO); };
           td.addEventListener('click', (e) => { if (!e.target.closest('.gedit, .gedit-in')) doJoin(); });
-          td.addEventListener('keydown', (e) => {
-            if (e.target === td && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); doJoin(); }
-          });
           tr.appendChild(td);
         }
       }

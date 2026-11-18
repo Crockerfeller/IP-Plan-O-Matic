@@ -25,6 +25,13 @@ npm run test:browsers                                  # all suites, both browse
 npm run test:browsers -- firefox features              # one browser, one suite
 ```
 
+Check accessibility with axe-core (WCAG 2.2 A and AA rules, light and dark themes): every tab of the app and its main dialogs with a plan loaded, and a sample of the guides. CI runs it in WebKit.
+
+```bash
+npm run test:a11y                  # WebKit; or: npm run test:a11y -- firefox
+A11Y_ALL=1 npm run test:a11y       # list every failing element, not just the first 8 per rule
+```
+
 `run.sh` needs Python 3 and Google Chrome (`CHROME=/path/to/chrome` to point elsewhere). You can also serve the repo (`python3 -m http.server`) and open `http://localhost:8000/tests/features.html` in a browser to watch a suite run. Served that way the page is a dev build, so the version tests only check the "dev" label.
 
 Lint the JavaScript (the app's script, guides, service worker and tests) with ESLint; needs Node.js:
