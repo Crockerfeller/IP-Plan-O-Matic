@@ -43,7 +43,7 @@ Network engineers, sysadmins, cloud architects, homelabbers, and CCNA / Network+
 
 ## Run locally
 
-It's a single `index.html` with no build step. Open it in a browser. Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`. A copy run straight from the repo is a **dev build**: it shows "dev" instead of a build number.
+It's a single `index.html` with no build step. Open it in a browser. (`package.json` is only for the linter: `npm install`, then `npm run lint` runs ESLint. The site doesn't use it.) Offline support (`sw.js`, `manifest.webmanifest`) needs it served over `https://` or `http://localhost`, for example `python3 -m http.server`. A copy run straight from the repo is a **dev build**: it shows "dev" instead of a build number.
 
 ## Versions and deploys
 

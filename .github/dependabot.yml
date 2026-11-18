@@ -1,4 +1,4 @@
-# Keep the GitHub Actions in .github/workflows up to date.
+# Keep the GitHub Actions in .github/workflows and the lint tools in package.json up to date.
 # Dependabot opens one pull request a month when new versions are out; the tests run on it before you merge.
 version: 2
 updates:
@@ -11,3 +11,13 @@ updates:
         patterns: ['*']
     commit-message:
       prefix: CI
+  # The linting tools in package.json (development only; the site has no dependencies).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      lint:
+        patterns: ['*']
+    commit-message:
+      prefix: Lint

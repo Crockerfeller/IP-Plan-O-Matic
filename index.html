@@ -2180,6 +2180,7 @@
   };
   // Subnet details that arrive from a link, a saved plan or an import: keep only known fields, valid VLANs and
   // statuses, and turn control characters (newlines, tabs) into spaces so they can't add lines to exported configs.
+  // eslint-disable-next-line no-control-regex -- matching control characters is the point
   const oneLine = (v) => String(v).replace(/[\u0000-\u001f\u007f]+/g, ' ');
   const cleanMeta = (v) => {
     const m = typeof v === 'string' ? { n: v } : (v && typeof v === 'object' ? v : {});
@@ -2245,7 +2246,7 @@
   // MACs are stored as aa:bb:cc:dd:ee:ff; aa-bb-…, aabb.ccdd.eeff and aabbccddeeff are accepted.
   const normMac = (s) => {
     const t = String(s ?? '').trim();
-    if (!t || !/^[0-9a-f:.\-]+$/i.test(t)) return '';
+    if (!t || !/^[0-9a-f:.-]+$/i.test(t)) return '';
     const hex = t.replace(/[^0-9a-f]/gi, '').toLowerCase();
     return hex.length === 12 ? hex.match(/../g).join(':') : '';
   };
@@ -3156,7 +3157,7 @@
     return [r.key, m.n, m.v ? `VLAN ${m.v}` : '', m.z || '', m.s === 'used' ? 'In use' : m.s === 'reserved' ? 'Reserved' : 'Free', `${fmt(size(r.mask))} addresses`].filter(Boolean).join(' · ');
   };
   const renderMap = () => {
-    const map = $('map'), wrap = $('mapWrap');
+    const map = $('map');
     $('mapToggle').setAttribute('aria-expanded', String(mapOpen));
     $('mapToggle').textContent = (mapOpen ? '▾' : '▸') + ' Address map';
     $('mapColor').value = mapMode;
@@ -5624,6 +5625,7 @@
     return new Blob([...parts, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   };
   const colName = (i) => { let s2 = ''; i++; while (i) { const m = (i - 1) % 26; s2 = String.fromCharCode(65 + m) + s2; i = Math.floor((i - 1) / 26); } return s2; };
+  // eslint-disable-next-line no-control-regex -- XML 1.0 forbids these control characters, so they are dropped
   const xe = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
   const sheetXml = (head, data) => {
     const all = [head, ...data];
@@ -6337,13 +6339,13 @@
     return { defs, entries, source, guessed };
   };
   const importText = (text) => {
-    text = String(text || '').replace(/^﻿/, '').trim();
+    text = String(text || '').replace(/^\uFEFF/, '').trim();   // a byte-order mark from Excel or Notepad
     if (!text) throw new Error('Nothing to import.');
     let base = null, tree = null, set = null, v6data = null, defs = null, peering = null, cloud = null, hosts = {};
     const entries = [];
     if (text[0] === '{' || text[0] === '[') {
       let docs;
-      try { docs = jsonDocs(text); } catch (e) { throw new Error('That JSON couldn’t be read.'); }
+      try { docs = jsonDocs(text); } catch (e) { throw new Error('That JSON couldn’t be read.', { cause: e }); }
       cloud = cloudJson(docs);
       if (!cloud && (docs.length !== 1 || Array.isArray(docs[0]))) throw new Error('That JSON isn’t a plan from here or a network list from AWS, Azure, Google Cloud or Oracle Cloud.');
     }
@@ -6634,7 +6636,7 @@
     text = String(text || '').trim();
     if (!text) throw new Error('Pick a saved plan, or paste a plan link or JSON.');
     const keep = stateHash();
-    let snap = null;
+    let snap;
     try {
       if (text[0] === '{' || text[0] === '[') importText(text);   // a plan's JSON, or a cloud's network list
       else {

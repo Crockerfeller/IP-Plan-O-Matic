@@ -1,2 +1,3 @@
 # Built site (tools/build_site.py)
 _site/
+node_modules/

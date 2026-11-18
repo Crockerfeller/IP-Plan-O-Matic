@@ -806,6 +806,7 @@ T.planImage = async () => {
   const svgOk = (t) => !new W.DOMParser().parseFromString(t, 'image/svg+xml').querySelector('parsererror');
   await load('../index.html#10.0.0.0/24');
   click('#tb-export');
+  // eslint-disable-next-line no-useless-escape -- the backslash stops the closing script tag ending this page's script block
   $('imText').value = 'Subnet,Name,VLAN,Status\n10.0.0.0/26,"Users <script>alert(1)<\/script> & co",10,used\n10.0.0.64/26,Phones,20,reserved\n';
   click('#imRun'); await sleep(100);
   select('#exInc', 'planned'); select('#exFmt', 'svg');
@@ -953,7 +954,7 @@ T.comparePlans = async () => {
   await W.eval('Promise.resolve()'); await sleep(400);
   const after = W.location.href;
   await load(before);
-  [txt, rows] = await cmp(after);
+  [, rows] = await cmp(after);
   check('compare: joined and network removed', rows.some((r) => r[0] === 'Joined' && r[1] === '10.0.0.128/25' && r[2].startsWith('10.0.0.128/26 (Servers)')) && rows.some((r) => r[0] === 'Network removed'), rows);
   // Saved plans are in the list.
   const plans = [{ id: 'x', name: 'Before change', hash: before.split('#')[1], t: Date.now() }];

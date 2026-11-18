@@ -30,6 +30,19 @@ jobs:
       - name: Run the test suites (headless Chrome)
         run: tests/run.sh
 
+  # ESLint: likely bugs in the app's script, the guides, the service worker and the tests (eslint.config.mjs).
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
   # Every export format checked by the tool that would consume it (tests/check_exports.py).
   exports:
     runs-on: ubuntu-latest
@@ -53,7 +66,7 @@ jobs:
         run: python3 tests/check_exports.py --require-all
 
   deploy:
-    needs: [test, exports]
+    needs: [test, lint, exports]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -11,7 +11,7 @@ const NASTY = `O'Brien "Lab" & <Ops> $(id) \`x\` ; #1 \\ 50% {a} ${'${x}'} é`;
 
 // Click Download for each format and keep what the page hands to the browser.
 async function saveAll(scenario, formats) {
-  let got = null, last = null;
+  let got, last;
   const origURL = W.URL.createObjectURL, origClick = W.HTMLAnchorElement.prototype.click;
   // Keep each blob, but hand back a real URL: the PNG step draws the SVG through one.
   W.URL.createObjectURL = (b) => { last = b; return origURL.call(W.URL, b); };
