@@ -14,6 +14,7 @@ const SHELL = [
   './js/tools.js?v=%%BUILD_SHA%%',
   './js/export-formats.js?v=%%BUILD_SHA%%',
   './js/export.js?v=%%BUILD_SHA%%',
+  './js/visualize.js?v=%%BUILD_SHA%%',
   './js/import.js?v=%%BUILD_SHA%%',
   './js/hosts.js?v=%%BUILD_SHA%%',
   './js/compare.js?v=%%BUILD_SHA%%',

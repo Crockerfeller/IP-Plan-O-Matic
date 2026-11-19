@@ -212,7 +212,7 @@ $('plansImport').addEventListener('change', () => {
 // =====================================================================
 // Tabs and theme
 // =====================================================================
-const TABS = ['plan', 'vlsm', 'tools', 'export', 'v6', 'learn'];
+const TABS = ['plan', 'viz', 'vlsm', 'tools', 'export', 'v6', 'learn'];
 const showTab = (t) => {
   if (!TABS.includes(t)) t = 'plan';
   for (const x of TABS) {
@@ -222,6 +222,7 @@ const showTab = (t) => {
   }
   try { localStorage.setItem('subnetPlanner.tab', t); } catch (e) { /* ignore */ }
   if (t === 'export') renderExport();
+  if (t === 'viz') renderViz();
   if (t === 'vlsm') updateVlsmBase();
   if (t === 'tools') { runInfo(); fillCmpSaved(); }
   if (t === 'v6') v6PlanDefaults();

@@ -60,7 +60,7 @@ try {
     await page.locator('#body tr input').first().fill('Servers');
     await page.locator('#body tr input').first().press('Tab');
     await settle(page);
-    for (const tab of ['plan', 'vlsm', 'tools', 'export', 'v6', 'learn']) {
+    for (const tab of ['plan', 'viz', 'vlsm', 'tools', 'export', 'v6', 'learn']) {
       await page.click(`#tb-${tab}`);
       if (tab === 'vlsm') { await page.fill('#vlsmIn', 'Users, 100\nPhones, 40'); await page.click('#vlsmRun'); }
       if (tab === 'export') await page.selectOption('#exFmt', 'cisco').catch(() => page.evaluate(() => { const s = document.getElementById('exFmt'); s.value = 'cisco'; s.dispatchEvent(new Event('change', { bubbles: true })); }));

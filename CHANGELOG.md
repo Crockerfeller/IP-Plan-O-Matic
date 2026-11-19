@@ -5,6 +5,11 @@ date. The build number in the app's footer is the commit it was built from.
 
 ## 2026-11-18
 
+- **Visualize tab:** a network diagram of the plan, drawn in each cloud's own style: AWS VPCs with Availability Zones
+  and public and private subnets, Azure VNets, Google Cloud VPCs by region, Oracle VCNs and on-premises sites by VLAN,
+  with an icon for what each subnet is for. Peered networks show the hub, spokes and the Transit Gateway or DRG
+  between them. Pan and zoom it, double-click a subnet to open it, and download it as PNG, SVG, or a PowerPoint slide
+  or Visio drawing made of editable shapes.
 - **Dual-stack IPv6 for cloud networks:** a switch on the network (and in the subnet wizard) gives every subnet an IPv6
   /64 in the Terraform, CloudFormation, Bicep and Azure CLI exports, following each cloud's rules.
 - **Import from NetBox and phpIPAM:** load their CSV export or paste their API's JSON. Top-level prefixes become

@@ -386,6 +386,7 @@
   <div class="tabbar">
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tb-plan" data-tab="plan">Plan IPv4</button>
+    <button type="button" role="tab" id="tb-viz" data-tab="viz">Visualize</button>
     <button type="button" role="tab" id="tb-vlsm" data-tab="vlsm">Auto-plan (VLSM)</button>
     <button type="button" role="tab" id="tb-tools" data-tab="tools">Check &amp; summarize</button>
     <button type="button" role="tab" id="tb-export" data-tab="export">Export &amp; import</button>
@@ -535,6 +536,34 @@
           <p>Paste CIDR like <kbd>10.0.0.0/16</kbd> into the network field.</p>
         </details>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= VISUALIZE ================= -->
+  <section id="tab-viz" role="tabpanel" aria-labelledby="tb-viz" hidden>
+    <div class="card pad">
+      <h2>Network diagram</h2>
+      <p class="sub">Every base network of the plan, drawn the way each cloud draws its own: AWS VPCs with their Availability Zones and public and private subnets, Azure VNets, Google Cloud VPCs by region, Oracle VCNs, and on-premises sites by VLAN. Peered networks are drawn with the hub on top and the Transit Gateway or DRG that joins them. Drag to move around; Ctrl or ⌘ and the scroll wheel (or a pinch) zooms. PowerPoint and Visio downloads are made of real shapes, so you can move and restyle every box and label.</p>
+      <div class="row vz-bar">
+        <label class="check"><input type="checkbox" id="vzFree" autocomplete="off"> Free subnets</label>
+        <label class="check"><input type="checkbox" id="vzDetail" checked autocomplete="off"> Hosts, VLANs and tags</label>
+        <div class="vz-zoom" role="group" aria-label="Zoom">
+          <button type="button" class="icon" id="vzOut" title="Zoom out (−)" aria-label="Zoom out">−</button>
+          <span id="vzZoomLbl" class="vz-zlbl" aria-live="polite">100%</span>
+          <button type="button" class="icon" id="vzIn" title="Zoom in (+)" aria-label="Zoom in">+</button>
+          <button type="button" id="vzFit" title="Fit the whole diagram (0)">Fit</button>
+          <button type="button" id="vz100" title="Actual size">100%</button>
+        </div>
+        <div class="vz-dl" role="group" aria-label="Download the diagram">
+          <button type="button" id="vzCopy" title="Copy the diagram to the clipboard as an image">Copy</button>
+          <button type="button" id="vzPng" title="Download as a PNG image">PNG</button>
+          <button type="button" id="vzSvg" title="Download as an SVG image: sharp at any size">SVG</button>
+          <button type="button" class="primary" id="vzPptx" title="Download as a PowerPoint slide (.pptx) of editable shapes">PowerPoint</button>
+          <button type="button" class="primary" id="vzVsdx" title="Download as a Visio drawing (.vsdx) of editable shapes">Visio</button>
+        </div>
+      </div>
+      <div id="vzStage" class="vz-stage" tabindex="0" role="img" aria-label="Network diagram of the plan. Arrow keys move it, plus and minus zoom, 0 fits it."></div>
+      <p class="vz-info" id="vzInfo"></p>
     </div>
   </section>
 
@@ -881,6 +910,7 @@
 <script src="js/tools.js?v=%%BUILD_SHA%%"></script>
 <script src="js/export-formats.js?v=%%BUILD_SHA%%"></script>
 <script src="js/export.js?v=%%BUILD_SHA%%"></script>
+<script src="js/visualize.js?v=%%BUILD_SHA%%"></script>
 <script src="js/import.js?v=%%BUILD_SHA%%"></script>
 <script src="js/hosts.js?v=%%BUILD_SHA%%"></script>
 <script src="js/compare.js?v=%%BUILD_SHA%%"></script>

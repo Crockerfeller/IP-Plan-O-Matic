@@ -2,7 +2,7 @@
 <script src="lib.js"></script>
 <script>(async()=>{try{
 await load('../index.html#'+encodeURI(`10.0.0.0/22/3.2/${btoa(JSON.stringify({l:'HQ',b:[['172.16.0.0/16','1.0','aws','Prod VPC']]})).replace(/=+$/,'')}`));
-for (const t of ['plan','vlsm','tools','export','v6']) {
+for (const t of ['plan','viz','vlsm','tools','export','v6']) {
   click('#tb-'+t); if (t==='v6') $('v6PlanCard').open = true; await sleep(50);
   const de = D.documentElement;
   // find widest offender

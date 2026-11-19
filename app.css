@@ -738,3 +738,23 @@ footer.site .ver a { text-decoration: none; }
   .cell-input, select.status { border: none !important; background: none !important; padding: 0 !important; -webkit-appearance: none; appearance: none; color: #000 !important; }
   .cell-input::placeholder { color: transparent; }
 }
+
+/* ---------- Visualize: the network diagram on a canvas you can pan and zoom ---------- */
+.vz-bar { align-items: center; margin-bottom: 12px; }
+.vz-zoom, .vz-dl { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vz-dl { margin-left: auto; }
+.vz-zlbl { min-width: 48px; text-align: center; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.vz-stage {
+  position: relative; overflow: hidden; height: min(72vh, 760px); min-height: 360px; border: 1px solid var(--border); border-radius: 10px;
+  background-color: var(--bg); background-image: radial-gradient(circle, var(--border) 1px, transparent 1px); background-size: 18px 18px;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.vz-stage.dragging { cursor: grabbing; }
+.vz-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vz-paper { position: absolute; left: 0; top: 0; transform-origin: 0 0; box-shadow: var(--shadow); border-radius: 4px; overflow: hidden; line-height: 0; }
+.vz-paper svg { display: block; }
+.vz-tile { cursor: pointer; }
+.vz-tile:hover { filter: brightness(.96); }
+.vz-info { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+@media (max-width: 640px) { .vz-dl { margin-left: 0; } .vz-stage { height: 60vh; } }
+@media print { .vz-bar { display: none; } .vz-stage { height: auto; border: 0; background: none; overflow: visible; } .vz-paper { position: static; transform: none !important; box-shadow: none; } .vz-paper svg { max-width: 100%; height: auto; } }

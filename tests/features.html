@@ -1799,6 +1799,59 @@ T.gcpOciWizards = async () => {
   check('oci tf: firewall subnet in the hub', /display_name   = "firewall"/.test(t), t.slice(0, 1500));
 };
 // Fonts are self-hosted: nothing is fetched from Google, and both fonts load from fonts/.
+T.visualize = async () => {
+  // A name that needs escaping in SVG, PowerPoint and Visio XML.
+  const blob64 = btoa(JSON.stringify({ m: { '10.0.0.0/24': { n: 'Web <tier> & "front"', v: '10', s: 'used' } } })).replace(/=+$/, '');
+  await load(`../index.html#10.0.0.0/24/1.0/${blob64}`);
+  click('#tb-viz'); await sleep(50);
+  const svgEl = q('#vzStage svg');
+  check('viz: draws the plan as an SVG', !!svgEl && svgEl.textContent.includes('Web <tier> & "front"') && svgEl.textContent.includes('On-premises') && svgEl.textContent.includes('VLAN 10'), svgEl && svgEl.textContent.slice(0, 300));
+  check('viz: each subnet is a tile with its CIDR', qa('#vzStage .vz-tile').length === 1 && q('#vzStage .vz-tile').getAttribute('data-key') === '10.0.0.0/24');
+  check('viz: info line counts what is drawn', $('vzInfo').textContent.startsWith('1 network, 1 subnet drawn'), $('vzInfo').textContent);
+  // Downloads: capture the Blob handed to download().
+  // PNG, PowerPoint and Visio draw images through an SVG blob URL first, so wait for the one of the file's own type.
+  const grab = async (id, svg = false) => {
+    let blob = null;
+    const orig = W.URL.createObjectURL;
+    W.URL.createObjectURL = (b) => { if (svg || b.type !== 'image/svg+xml') { blob = b; return 'blob:x'; } return orig.call(W.URL, b); };
+    click(id);
+    for (let i = 0; i < 200 && !blob; i++) await sleep(30);
+    W.URL.createObjectURL = orig;
+    return blob;
+  };
+  const svgText = await (await grab('#vzSvg', true)).text();
+  const doc = new W.DOMParser().parseFromString(svgText, 'image/svg+xml');
+  check('viz: SVG download is well-formed', !doc.querySelector('parsererror') && doc.documentElement.textContent.includes('Web <tier> & "front"'), svgText.slice(0, 200));
+  const png = new Uint8Array(await (await grab('#vzPng')).arrayBuffer());
+  check('viz: PNG download', png.length > 1000 && png[1] === 0x50 && png[2] === 0x4e && png[3] === 0x47, png.length);
+  const zipText = async (b) => new TextDecoder('latin1').decode(new Uint8Array(await b.arrayBuffer()));
+  const pptx = await grab('#vzPptx');
+  const pt = await zipText(pptx);
+  check('viz: PowerPoint download is a zip with a slide, shapes and icons', pptx.type.includes('presentationml') && pt.startsWith('PK') && pt.includes('ppt/slides/slide1.xml') && pt.includes('ppt/media/image1.png') && pt.includes('<a:t>Web &lt;tier&gt; &amp; &quot;front&quot;</a:t>'), pptx.type);
+  const vsdx = await grab('#vzVsdx');
+  const vt = await zipText(vsdx);
+  check('viz: Visio download is a zip with a page of shapes', vsdx.type === 'application/vnd.ms-visio.drawing' && vt.startsWith('PK') && vt.includes('visio/pages/page1.xml') && vt.includes('<Text>Web &lt;tier&gt; &amp; &quot;front&quot;</Text>') && vt.includes('ForeignData'), vsdx.type);
+  // Free subnets: hidden by default, shown when ticked.
+  await load('../index.html#10.0.0.0/24/3.2');
+  click('#tb-viz'); await sleep(50);
+  const none = qa('#vzStage .vz-tile').length;
+  click('#vzFree'); await sleep(50);
+  check('viz: free subnets only when ticked', none === 0 && qa('#vzStage .vz-tile').length >= 1 && $('vzStage').textContent.includes('Free'), [none, qa('#vzStage .vz-tile').length]);
+  click('#vzFree');
+  // AWS hub and spoke from the wizard: VPCs with Availability Zones, joined by a Transit Gateway.
+  await load('../index.html#10.0.0.0/16');
+  select('#platform', 'aws'); click('#tplBtn'); select('#azLayout', 'hub'); click('#azApply');
+  click('#tb-viz'); await sleep(50);
+  const t = $('vzStage').textContent;
+  check('viz: AWS hub and spoke', t.includes('AWS Cloud') && t.includes('Transit Gateway') && t.includes('Availability Zone us-east-1a') && t.includes('HUB') && t.includes('Public') && t.includes('Private'), t.slice(0, 400));
+  check('viz: zoom buttons', (() => { click('#vzFit'); const a = $('vzZoomLbl').textContent; click('#vzIn'); return a !== $('vzZoomLbl').textContent; })(), $('vzZoomLbl').textContent);
+  // Double-click a subnet: its row on the Plan tab.
+  const tile = qa('#vzStage .vz-tile').find((r) => r.getAttribute('data-key') === '10.0.38.0/24') || q('#vzStage .vz-tile');
+  tile.dispatchEvent(new W.MouseEvent('dblclick', { bubbles: true }));
+  await sleep(50);
+  check('viz: double-click opens the subnet on the Plan tab', !$('tab-plan').hidden, tile.getAttribute('data-key'));
+};
+
 T.fonts = async () => {
   await load('../index.html#10.0.0.0/24');
   await D.fonts.ready;

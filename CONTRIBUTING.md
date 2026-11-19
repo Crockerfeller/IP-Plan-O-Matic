@@ -28,6 +28,7 @@ one scope: a top-level name in one file can be used by the files after it. In lo
 | `tools.js` | The Tools tab |
 | `export-formats.js` | Every export format, one `gen…` function each |
 | `export.js` | The Export tab: format menu, preview, Copy and Download |
+| `visualize.js` | The Visualize tab: the network diagram, and its PNG, SVG, PowerPoint and Visio files |
 | `import.js` | Import from cloud CLI JSON, CSV and address lists |
 | `hosts.js` | IP assignments inside a subnet |
 | `compare.js` | Compare plans |
