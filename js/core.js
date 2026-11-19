@@ -19,7 +19,10 @@ const netAddr = (ip, mask) => (mask === 0 ? 0 : (ip & (~0 << (32 - mask))) >>> 0
 const netmask = (mask) => netAddr(0xffffffff, mask);
 const wildcard = (mask) => 0xffffffff - netmask(mask);
 const lastAddr = (addr, mask) => addr + size(mask) - 1;
-const fmt = (n) => n.toLocaleString('en-US');
+// Numbers on screen follow the visitor's settings (1,024 or 1.024 or 1 024). The files the app writes use fmtDoc: US
+// format, like the English text around them, so a file reads the same wherever it was made.
+const fmt = (n) => n.toLocaleString();
+const fmtDoc = (n) => n.toLocaleString('en-US');
 const cidrStr = (a, m) => `${ntoa(a)}/${m}`;
 const inBlock = (ip, a, m) => ip >= a && ip <= lastAddr(a, m);
 const overlaps = (a1, m1, a2, m2) => a1 <= lastAddr(a2, m2) && a2 <= lastAddr(a1, m1);

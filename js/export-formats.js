@@ -901,7 +901,7 @@ const docTable = (list) => {
   const rowsOut = list.map((x) => [
     ...(multi ? [blockCidr(state.blocks[x.bi])] : []), x.key, x.meta.n || '', x.meta.v || '', ...(anyZone ? [x.meta.z || ''] : []),
     x.info.gw === null ? '' : ntoa(x.info.gw), x.info.uF === null ? '' : (x.info.uF === x.info.uL ? ntoa(x.info.uF) : `${ntoa(x.info.uF)} – ${ntoa(x.info.uL)}`),
-    fmt(x.info.hosts), x.meta.s === 'used' ? 'In use' : x.meta.s === 'reserved' ? 'Reserved' : 'Free', x.meta.o || '',
+    fmtDoc(x.info.hosts), x.meta.s === 'used' ? 'In use' : x.meta.s === 'reserved' ? 'Reserved' : 'Free', x.meta.o || '',
   ]);
   return { head, rows: rowsOut, numeric: head.indexOf('Hosts') };
 };
@@ -1044,7 +1044,7 @@ const genPlanSvg = (list) => {
   text(W - P, y + 22, new Date().toISOString().slice(0, 10), { fs: 12, fill: IMG.muted, anchor: 'end' });
   y += 34;
   const one = state.blocks.length === 1;
-  text(P, y + 14, `${fmt(all.length)} subnet${all.length === 1 ? '' : 's'} · ${Math.round((100 * usedA) / totalA)}% of ${fmt(totalA)} addresses in use${one ? ' · ' + CLOUDS[state.blocks[0].cloud].label : ''}`, { fs: 13, fill: IMG.muted });
+  text(P, y + 14, `${fmtDoc(all.length)} subnet${all.length === 1 ? '' : 's'} · ${Math.round((100 * usedA) / totalA)}% of ${fmtDoc(totalA)} addresses in use${one ? ' · ' + CLOUDS[state.blocks[0].cloud].label : ''}`, { fs: 13, fill: IMG.muted });
   // Legend
   let lx = P;
   const legend = mapMode === 'vlan'
@@ -1064,7 +1064,7 @@ const genPlanSvg = (list) => {
       out.push(`<line x1="${P}" y1="${y}" x2="${W - P}" y2="${y}" stroke="${IMG.border}"/>`);
       y += 24;
       text(P, y, blockName(b), { fs: 16, bold: true });
-      text(W - P, y, `${CLOUDS[b.cloud].label} · ${fmt(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}`, { fs: 12, fill: IMG.muted, anchor: 'end' });
+      text(W - P, y, `${CLOUDS[b.cloud].label} · ${fmtDoc(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}`, { fs: 12, fill: IMG.muted, anchor: 'end' });
       y += 12;
     }
     // Address map: the same grid as on the Plan tab.
@@ -1107,14 +1107,14 @@ const genPlanSvg = (list) => {
       if (rowsLeft <= 0) { cut++; continue; }
       rowsLeft--;
       const range = x.info.uF === null ? '' : x.info.uF === x.info.uL ? ntoa(x.info.uF) : `${ntoa(x.info.uF)} – ${ntoa(x.info.uL)}`;
-      const vals = [x.key, x.meta.n || '', x.meta.v || '', range, fmt(x.info.hosts), x.meta.s === 'used' ? 'In use' : x.meta.s === 'reserved' ? 'Reserved' : 'Free'];
+      const vals = [x.key, x.meta.n || '', x.meta.v || '', range, fmtDoc(x.info.hosts), x.meta.s === 'used' ? 'In use' : x.meta.s === 'reserved' ? 'Reserved' : 'Free'];
       C.forEach(([cx, , cwid, mono, anchor], ci) => text(anchor ? P + cx + cwid - 8 : P + cx + 8, y + 15, fit(vals[ci], cwid - 14, 12, mono), { fs: 12, mono, anchor }));
       out.push(`<line x1="${P}" y1="${y + 22}" x2="${W - P}" y2="${y + 22}" stroke="${IMG.border}"/>`);
       y += 22;
     }
     y += 10;
   });
-  if (cut) { y += 6; text(P, y + 12, `…and ${fmt(cut)} more subnet${cut === 1 ? '' : 's'}. Export CSV or Excel for the full list.`, { fs: 12, fill: IMG.muted }); y += 20; }
+  if (cut) { y += 6; text(P, y + 12, `…and ${fmtDoc(cut)} more subnet${cut === 1 ? '' : 's'}. Export CSV or Excel for the full list.`, { fs: 12, fill: IMG.muted }); y += 20; }
   y += 14;
   text(P, y + 12, 'Made with IP Plan-O-Matic · crockerfeller.github.io/IP-Plan-O-Matic', { fs: 11, fill: IMG.muted });
   y += 12 + P;

@@ -76,6 +76,21 @@ try {
       if (d.failures || d.errors.length || csp.length) failed = true;
       await context.close();
     }
+    // Numbers on screen follow the visitor's locale; the files the app writes stay in US format.
+    if (!suites.length) {
+      const context = await browser.newContext({ locale: 'de-DE', viewport: { width: 1500, height: 1000 } });
+      const page = await context.newPage();
+      console.log(`== ${name} locale`);
+      await page.goto(`http://127.0.0.1:${port}/index.html#10.0.0.0/22`);
+      await page.waitForFunction(() => document.documentElement.dataset.ready === '1');
+      const summary = await page.locator('#summary').textContent();
+      await page.click('#tb-export');
+      await page.evaluate(() => { const s = document.getElementById('exFmt'); s.value = 'md'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+      const md = await page.locator('#exOut').inputValue();
+      const checks = [['on screen: 1.024 addresses for a German visitor', /1\.024/.test(summary || '')], ['in the Markdown file: 1,022 hosts', /1,022/.test(md) && !/1\.022/.test(md)]];
+      for (const [what, ok] of checks) { console.log(`  ${ok ? 'PASS' : 'FAIL'} ${what}`); if (!ok) failed = true; }
+      await context.close();
+    }
     await browser.close();
   }
 } finally {
