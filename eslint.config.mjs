@@ -1,9 +1,10 @@
 // ESLint: catches likely bugs (undefined names, unreachable code, duplicate keys...). Style rules are off on purpose.
 // Run with `npm run lint` (after `npm install`). CI runs it on every push.
-// Lints app.js, sw.js and the other .js files, plus the scripts inside the HTML guides and tests (eslint-plugin-html).
+// Lints the app (js/), sw.js and the other .js files, plus the scripts inside the HTML guides and tests (eslint-plugin-html).
 import js from '@eslint/js';
 import html from 'eslint-plugin-html';
 import globals from 'globals';
+import { appGlobals } from './tools/app-globals.mjs';
 
 // What tests/lib.js defines for the test pages that load it.
 const testLib = Object.fromEntries([
@@ -26,7 +27,17 @@ export default [
     },
   },
   { files: ['**/*.html'], plugins: { html } },
-  { files: ['eslint.config.mjs', 'tests/*.mjs'], languageOptions: { sourceType: 'module', globals: globals.node } },
+  // The app's scripts share one scope (see tools/app-globals.mjs): each file may use the others' top-level names, and
+  // a top-level name used only by another file isn't "unused" here (`npm run lint` checks that across files instead).
+  {
+    files: ['js/*.js'],
+    languageOptions: { globals: Object.fromEntries(Object.entries(appGlobals()).map(([n, g]) => [n, g.kind])) },
+    rules: {
+      'no-unused-vars': ['error', { vars: 'local', caughtErrors: 'none' }],
+      'no-redeclare': ['error', { builtinGlobals: false }],
+    },
+  },
+  { files: ['eslint.config.mjs', 'tests/*.mjs', 'tools/*.mjs'], languageOptions: { sourceType: 'module', globals: globals.node } },
   { files: ['sw.js'], languageOptions: { globals: globals.serviceworker } },
   // lib.js defines helpers for the test pages, so its top-level names are "unused" here.
   { files: ['tests/lib.js'], rules: { 'no-unused-vars': ['error', { vars: 'local', caughtErrors: 'none' }] } },

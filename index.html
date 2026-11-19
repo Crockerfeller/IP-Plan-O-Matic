@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Content Security Policy: only this site's own app.js can run, so even an escaping bug can't run injected script.
+<!-- Content Security Policy: only this site's own scripts (js/) can run, so even an escaping bug can't run injected script.
      Styles allow inline (the app sets style="" in its markup). connect-src lets a downloaded copy check the live site for updates. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://crockerfeller.github.io; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>IP Plan-O-Matic — Free Visual Subnet Calculator, IPv4/IPv6 Planner &amp; VLSM Tool</title>
@@ -856,6 +856,18 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=%%BUILD_SHA%%"></script>
+<!-- The app: plain scripts that share one scope, loaded in this order (each uses what the ones before it define). -->
+<script src="js/core.js?v=%%BUILD_SHA%%"></script>
+<script src="js/plan.js?v=%%BUILD_SHA%%"></script>
+<script src="js/vlsm.js?v=%%BUILD_SHA%%"></script>
+<script src="js/networks.js?v=%%BUILD_SHA%%"></script>
+<script src="js/tools.js?v=%%BUILD_SHA%%"></script>
+<script src="js/export-formats.js?v=%%BUILD_SHA%%"></script>
+<script src="js/export.js?v=%%BUILD_SHA%%"></script>
+<script src="js/import.js?v=%%BUILD_SHA%%"></script>
+<script src="js/hosts.js?v=%%BUILD_SHA%%"></script>
+<script src="js/compare.js?v=%%BUILD_SHA%%"></script>
+<script src="js/ipv6.js?v=%%BUILD_SHA%%"></script>
+<script src="js/main.js?v=%%BUILD_SHA%%"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   "description": "Development tools only (linting, type checking, cross-browser and accessibility tests). The site itself has no build step and no dependencies.",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint . && node tools/app-globals.mjs",
     "typecheck": "tsc -p .",
     "test:browsers": "node tests/browsers.mjs",
     "test:a11y": "node tests/a11y.mjs"
@@ -14,6 +14,7 @@
     "@eslint/js": "10.0.1",
     "eslint": "10.15.0",
     "eslint-plugin-html": "8.2.1",
+    "espree": "11.2.0",
     "globals": "17.14.0",
     "playwright": "1.65.1",
     "typescript": "7.0.2"

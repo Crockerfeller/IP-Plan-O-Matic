@@ -31,7 +31,7 @@ jobs:
         run: tests/run.sh
 
   # ESLint: likely bugs in the app's script, the guides, the service worker and the tests (eslint.config.mjs).
-  # TypeScript checks app.js's types (tsconfig.json); nothing is compiled. And the changelog reminder.
+  # TypeScript checks the app's types (js/) (tsconfig.json); nothing is compiled. And the changelog reminder.
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10

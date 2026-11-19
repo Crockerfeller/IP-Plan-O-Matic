@@ -4,13 +4,13 @@
     python3 tools/check_changelog.py BASE HEAD     # what CI runs for the pushed or pull-request commits
     python3 tools/check_changelog.py               # this branch against main
 
-Fails when the commits in BASE..HEAD change the app (index.html, app.js, app.css) or the guides (learn/) but not
+Fails when the commits in BASE..HEAD change the app (index.html, js/, app.css) or the guides (learn/) but not
 CHANGELOG.md. A refactor or a fix nobody would notice can skip it: put [no changelog] in any of the commit messages.
 """
 import subprocess
 import sys
 
-VISIBLE = ('index.html', 'app.js', 'app.css', 'learn/')
+VISIBLE = ('index.html', 'js/', 'app.css', 'learn/')
 SKIP = '[no changelog]'
 
 
