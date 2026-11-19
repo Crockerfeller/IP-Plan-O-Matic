@@ -297,6 +297,9 @@ const azSecurity = (nets, pairs, subName) => {
   }
   return res;
 };
+// A dual-stack network's subnets that get IPv6, with their /64 numbers (see dualStackIndex). Empty when it's IPv4-only.
+/** @type {(v: CloudNet, cloud: string) => Map<string, number>} */
+const subnets6 = (v, cloud) => (v.b.v6 ? dualStackIndex(v.b, v.items.filter((x) => v6Capable(x.meta, cloud))) : new Map());
 const memo = (f) => { const m = new Map(); return (x) => { if (!m.has(x)) m.set(x, f(x)); return m.get(x); }; };
 const genTf = (list, kind) => {
   const want = { 'tf-aws': 'aws', 'tf-azure': 'azure', 'tf-gcp': 'gcp', 'tf-oci': 'oci' }[kind];
@@ -305,7 +308,9 @@ const genTf = (list, kind) => {
   if (kind === 'tf-aws') {
     const nm = makeNamer('tf');
     for (const v of nets) {
-      out.push(`resource "aws_vpc" "${v.id}" {`, `  cidr_block           = "${v.base}"`, '  enable_dns_support   = true', '  enable_dns_hostnames = true', '  tags = {', `    Name = "${tq(v.name)}"`, '  }', '}', '');
+      const i6 = subnets6(v, 'aws');
+      out.push(`resource "aws_vpc" "${v.id}" {`, `  cidr_block           = "${v.base}"`, '  enable_dns_support   = true', '  enable_dns_hostnames = true',
+        ...(v.b.v6 ? ['  assign_generated_ipv6_cidr_block = true   # Amazon gives the VPC a /56; each subnet takes a /64 of it'] : []), '  tags = {', `    Name = "${tq(v.name)}"`, '  }', '}', '');
       v.tgw = [];
       v.byZone = {};   // first subnet in each zone: the attachment falls back to these
       for (const x of v.items) {
@@ -313,12 +318,14 @@ const genTf = (list, kind) => {
         if (x.meta.d === 'aws-tgw') v.tgw.push(rid);
         if (!((x.meta.z || '') in v.byZone)) v.byZone[x.meta.z || ''] = rid;
         if (x.group) out.push(`# Group: ${x.group}`);
-        out.push(`resource "aws_subnet" "${rid}" {`, `  vpc_id     = aws_vpc.${v.id}.id`, `  cidr_block = "${x.key}"`, x.meta.z ? `  availability_zone = "${tq(x.meta.z)}"` : '  # availability_zone = "us-east-1a"', '  tags = {', `    Name = "${tq(x.meta.n || x.key)}"`);
+        out.push(`resource "aws_subnet" "${rid}" {`, `  vpc_id     = aws_vpc.${v.id}.id`, `  cidr_block = "${x.key}"`,
+          ...(i6.has(x.key) ? [`  ipv6_cidr_block = cidrsubnet(aws_vpc.${v.id}.ipv6_cidr_block, 8, ${i6.get(x.key)})`, '  assign_ipv6_address_on_creation = true'] : []), x.meta.z ? `  availability_zone = "${tq(x.meta.z)}"` : '  # availability_zone = "us-east-1a"', '  tags = {', `    Name = "${tq(x.meta.n || x.key)}"`);
         if (x.group) out.push(`    Group = "${tq(x.group)}"`);
         if (x.meta.o) out.push(`    Notes = "${tq(x.meta.o)}"`);
         out.push('  }', '}', '');
       }
     }
+    if (nets.some((v) => v.b.v6)) out.push('# IPv6: for outbound traffic from private subnets, add an egress-only internet gateway and a ::/0 route to it.', '');
     const po = state.po, pairs = netPairs();
     const route = (a, b, target, dep) => out.push(`resource "aws_route" "${a.id}_to_${b.id}" {`, `  route_table_id         = aws_vpc.${a.id}.main_route_table_id`,
       `  destination_cidr_block = "${b.base}"`, `  ${target}`, ...(dep ? [`  depends_on             = [${dep}]`] : []), '}', '');
@@ -356,11 +363,12 @@ const genTf = (list, kind) => {
     const nm = memo(makeNamer('tf')), an = makeNamer('lower'), sn = memo((x) => azSubnetName(x, an));
     out.push('variable "resource_group_name" {', '  type = string', '}', '', 'variable "location" {', '  type = string', '}', '');
     for (const v of nets) {
-      out.push(`resource "azurerm_virtual_network" "${v.id}" {`, `  name                = "vnet-${v.slug}"`, `  address_space       = ["${v.base}"]`, '  location            = var.location', '  resource_group_name = var.resource_group_name', '}', '');
+      const i6 = subnets6(v, 'azure');
+      out.push(`resource "azurerm_virtual_network" "${v.id}" {`, `  name                = "vnet-${v.slug}"`, `  address_space       = ["${v.base}"${v.b.v6 ? `, "${v.b.v6p}"` : ''}]`, '  location            = var.location', '  resource_group_name = var.resource_group_name', '}', '');
       for (const x of v.items) {
         const svc = svcOf(x.meta);
         if (x.group) out.push(`# Group: ${x.group}`);
-        out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "${tq(sn(x))}"`, '  resource_group_name  = var.resource_group_name', `  virtual_network_name = azurerm_virtual_network.${v.id}.name`, `  address_prefixes     = ["${x.key}"]`);
+        out.push(`resource "azurerm_subnet" "${nm(x)}" {`, `  name                 = "${tq(sn(x))}"`, '  resource_group_name  = var.resource_group_name', `  virtual_network_name = azurerm_virtual_network.${v.id}.name`, `  address_prefixes     = ["${x.key}"${i6.has(x.key) ? `, "${azSubnet6(v.b, /** @type {number} */ (i6.get(x.key)))}"` : ''}]`);
         if (svc && svc.deleg) out.push('', '  delegation {', '    name = "delegation"', '    service_delegation {', `      name = "${svc.deleg}"`, '    }', '  }');
         out.push('}', '');
       }
@@ -395,10 +403,13 @@ const genTf = (list, kind) => {
     const nm = makeNamer('tf'), dn = makeNamer('dns');
     out.push('variable "compartment_id" {', '  type = string', '}', '');
     for (const v of nets) {
-      out.push(`resource "oci_core_vcn" "${v.id}" {`, '  compartment_id = var.compartment_id', `  cidr_blocks    = ["${v.base}"]`, `  display_name   = "vcn-${v.slug}"`, `  dns_label      = "${v.dns}"`, '}', '');
+      const i6 = subnets6(v, 'oci');
+      out.push(`resource "oci_core_vcn" "${v.id}" {`, '  compartment_id = var.compartment_id', `  cidr_blocks    = ["${v.base}"]`, `  display_name   = "vcn-${v.slug}"`, `  dns_label      = "${v.dns}"`,
+        ...(v.b.v6 ? ['  is_ipv6enabled = true   # Oracle gives the VCN a /56; each subnet takes a /64 of it'] : []), '}', '');
       for (const x of v.items) {
         if (x.group) out.push(`# Group: ${x.group}`);
-        out.push(`resource "oci_core_subnet" "${nm(x)}" {`, '  compartment_id = var.compartment_id', `  vcn_id         = oci_core_vcn.${v.id}.id`, `  cidr_block     = "${x.key}"`, `  display_name   = "${tq(x.meta.n || x.key)}"`, `  dns_label      = "${dn(x)}"`);
+        out.push(`resource "oci_core_subnet" "${nm(x)}" {`, '  compartment_id = var.compartment_id', `  vcn_id         = oci_core_vcn.${v.id}.id`, `  cidr_block     = "${x.key}"`, `  display_name   = "${tq(x.meta.n || x.key)}"`, `  dns_label      = "${dn(x)}"`,
+          ...(i6.has(x.key) ? [`  ipv6cidr_block = cidrsubnet(oci_core_vcn.${v.id}.ipv6cidr_blocks[0], 8, ${i6.get(x.key)})`] : []));
         if (x.meta.v) out.push(`  freeform_tags  = { "VLAN" = "${x.meta.v}" }`);
         out.push('}', '');
       }
@@ -415,7 +426,9 @@ const genTf = (list, kind) => {
     out.push('variable "region" {', '  type = string', '}', '');
     // One VPC per base network. A subnet's Zone column holds its region (the wizard repeats subnets per region).
     for (const v of nets) {
-      out.push(`resource "google_compute_network" "${v.id}" {`, `  name                    = "vpc-${v.slug}"`, '  auto_create_subnetworks = false', '}', '');
+      const i6 = subnets6(v, 'gcp');
+      out.push(`resource "google_compute_network" "${v.id}" {`, `  name                    = "vpc-${v.slug}"`, '  auto_create_subnetworks = false',
+        ...(v.b.v6 ? ['  enable_ula_internal_ipv6 = true   # Google gives each dual-stack subnet a private /64'] : []), '}', '');
       const svcId = (x) => (svcOf(x.meta) || {}).id;
       const second = v.items.filter((x) => (svcOf(x.meta) || {}).secondary);
       const psa = v.items.filter((x) => svcId(x) === 'gcp-psa');
@@ -424,7 +437,8 @@ const genTf = (list, kind) => {
         const svc = svcOf(x.meta);
         if (svc && (svc.secondary || svc.id === 'gcp-psa')) continue;
         if (x.group) out.push(`# Group: ${x.group}`);
-        out.push(`resource "google_compute_subnetwork" "${nm(x)}" {`, `  name          = "${gn(x)}"`, `  ip_cidr_range = "${x.key}"`, `  region        = ${x.meta.z ? `"${tq(x.meta.z)}"` : 'var.region'}`, `  network       = google_compute_network.${v.id}.id`);
+        out.push(`resource "google_compute_subnetwork" "${nm(x)}" {`, `  name          = "${gn(x)}"`, `  ip_cidr_range = "${x.key}"`, `  region        = ${x.meta.z ? `"${tq(x.meta.z)}"` : 'var.region'}`, `  network       = google_compute_network.${v.id}.id`,
+          ...(i6.has(x.key) ? ['  stack_type       = "IPV4_IPV6"', '  ipv6_access_type = "INTERNAL"'] : []));
         if (x.meta.o || x.meta.n) out.push(`  description   = "${tq(x.meta.o || x.meta.n)}"`);
         if (svc && svc.purpose) out.push(`  purpose       = "${svc.purpose}"`, ...(svc.purpose.endsWith('_MANAGED_PROXY') ? ['  role          = "ACTIVE"'] : []));
         if (svc && svc.id === 'gcp-gke') {
@@ -486,14 +500,14 @@ const genAzCli = (list) => {
     '  az @args --only-show-errors --output none 2>$null',
     '  return $LASTEXITCODE -eq 0',
     '}',
-    'function Add-Vnet([string]$Name, [string]$Prefix) {',
+    'function Add-Vnet([string]$Name, [string[]]$Prefix) {',
     '  if (Test-AzExists network vnet show -g $ResourceGroup -n $Name) { Write-Host "VNet $Name exists: skipped"; return }',
-    '  Invoke-Az network vnet create -g $ResourceGroup -l $Location -n $Name --address-prefixes $Prefix',
+    '  Invoke-Az network vnet create -g $ResourceGroup -l $Location -n $Name --address-prefixes @Prefix',
     '}',
-    'function Add-Subnet([string]$Vnet, [string]$Name, [string]$Prefix, [string]$Delegation) {',
+    'function Add-Subnet([string]$Vnet, [string]$Name, [string[]]$Prefix, [string]$Delegation) {',
     '  if (Test-AzExists network vnet subnet show -g $ResourceGroup --vnet-name $Vnet -n $Name) { Write-Host "Subnet $Name exists: skipped"; return }',
     "  $more = if ($Delegation) { @('--delegations', $Delegation) } else { @() }",
-    '  Invoke-Az network vnet subnet create -g $ResourceGroup --vnet-name $Vnet -n $Name --address-prefixes $Prefix @more',
+    '  Invoke-Az network vnet subnet create -g $ResourceGroup --vnet-name $Vnet -n $Name --address-prefixes @Prefix @more',
     '}',
     'function Add-Peering([string]$Vnet, [string]$Name, [string]$Remote, [string[]]$Options) {',
     '  if (Test-AzExists network vnet peering show -g $ResourceGroup --vnet-name $Vnet -n $Name) { Write-Host "Peering $Name exists: skipped"; return }',
@@ -503,14 +517,17 @@ const genAzCli = (list) => {
     'Invoke-Az group create -n $ResourceGroup -l $Location',
   );
   const an = makeNamer('lower'), sn = memo((x) => azSubnetName(x, an));
+  // One prefix, or @('IPv4', 'IPv6') for a dual-stack VNet or subnet.
+  const pfx = (a, b) => (b ? `@(${psq(a)}, ${psq(b)})` : psq(a));
   for (const v of nets) {
-    out.push('', `# ${v.name}`, `Add-Vnet ${psq('vnet-' + v.slug)} ${psq(v.base)}`);
+    const i6 = subnets6(v, 'azure');
+    out.push('', `# ${v.name}`, `Add-Vnet ${psq('vnet-' + v.slug)} ${pfx(v.base, v.b.v6 ? v.b.v6p : '')}`);
     let grp = v.name;
     for (const x of v.items) {
       const svc = svcOf(x.meta);
       if (x.group && x.group !== grp) out.push(`# Group: ${x.group}`);
       grp = x.group || grp;
-      out.push(`Add-Subnet ${psq('vnet-' + v.slug)} ${psq(sn(x))} ${psq(x.key)}${svc && svc.deleg ? ' ' + psq(svc.deleg) : ''}`);
+      out.push(`Add-Subnet ${psq('vnet-' + v.slug)} ${psq(sn(x))} ${pfx(x.key, i6.has(x.key) ? azSubnet6(v.b, /** @type {number} */ (i6.get(x.key))) : '')}${svc && svc.deleg ? ' ' + psq(svc.deleg) : ''}`);
     }
   }
   const peers = azPeerings(netPairs());
@@ -585,13 +602,15 @@ const genBicep = (list) => {
   }
   // Subnets are declared inside their VNet, so deploying again doesn't remove them.
   for (const v of nets) {
-    out.push(`resource vnet_${v.id} 'Microsoft.Network/virtualNetworks@${API}' = {`, `  name: ${bq('vnet-' + v.slug)}`, '  location: location', '  properties: {', '    addressSpace: {', `      addressPrefixes: [`, `        ${bq(v.base)}`, '      ]', '    }', '    subnets: [');
+    const i6 = subnets6(v, 'azure');
+    out.push(`resource vnet_${v.id} 'Microsoft.Network/virtualNetworks@${API}' = {`, `  name: ${bq('vnet-' + v.slug)}`, '  location: location', '  properties: {', '    addressSpace: {', `      addressPrefixes: [`, `        ${bq(v.base)}`, ...(v.b.v6 ? [`        ${bq(/** @type {string} */ (v.b.v6p))}`] : []), '      ]', '    }', '    subnets: [');
     let grp = v.name;
     for (const x of v.items) {
       const svc = svcOf(x.meta);
       if (x.group && x.group !== grp) out.push(`      // Group: ${x.group}`);
       grp = x.group || grp;
-      out.push('      {', `        name: ${bq(sn(x))}`, '        properties: {', `          addressPrefix: ${bq(x.key)}`);
+      out.push('      {', `        name: ${bq(sn(x))}`, '        properties: {',
+        ...(i6.has(x.key) ? ['          addressPrefixes: [', `            ${bq(x.key)}`, `            ${bq(azSubnet6(v.b, /** @type {number} */ (i6.get(x.key))))}`, '          ]'] : [`          addressPrefix: ${bq(x.key)}`]));
       if (rtOf.has(x)) out.push('          routeTable: {', `            id: ${rtOf.get(x)}.id`, '          }');
       if (nsgOf.has(x)) out.push('          networkSecurityGroup: {', `            id: ${nsgOf.get(x)}.id`, '          }');
       if (svc && svc.deleg) out.push('          delegations: [', '            {', "              name: 'delegation'", '              properties: {', `                serviceName: ${bq(svc.deleg)}`, '              }', '            }', '          ]');
@@ -630,6 +649,9 @@ const genCfn = (list) => {
   for (const v of nets) {
     v.cf = lid('Vpc', v.id);
     res.push(`  ${v.cf}:`, '    Type: AWS::EC2::VPC', '    Properties:', `      CidrBlock: ${v.base}`, '      EnableDnsSupport: true', '      EnableDnsHostnames: true', ...tags([['Name', v.name]]));
+    // Dual-stack: Amazon gives the VPC a /56, and each subnet takes a /64 of it by number.
+    const i6 = subnets6(v, 'aws'), v6Id = `${v.cf}Ipv6`;
+    if (v.b.v6) res.push(`  ${v6Id}:`, '    Type: AWS::EC2::VPCCidrBlock', '    Properties:', `      VpcId: !Ref ${v.cf}`, '      AmazonProvidedIpv6CidrBlock: true');
     v.subs = []; v.tgw = []; v.byZone = {};
     for (const x of v.items) {
       const id = lid('Subnet', nm(x));
@@ -637,11 +659,13 @@ const genCfn = (list) => {
       if (x.meta.d === 'aws-tgw') v.tgw.push(id);
       if (!((x.meta.z || '') in v.byZone)) v.byZone[x.meta.z || ''] = id;
       if (x.group) res.push(`  # Group: ${x.group}`);
-      res.push(`  ${id}:`, '    Type: AWS::EC2::Subnet', '    Properties:', `      VpcId: !Ref ${v.cf}`, `      CidrBlock: ${x.key}`);
+      res.push(`  ${id}:`, '    Type: AWS::EC2::Subnet', ...(i6.has(x.key) ? [`    DependsOn: ${v6Id}`] : []), '    Properties:', `      VpcId: !Ref ${v.cf}`, `      CidrBlock: ${x.key}`);
+      if (i6.has(x.key)) res.push(`      Ipv6CidrBlock: !Select [${i6.get(x.key)}, !Cidr [!Select [0, !GetAtt ${v.cf}.Ipv6CidrBlocks], 256, 64]]`, '      AssignIpv6AddressOnCreation: true');
       res.push(x.meta.z ? `      AvailabilityZone: ${j(x.meta.z)}` : '      # AvailabilityZone: us-east-1a');
       res.push(...tags([['Name', x.meta.n || x.key], ...(x.group ? [['Group', x.group]] : []), ...(x.meta.o ? [['Notes', x.meta.o]] : [])]));
     }
   }
+  if (nets.some((v) => v.b.v6)) res.push('  # IPv6: for outbound traffic from private subnets, add an AWS::EC2::EgressOnlyInternetGateway and a ::/0 route to it.');
   // Routes need a route table CloudFormation can name, so a VPC with peering routes gets its own route table,
   // shared by all its subnets.
   const po = state.po, pairs = netPairs();
@@ -989,7 +1013,7 @@ const genJson = () => JSON.stringify({
   platform: state.blocks[0].cloud,
   gateway: settings.gw,
   tree: packBits(treeToBits(state.blocks[0].root)),
-  blocks: state.blocks.map((b) => ({ base: blockCidr(b), label: b.label || '', platform: b.cloud, tree: packBits(treeToBits(b.root)) })),
+  blocks: state.blocks.map((b) => ({ base: blockCidr(b), label: b.label || '', platform: b.cloud, tree: packBits(treeToBits(b.root)), ...(b.v6 ? { dualStack: true, ...(b.v6p ? { ipv6Range: b.v6p } : {}) } : {}) })),
   ...(state.peers ? { peering: { pairs: state.peers.filter(([a, b]) => blockByCidr(a) && blockByCidr(b)), options: state.po } } : {}),
   subnets: allRows().map((r) => {
     const m = getMeta(r.key), i = hostInfo(r.addr, r.mask, r.cloud);

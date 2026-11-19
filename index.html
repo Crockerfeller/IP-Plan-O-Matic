@@ -228,6 +228,7 @@
         <label for="azZones" id="azZonesL">Availability Zones</label>
         <input type="text" id="azZones" spellcheck="false" value="us-east-1a, us-east-1b, us-east-1c" title="Each subnet is made once per zone">
       </div>
+      <label class="check" title="Each subnet also gets an IPv6 /64 in the cloud exports (the cloud's own rules: an Amazon or Oracle /56, a private /48 for Azure, Google's /64s)"><input type="checkbox" id="azV6" autocomplete="off"> Dual-stack IPv6</label>
       <button type="button" id="azAddSpoke">Add spoke</button>
     </div>
     <div id="azVnets"></div>
@@ -441,6 +442,14 @@
             <option value="gcp">Google Cloud VPC</option>
             <option value="oci">Oracle Cloud (OCI) VCN</option>
           </select>
+        </div>
+        <!-- Cloud networks only: dual-stack gives each subnet an IPv6 /64 in the cloud exports. Azure needs the range. -->
+        <div class="field" id="v6Field" hidden>
+          <span class="lbl" id="netV6L">IPv6</span>
+          <div class="v6-row">
+          <label class="check" title="Each subnet also gets an IPv6 /64 in this cloud’s exports (Terraform, CloudFormation, Bicep, Azure CLI)"><input type="checkbox" id="netV6" aria-describedby="netV6L"> Dual-stack</label>
+          <input type="text" id="netV6p" spellcheck="false" hidden aria-label="IPv6 range for this VNet" title="The VNet’s IPv6 range: a private ULA /48 by default, or your own. Each subnet gets a /64 from it." style="width:190px">
+          </div>
         </div>
         <span class="net-row-acts" id="netRowActs"></span>
         <button type="button" id="tplBtn" class="wiz" title="Pick the Azure or AWS services you need (gateway, firewall, Bastion, delegated subnets…) and get a VNet or VPC, or a hub and spokes, with a correctly named, correctly sized subnet for each. Applying it replaces the current IPv4 plan."><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.6 3.4 3.4 1.6-3.4 1.6L8 11.5 6.4 8.1 3 6.5l3.4-1.6z" fill="currentColor"/><path d="M13 10.5l.7 1.3 1.3.7-1.3.7-.7 1.3-.7-1.3-1.3-.7 1.3-.7z" fill="currentColor"/></svg>Azure / AWS subnet wizard…</button>

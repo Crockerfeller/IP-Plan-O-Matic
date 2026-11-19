@@ -390,7 +390,13 @@ $('azApply').addEventListener('click', () => {
   const single = tplLayout === 'single';
   if (planInUse() && !confirm(`Replace the current IPv4 plan with this ${single ? tpl.net : 'hub and spokes'}?`)) return;
   checkpoint();
-  state.blocks = res.vnets.map((v) => { const b = mkBlock(v.addr, v.mask, tpl.cloud, v.label); b.root = v.root; return b; });
+  const dual = $('azV6').checked;
+  state.blocks = res.vnets.map((v) => {
+    const b = mkBlock(v.addr, v.mask, tpl.cloud, v.label);
+    b.root = v.root;
+    if (dual) { b.v6 = true; if (b.cloud === 'azure') b.v6p = ulaPrefix(); }
+    return b;
+  });
   state.active = 0;
   state.meta = {};
   state.hosts = {};

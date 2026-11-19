@@ -807,6 +807,12 @@ const syncControls = () => {
   // Cloud platforms fix the gateway at .1, so the choice only applies to Standard.
   $('gwField').hidden = settings.cloud !== 'std';
   $('gwPos').title = 'Which address in each subnet is the router/gateway';
+  // IPv6 dual-stack: cloud networks only; Azure also shows the range.
+  const b = blk();
+  $('v6Field').hidden = !DUAL_STACK_CLOUDS.includes(settings.cloud);
+  $('netV6').checked = !!b.v6;
+  $('netV6p').hidden = !(b.v6 && b.cloud === 'azure');
+  $('netV6p').value = b.v6p || '';
   $('v6Net').value = v6Key(v6.net, v6.mask);
   tplSync();
 };
@@ -975,10 +981,37 @@ $('addForm').addEventListener('submit', (e) => {
 $('platform').addEventListener('change', () => {
   checkpoint();
   settings.cloud = $('platform').value;
+  // Dual-stack is a cloud setting: on-prem drops it, and Azure needs a range of its own.
+  const b = blk();
+  if (!DUAL_STACK_CLOUDS.includes(b.cloud)) { delete b.v6; delete b.v6p; }
+  else if (b.v6 && b.cloud === 'azure' && !b.v6p) b.v6p = ulaPrefix();
   syncControls();
   update();
   const lim = divLimit();
   if (settings.cloud !== 'std') toast(`${CLOUDS[settings.cloud].label}: gateway is always .1, ${hostInfo(0, 24).reserved.length} addresses reserved per subnet, smallest /${lim}`);
+});
+$('netV6').addEventListener('change', () => {
+  checkpoint();
+  const b = blk();
+  b.v6 = $('netV6').checked;
+  if (b.v6 && b.cloud === 'azure' && !b.v6p) b.v6p = ulaPrefix();
+  if (!b.v6) { delete b.v6; delete b.v6p; }
+  syncControls();
+  update();
+  toast(b.v6 ? `Dual-stack: each subnet in ${blockCidr(b)} gets an IPv6 /64 in the ${CLOUDS[b.cloud].label} exports` : `${blockCidr(b)} is IPv4-only again`);
+});
+$('netV6p').addEventListener('change', () => {
+  const r = cleanV6Range($('netV6p').value);
+  clearMsg('msg');
+  if (!r) {
+    showMsg('msg', 'Enter the VNet’s IPv6 range with its prefix length, /56 or shorter, like fd12:3456:789a::/48.', 'error');
+    $('netV6p').value = blk().v6p || '';
+    return;
+  }
+  checkpoint();
+  blk().v6p = r;
+  syncControls();
+  update();
 });
 $('gwPos').addEventListener('change', () => {
   checkpoint();

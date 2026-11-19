@@ -297,7 +297,8 @@ const hostInfo = (addr, mask, c = settings.cloud) => {
 // state.network / mask / root and settings.cloud always refer to the active block.
 /** A tree node: a leaf, or split into halves (IPv6 also splits 16 ways on nibble boundaries).
     @typedef {{ c: TreeNode[] | null }} TreeNode */
-/** One base network of the plan. @typedef {{ network: number, mask: number, root: TreeNode, cloud: string, label: string }} Block */
+/** One base network of the plan. v6: dual-stack (its subnets get IPv6 /64s in the cloud exports); v6p: the IPv6 range, where
+    the network's owner picks it (Azure). @typedef {{ network: number, mask: number, root: TreeNode, cloud: string, label: string, v6?: boolean, v6p?: string }} Block */
 /** The plan. network, mask and root are the active block's (getters below).
     @typedef {{ blocks: Block[], active: number, meta: Record<string, any>, hosts: Record<string, any>, peers: [string, string][] | null,
       po: typeof PEER_DEFAULTS, network: number, mask: number, root: TreeNode }} PlanState */
@@ -512,6 +513,63 @@ const MAX6 = 4096;
 /** The IPv6 plan. @type {{ net: bigint, mask: number, root: TreeNode, meta: Record<string, any> }} */
 const v6 = { net: builtIn(parse6, '2001:db8::'), mask: 48, root: { c: null }, meta: {} };
 const v6Key = (a, m) => `${fmt6(a)}/${m}`;
+
+// ---------- Dual-stack cloud networks ----------
+// A dual-stack base network gives each subnet an IPv6 /64 in the cloud exports. AWS and Oracle Cloud assign the network
+// a /56 and the subnets pick /64s from it by number (0-255); Azure uses a range you choose (a private ULA /48 by
+// default) with /64 subnets; Google Cloud assigns each subnet's /64 itself.
+const DUAL_STACK_CLOUDS = ['aws', 'azure', 'gcp', 'oci'];
+// A random private range (RFC 4193 unique local address): fd + 40 random bits, /48.
+const ulaPrefix = () => {
+  const r = crypto.getRandomValues(new Uint8Array(5));
+  const h = [...r].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return v6Key(builtIn(parse6, `fd${h.slice(0, 2)}:${h.slice(2, 6)}:${h.slice(6, 10)}::`), 48);
+};
+// An IPv6 range for a network, written the standard way, or '' when it isn't one: it must leave room for 256 /64s.
+/** @type {(s: any) => string} */
+const cleanV6Range = (s) => {
+  const p = parse6Cidr(String(s ?? '').trim());
+  if (!p || !/\//.test(String(s)) || p.mask > 56 || p.mask < 8 || p.n !== p.net) return '';
+  return v6Key(p.net, p.mask);
+};
+/** @type {(blocks: Block[], d6: any) => void} */
+const applyDualStack = (blocks, d6) => {
+  if (!d6 || typeof d6 !== 'object') return;
+  for (const b of blocks) {
+    const v = d6[blockCidr(b)];
+    if (!v || !DUAL_STACK_CLOUDS.includes(b.cloud)) continue;
+    b.v6 = true;
+    const r = cleanV6Range(v);
+    if (r) b.v6p = r;
+    else if (b.cloud === 'azure') b.v6p = ulaPrefix();
+  }
+};
+// Can this subnet be dual-stack? Azure's gateway, firewall, Bastion and Route Server subnets and its delegated
+// subnets stay IPv4-only (Azure allows that inside a dual-stack VNet), as do Google Cloud's proxy-only and other
+// special-purpose subnets.
+/** @type {(meta: Record<string, any>, cloud: string) => boolean} */
+const v6Capable = (meta, cloud) => {
+  if (cloud === 'aws' || cloud === 'oci') return true;
+  const svc = svcOf(meta);
+  return !svc || (cloud === 'gcp' && !svc.purpose && !svc.secondary && svc.id !== 'gcp-psa');
+};
+// Each dual-stack subnet's /64 number, 0-255. It follows the subnet's place in the network (the network split into
+// 256 equal slices), so it stays the same from one export to the next; two subnets in one slice take the next free
+// numbers. Subnets past the 256th get none.
+/** @type {(b: Block, items: { key: string, addr: number, mask: number }[]) => Map<string, number>} */
+const dualStackIndex = (b, items) => {
+  const out = new Map(), taken = new Set();
+  const slice = size(Math.min(b.mask + 8, 32));
+  const wants = [...items].sort((x, y) => x.addr - y.addr).map((x) => [x.key, Math.floor((x.addr - b.network) / slice)]);
+  const late = [];
+  for (const [k, i] of wants) { if (taken.has(i)) late.push(k); else { taken.add(i); out.set(k, i); } }
+  let next = 0;
+  for (const k of late) { while (taken.has(next)) next++; if (next > 255) break; taken.add(next); out.set(k, next); }
+  return out;
+};
+// Azure: the subnet's /64 inside the network's range.
+/** @type {(b: Block, i: number) => string} */
+const azSubnet6 = (b, i) => { const p = builtIn(parse6Cidr, b.v6p || ''); return v6Key(p.net + (BigInt(i) << 64n), 64); };
 // v6.meta: { 'prefix/len': { n: name, v: vlan, o: note, s: 'used' | 'reserved' } }
 const v6Get = (k) => v6.meta[k] || {};
 const v6Set = (k, f, val) => {
@@ -749,6 +807,9 @@ const extras = () => {
     if (state.active) o.a = state.active;
   }
   if (state.peers) { o.p = state.peers.filter(([a, b]) => blockByCidr(a) && blockByCidr(b)); o.po = state.po; }
+  // Dual-stack networks: { cidr: 1 } or { cidr: their IPv6 range }.
+  const d6 = state.blocks.filter((b) => b.v6).map((b) => [blockCidr(b), b.v6p || 1]);
+  if (d6.length) o.d6 = Object.fromEntries(d6);
   // Assigned addresses inside the plan, each as [name] or [name, mac] or [name, mac, notes].
   const hs = Object.entries(state.hosts).filter(([ip]) => blockOf(aton(ip)) >= 0);
   if (hs.length) o.h = Object.fromEntries(hs.map(([ip, h]) => [ip, h.o ? [h.n || '', h.m || '', h.o] : h.m ? [h.n || '', h.m] : [h.n || '']]));
@@ -839,6 +900,7 @@ const loadFromHash = (hash, q) => {
       blocks.push(b);
     }
   }
+  applyDualStack(blocks, x.d6);
   state.blocks = blocks;
   state.active = Number.isInteger(x.a) && x.a > 0 && x.a < blocks.length ? x.a : 0;
   settings.gw = x.g === 'last' ? 'last' : 'first';

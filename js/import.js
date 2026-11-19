@@ -217,7 +217,7 @@ const importText = (text) => {
     if (Array.isArray(j.hosts)) hosts = cleanHosts(Object.fromEntries(j.hosts.filter((h) => h && h.ip).map((h) => [h.ip, h])));
     if (j.peering && typeof j.peering === 'object') peering = j.peering;
     if (Array.isArray(j.blocks) && j.blocks.length) {
-      defs = j.blocks.map((b) => ({ c: parseCidr(b && b.base), tree: b && b.tree, cloud: b && CLOUDS[b.platform] ? b.platform : 'std', label: String((b && b.label) || '').slice(0, 40) })).filter((d) => d.c);
+      defs = j.blocks.map((b) => ({ c: parseCidr(b && b.base), tree: b && b.tree, cloud: b && CLOUDS[b.platform] ? b.platform : 'std', label: String((b && b.label) || '').slice(0, 40), d6: b && b.dualStack ? (b.ipv6Range || 1) : 0 })).filter((d) => d.c);
     }
   } else {
     const recs = parseCsv(text);
@@ -253,6 +253,7 @@ const importText = (text) => {
     if (blocks.some((b) => overlaps(d.c.addr, d.c.mask, b.network, b.mask))) continue;
     const b = mkBlock(d.c.addr, d.c.mask, d.cloud, d.label);
     b.root = d.tree ? treeFrom(String(d.tree), d.c.mask) : null;
+    if (d.d6) applyDualStack([b], { [blockCidr(b)]: d.d6 });
     blocks.push(b);
   }
   let skipped = 0;

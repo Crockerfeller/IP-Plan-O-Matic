@@ -5,6 +5,8 @@ date. The build number in the app's footer is the commit it was built from.
 
 ## 2026-11-18
 
+- **Dual-stack IPv6 for cloud networks:** a switch on the network (and in the subnet wizard) gives every subnet an IPv6
+  /64 in the Terraform, CloudFormation, Bicep and Azure CLI exports, following each cloud's rules.
 - **Import from NetBox and phpIPAM:** load their CSV export or paste their API's JSON. Top-level prefixes become
   base networks, containers name them, and names, VLANs, statuses and comments come across.
 - **Numbers in your format:** counts on screen use your browser's settings (1,024 or 1.024 or 1 024). Exported files

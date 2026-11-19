@@ -414,6 +414,45 @@ T.ipamImport = async () => {
   imp('Prefix,Name,Status\n10.80.0.0/24,Plain,used');
   check('ipam: a Prefix CSV with a Name column is a plain plan CSV', sub(asJson(), '10.80.0.0/24').name === 'Plain' && !/NetBox/.test($('imMsg').textContent), $('imMsg').textContent);
 };
+// Dual-stack cloud networks: each subnet gets an IPv6 /64 in the cloud exports, numbered by its place in the network.
+T.dualStack = async () => {
+  await load('../index.html#10.0.0.0/16');
+  check('dual-stack: no IPv6 switch for on-prem', $('v6Field').hidden);
+  select('#platform', 'aws');
+  check('dual-stack: the switch shows for a cloud network, off', !$('v6Field').hidden && !$('netV6').checked && $('netV6p').hidden);
+  for (const t of ['10.0.0.0/26 A', '10.0.0.64/26 B', '10.0.1.0/24 C']) { $('addIn').value = t; $('addForm').requestSubmit(); }
+  $('netV6').click();
+  const out = (f) => { click('#tb-export'); select('#exFmt', f); const v = $('exOut').value; click('#tb-plan'); return v; };
+  let tf = out('tf-aws');
+  const idx = (name) => { const m = new RegExp(`Name *= "${name}"`).exec(tf); const before = tf.slice(0, m ? m.index : 0); const all = [...before.matchAll(/cidrsubnet\(aws_vpc\.main\.ipv6_cidr_block, 8, (\d+)\)/g)]; return all.length ? +all[all.length - 1][1] : -1; };
+  check('dual-stack: AWS VPC asks for a /56', /assign_generated_ipv6_cidr_block *= true/.test(tf) && /egress-only internet gateway/.test(tf), tf.slice(0, 400));
+  check('dual-stack: /64 numbers follow the address; a second subnet in the same slice takes the next free one', idx('A') === 0 && idx('C') === 1 && idx('B') === 2, [idx('A'), idx('B'), idx('C')]);
+  // The setting is in the link (written a moment after a change).
+  await sleep(400);
+  await load('../index.html' + W.location.hash);
+  check('dual-stack: kept in the link', $('netV6').checked && out('tf-aws').includes('assign_ipv6_address_on_creation'));
+  // Azure: a private /48 of its own, editable; a bad range is refused.
+  select('#platform', 'azure');
+  check('dual-stack: Azure gets a private ULA /48', !$('netV6p').hidden && /^fd[0-9a-f]{2}:[0-9a-f]{1,4}:[0-9a-f]{1,4}::\/48$/.test($('netV6p').value), $('netV6p').value);
+  type('#netV6p', 'fd00::/60');
+  check('dual-stack: a range too small for 256 /64s is refused', $('msg').classList.contains('error') && /^fd[0-9a-f]{2}:/.test($('netV6p').value), [$('msg').textContent, $('netV6p').value]);
+  type('#netV6p', '2001:db8:1::/48');
+  tf = out('tf-azure');
+  check('dual-stack: Azure VNet and subnets use the range', /address_space *= \["10\.0\.0\.0\/16", "2001:db8:1::\/48"\]/.test(tf) && tf.includes('"10.0.0.0/26", "2001:db8:1::/64"]') && tf.includes('"10.0.1.0/24", "2001:db8:1:1::/64"]'), tf.slice(0, 900));
+  const bicep = out('bicep'), ps = out('az-ps');
+  check('dual-stack: Bicep and the Azure CLI script too', bicep.includes("'2001:db8:1::/48'") && /addressPrefixes: \[\s+'10\.0\.0\.0\/26'\s+'2001:db8:1::\/64'/.test(bicep) && ps.includes("@('10.0.0.0/26', '2001:db8:1::/64')"), [bicep.slice(0, 300), ps.split('\n').filter((l) => /Add-(Vnet|Subnet) /.test(l))]);
+  // The JSON file keeps it, and importing it brings it back.
+  const js = out('json');
+  const j = JSON.parse(js);
+  check('dual-stack: in the JSON export', j.blocks[0].dualStack === true && j.blocks[0].ipv6Range === '2001:db8:1::/48', j.blocks[0]);
+  await load('../index.html#192.168.0.0/24');
+  click('#tb-export'); $('imText').value = js; click('#imRun'); click('#tb-plan');
+  check('dual-stack: JSON import brings it back', $('netV6').checked && $('netV6p').value === '2001:db8:1::/48', [$('imMsg').textContent, $('netV6p').value]);
+  // Back to on-prem drops it.
+  select('#platform', 'std');
+  select('#platform', 'aws');
+  check('dual-stack: switching to on-prem clears it', !$('netV6').checked && !out('tf-aws').includes('ipv6'));
+};
 T.backup = async () => {
   await load('../index.html#10.2.0.0/16');
   W.localStorage.removeItem('subnetPlanner.plans'); W.localStorage.removeItem('subnetPlanner.backedUp');
