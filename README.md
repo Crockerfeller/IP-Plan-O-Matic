@@ -54,7 +54,7 @@ The build (`python3 tools/build_site.py _site`) stamps `index.html`, `app.js` an
 
 ## What's new and feedback
 
-[`CHANGELOG.md`](CHANGELOG.md) lists what changed, by date; the app's footer links to it as **What's new**. Found a problem or have an idea? Use [Report a problem](https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=bug.yml) or [Suggest a feature](https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=feature.yml) (the footer has both links, and Report a problem fills in your build number), or message [@wangooroo on X](https://x.com/wangooroo).
+[`CHANGELOG.md`](CHANGELOG.md) lists what changed, by date; the app's footer links to it as **What's new**. CI fails a push that changes the app or the guides without a line there; put `[no changelog]` in a commit message for changes nobody would notice. Found a problem or have an idea? Use [Report a problem](https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=bug.yml) or [Suggest a feature](https://github.com/Crockerfeller/IP-Plan-O-Matic/issues/new?template=feature.yml) (the footer has both links, and Report a problem fills in your build number), or message [@wangooroo on X](https://x.com/wangooroo).
 
 ## License
 
