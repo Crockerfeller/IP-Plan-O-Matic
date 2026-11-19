@@ -1847,6 +1847,14 @@ T.visualize = async () => {
   check('viz: zoom buttons', (() => { click('#vzFit'); const a = $('vzZoomLbl').textContent; click('#vzIn'); return a !== $('vzZoomLbl').textContent; })(), $('vzZoomLbl').textContent);
   // Double-click a subnet: its row on the Plan tab.
   const tile = qa('#vzStage .vz-tile').find((r) => r.getAttribute('data-key') === '10.0.38.0/24') || q('#vzStage .vz-tile');
+  // A press alone must not capture the pointer: a captured pointer's click and dblclick go to the stage, not the tile.
+  // (Browsers ignore capture for synthetic events, so watch for the call itself.)
+  let captured = false;
+  $('vzStage').setPointerCapture = () => { captured = true; };
+  tile.dispatchEvent(new W.PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, pointerType: 'mouse' }));
+  tile.dispatchEvent(new W.PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 1, pointerType: 'mouse' }));
+  delete $('vzStage').setPointerCapture;
+  check('viz: pressing a tile leaves clicks on the tile', !captured);
   tile.dispatchEvent(new W.MouseEvent('dblclick', { bubbles: true }));
   await sleep(50);
   check('viz: double-click opens the subnet on the Plan tab', !$('tab-plan').hidden, tile.getAttribute('data-key'));

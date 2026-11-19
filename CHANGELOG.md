@@ -3,6 +3,11 @@
 IP Plan-O-Matic deploys every change as soon as its tests pass, so there are no version numbers: entries are grouped by
 date. The build number in the app's footer is the commit it was built from.
 
+## 2026-11-19
+
+- **Visualize tab:** double-clicking a subnet now opens it on the Plan tab. The diagram's panning was catching the
+  clicks before they reached the subnet.
+
 ## 2026-11-18
 
 - **Visualize tab:** a network diagram of the plan, drawn in each cloud's own style: AWS VPCs with Availability Zones

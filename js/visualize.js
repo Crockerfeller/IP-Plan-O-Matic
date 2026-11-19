@@ -622,12 +622,13 @@ $('vz100').addEventListener('click', () => { vzZoom(1 / vzView.k); });
   stage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: vzView.x, vy: vzView.y, moved: false };
-    stage.setPointerCapture(e.pointerId);
   });
   stage.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    // Capture only once a drag starts: capturing on pointerdown retargets click and dblclick to the stage, so a tile could never be double-clicked.
+    if (!drag.moved) stage.setPointerCapture(e.pointerId);
     drag.moved = true; stage.classList.add('dragging');
     vzView.x = drag.vx + dx; vzView.y = drag.vy + dy; vzView.fitted = false;
     vzApply();
