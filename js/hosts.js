@@ -35,7 +35,7 @@ const renderHosts = () => {
   $('hostsTtl').textContent = `IP addresses in ${hostsKey}${meta.n ? ` (${meta.n})` : ''}`;
   const mine = hostsIn(c.addr, c.mask), used = mine.filter((ip) => info.uF !== null && info.uL !== null && ip >= info.uF && ip <= info.uL).length;
   const nf = nextFree(), pct = info.hosts ? Math.round((100 * used) / info.hosts) : 0;
-  $('hostsSum').textContent = `${fmt(used)} of ${fmt(info.hosts)} usable address${info.hosts === 1 ? '' : 'es'} assigned (${pct}%)${nf === null ? '. None left.' : ` · next free ${ntoa(nf)}`}`;
+  $('hostsSum').textContent = `${fmt(used)} of ${fmt(info.hosts)} usable address${info.hosts === 1 ? '' : 'es'} assigned (${pctFmt(pct, 0)})${nf === null ? '. None left.' : ` · next free ${ntoa(nf)}`}`;
   $('hostsBar').style.setProperty('--p', Math.min(100, (100 * used) / Math.max(1, info.hosts)) + '%');
   if (!$('hAddIp').value && nf !== null) $('hAddIp').value = ntoa(nf);
   // The platform's own addresses, read-only, among the assigned ones.
@@ -135,7 +135,7 @@ $('hPasteRun').addEventListener('click', () => {
     update();
     renderHosts();
   }
-  showMsg('hostsMsg', `Assigned ${added} address${added === 1 ? '' : 'es'}.${bad.length ? ` Skipped ${bad.length} (outside the subnet, reserved, already assigned or without a name): ${bad.slice(0, 6).join(', ')}${bad.length > 6 ? '…' : ''}.` : ''}`, bad.length ? 'error' : 'ok');
+  showMsg('hostsMsg', `Assigned ${fmt(added)} address${added === 1 ? '' : 'es'}.${bad.length ? ` Skipped ${fmt(bad.length)} (outside the subnet, reserved, already assigned or without a name): ${bad.slice(0, 6).join(', ')}${bad.length > 6 ? '…' : ''}.` : ''}`, bad.length ? 'error' : 'ok');
   if (!bad.length) $('hPaste').value = '';
 });
 $('hostsClose').addEventListener('click', () => $('hostsDlg').close());

@@ -93,13 +93,13 @@ const renderV6 = () => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'small';
       b.textContent = `Join → /${lf.parent.m}`;
-      b.title = `Join ${span} prefixes back into ${v6Key(lf.parent.a, lf.parent.m)}`;
+      b.title = `Join ${fmt(span)} prefixes back into ${v6Key(lf.parent.a, lf.parent.m)}`;
       const hl = (on) => { for (let r = idx; r < idx + span; r++) body.rows[r] && body.rows[r].classList.toggle('hl', on); };
       b.addEventListener('mouseenter', () => hl(true));
       b.addEventListener('mouseleave', () => hl(false));
       b.addEventListener('focus', () => hl(true));
       b.addEventListener('blur', () => hl(false));
-      b.addEventListener('click', () => { checkpoint(); lf.parent.node.c = null; renderV6(); writeHash(); toast(`Joined ${span} prefixes into ${v6Key(lf.parent.a, lf.parent.m)}`, UNDO); });
+      b.addEventListener('click', () => { checkpoint(); lf.parent.node.c = null; renderV6(); writeHash(); toast(`Joined ${fmt(span)} prefixes into ${v6Key(lf.parent.a, lf.parent.m)}`, UNDO); });
       td(b);
     } else td('');
     body.appendChild(tr);
@@ -235,7 +235,7 @@ $('v6PlanRun').addEventListener('click', () => {
   if (failed.length) {
     const g = {};
     for (const r of failed) g[r.len] = (g[r.len] || 0) + 1;
-    html += `<div class="msg show error">Doesn’t fit: ${Object.entries(g).map(([len, n]) => `${n} × /${len}`).join(', ')}. Use a larger prefix${mode === 'fill' ? ', free up space or switch to Replace the plan' : ''}.</div>`;
+    html += `<div class="msg show error">Doesn’t fit: ${Object.entries(g).map(([len, n]) => `${fmt(n)} × /${len}`).join(', ')}. Use a larger prefix${mode === 'fill' ? ', free up space or switch to Replace the plan' : ''}.</div>`;
   }
   if (placed.length) {
     html += `<div class="stat-line">Places <b>${placed.length}</b> prefix${placed.length > 1 ? 'es' : ''} in ${esc(v6Key(v6.net, v6.mask))}${mode === 'fill' ? ', keeping existing ones' : ''}. The plan will have ${fmt(rowsAfter)} rows.</div>`;
@@ -273,5 +273,5 @@ $('v6PlanApply').addEventListener('click', () => {
   $('v6PlanOut').innerHTML = '';
   renderV6();
   writeHash();
-  toast(`Applied ${plan.placed.length} IPv6 prefixes`, UNDO);
+  toast(`Applied ${fmt(plan.placed.length)} IPv6 prefixes`, UNDO);
 });

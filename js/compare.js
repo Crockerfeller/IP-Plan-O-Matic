@@ -87,7 +87,7 @@ const runCompare = async (text, name) => {
   const changes = diffPlans(other, planRows(), $('cmpAll').checked);
   cmpLast = { changes, name };
   const by = (k) => changes.filter((c) => c.kind === k).length;
-  const parts = ['Added', 'Removed', 'Changed', 'Split', 'Joined'].map((k) => /** @type {[string, number]} */ ([k, by(k)])).filter(([, n]) => n).map(([k, n]) => `${n} ${k.toLowerCase()}`);
+  const parts = ['Added', 'Removed', 'Changed', 'Split', 'Joined'].map((k) => /** @type {[string, number]} */ ([k, by(k)])).filter(([, n]) => n).map(([k, n]) => `${fmt(n)} ${k.toLowerCase()}`);
   const nets = changes.filter((c) => c.kind.startsWith('Network')).length;
   if (nets) parts.unshift(`${nets} network change${nets === 1 ? '' : 's'}`);
   let html = `<div class="stat-line">From <b>${esc(name)}</b> to the current plan: ${changes.length ? parts.join(', ') : 'no differences'}${changes.length || $('cmpAll').checked ? '.' : ' in named, VLAN-tagged or in-use subnets. Tick “Include free, unnamed subnets” to see changes to free space too.'}</div>`;

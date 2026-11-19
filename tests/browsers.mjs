@@ -83,12 +83,18 @@ try {
       console.log(`== ${name} locale`);
       await page.goto(`http://127.0.0.1:${port}/index.html#10.0.0.0/22`);
       await page.waitForFunction(() => document.documentElement.dataset.ready === '1');
-      const summary = await page.locator('#summary').textContent();
       await page.click('#tb-export');
       await page.evaluate(() => { const s = document.getElementById('exFmt'); s.value = 'md'; s.dispatchEvent(new Event('change', { bubbles: true })); });
       const md = await page.locator('#exOut').inputValue();
-      const checks = [['on screen: 1.024 addresses for a German visitor', /1\.024/.test(summary || '')], ['in the Markdown file: 1,022 hosts', /1,022/.test(md) && !/1\.022/.test(md)]];
-      for (const [what, ok] of checks) { console.log(`  ${ok ? 'PASS' : 'FAIL'} ${what}`); if (!ok) failed = true; }
+      await page.click('#tb-plan');
+      // A /26 of the /22 in use: 6.25%, so the summary shows a decimal.
+      for (let i = 0; i < 4; i++) await page.locator('#body tr .col-divide button').first().click();
+      await page.locator('#body tr select.status').first().selectOption('used');
+      const summary = `${await page.locator('#summary').textContent()} ${await page.locator('#usageLegend').textContent()}`;
+      const checks = [['on screen: 1.024 addresses for a German visitor', /1\.024/.test(summary)],
+        ['on screen: a German percentage, 6,3 % (comma, space before %)', /\(6,[23]\s%\)/.test(summary) && !/\d\.\d\s?%/.test(summary)],
+        ['in the Markdown file: 1,022 hosts', /1,022/.test(md) && !/1\.022/.test(md)]];
+      for (const [what, ok] of checks) { console.log(`  ${ok ? 'PASS' : 'FAIL'} ${what}`); if (!ok) { failed = true; console.log('    summary: ' + summary.replace(/\s+/g, ' ').slice(0, 300)); } }
       await context.close();
     }
     await browser.close();

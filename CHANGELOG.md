@@ -9,8 +9,8 @@ date. The build number in the app's footer is the commit it was built from.
   /64 in the Terraform, CloudFormation, Bicep and Azure CLI exports, following each cloud's rules.
 - **Import from NetBox and phpIPAM:** load their CSV export or paste their API's JSON. Top-level prefixes become
   base networks, containers name them, and names, VLANs, statuses and comments come across.
-- **Numbers in your format:** counts on screen use your browser's settings (1,024 or 1.024 or 1 024). Exported files
-  stay in one format so tools read them the same everywhere.
+- **Numbers in your format:** counts, decimals and percentages on screen use your browser's settings (1,024 and 6.3%,
+  or 1.024 and 6,3 % in Germany). Exported files stay in one format so tools read them the same everywhere.
 - **PNG export** shows an error instead of hanging when the image is too big for the device's memory.
 - **Backups:** the Plans dialog reminds you to back up saved plans when they've changed since your last backup,
   and asks the browser to keep them (so Safari doesn't clear them after a week away). Backups are dated files.

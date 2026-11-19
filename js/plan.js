@@ -103,11 +103,11 @@ const renderSummary = () => {
     (state.blocks.length > 1 ? `<span>All ${state.blocks.length} ${netWord()}s <b>${fmt(state.blocks.reduce((t, b) => t + size(b.mask), 0))}</b> addresses</span>` : '');
   const pct = (x) => (x / total) * 100;
   $('usageBar').innerHTML = `<span class="u-used" style="width:${pct(by.used)}%"></span><span class="u-res" style="width:${pct(by.reserved)}%"></span>`;
-  const p1 = (x) => (pct(x) < 0.1 && x > 0 ? '<0.1' : pct(x).toFixed(pct(x) < 10 ? 1 : 0));
+  const p1 = (x) => (pct(x) < 0.1 && x > 0 ? '<' + pctFmt(0.1) : pctFmt(pct(x), pct(x) < 10 ? 1 : 0));
   $('usageLegend').innerHTML =
-    `<span><i style="background:var(--ok)"></i>In use ${fmt(by.used)} addresses (${p1(by.used)}%)</span>` +
-    `<span><i style="background:var(--hl-border)"></i>Reserved ${fmt(by.reserved)} (${p1(by.reserved)}%)</span>` +
-    `<span><i style="background:var(--border)"></i>Free ${fmt(by.free)} (${p1(by.free)}%)</span>`;
+    `<span><i style="background:var(--ok)"></i>In use ${fmt(by.used)} addresses (${p1(by.used)})</span>` +
+    `<span><i style="background:var(--hl-border)"></i>Reserved ${fmt(by.reserved)} (${p1(by.reserved)})</span>` +
+    `<span><i style="background:var(--border)"></i>Free ${fmt(by.free)} (${p1(by.free)})</span>`;
 
   const w = [classTags(state.network, state.mask)];
   if (CLOUDS[settings.cloud].max && state.mask < CLOUDS[settings.cloud].max) w.push(`<span class="tag danger">${CLOUDS[settings.cloud].label} CIDR blocks must be between /${CLOUDS[settings.cloud].max} and /${CLOUDS[settings.cloud].min}</span>`);
@@ -251,7 +251,7 @@ const renderBlocks = () => {
     const on = i === state.active;
     card.className = 'net-card' + (on ? ' editing' : '');
     card.dataset.cidr = blockCidr(b);
-    const bar = `<div class="nc-bar" title="In use ${Math.round((by.used / tot) * 100)}%, reserved ${Math.round((by.reserved / tot) * 100)}%"><i style="width:${(by.used / tot) * 100}%;background:var(--ok)"></i><i style="width:${(by.reserved / tot) * 100}%;background:var(--hl-border)"></i></div>`;
+    const bar = `<div class="nc-bar" title="In use ${pctFmt((by.used / tot) * 100, 0)}, reserved ${pctFmt((by.reserved / tot) * 100, 0)}"><i style="width:${(by.used / tot) * 100}%;background:var(--ok)"></i><i style="width:${(by.reserved / tot) * 100}%;background:var(--hl-border)"></i></div>`;
     const subs = `${fmt(leaves.length)} subnet${leaves.length === 1 ? '' : 's'}${peers ? ` · ⇄ ${peers}` : ''}`;
     if (on) {
       // The selected card is a group of fields (the editor), not a button.
@@ -545,7 +545,7 @@ const render = () => {
         td.style.setProperty('--h', String(hueFor(anc.mask)));
         td.rowSpan = span;
         const gkey = cidrStr(anc.addr, anc.mask), gname = getMeta(gkey).n || '';
-        td.title = `Join ${span} subnets into ${gname ? gname + ' (' + gkey + ')' : gkey}`;
+        td.title = `Join ${fmt(span)} subnets into ${gname ? gname + ' (' + gkey + ')' : gkey}`;
         // A real button joins; the rename button sits beside it (not inside, where screen readers can't reach it).
         td.innerHTML = `<button type="button" class="bar-join" aria-label="${esc(td.title)}">${gname ? `<span class="gname">${esc(gname)}</span>` : ''}/${anc.mask}</button><span class="hint" aria-hidden="true">join</span>`;
         // Name or rename the group, except on the base network's own bar (its name is on the network card).
@@ -566,7 +566,7 @@ const render = () => {
         td.addEventListener('mouseleave', () => hl(false));
         td.addEventListener('focusin', () => hl(true));
         td.addEventListener('focusout', () => hl(false));
-        const doJoin = () => { checkpoint(); anc.node.c = null; update(); toast(`Joined ${span} subnets into ${cidrStr(anc.addr, anc.mask)}`, UNDO); };
+        const doJoin = () => { checkpoint(); anc.node.c = null; update(); toast(`Joined ${fmt(span)} subnets into ${cidrStr(anc.addr, anc.mask)}`, UNDO); };
         td.addEventListener('click', (e) => { if (!/** @type {any} */ (e.target).closest('.gedit, .gedit-in')) doJoin(); });
         tr.appendChild(td);
       }
@@ -644,7 +644,7 @@ const keyJoin = () => {
   parent.c = null;
   selKey = cidrStr(pa, r.mask - 1);
   update();
-  toast(`Joined ${n} subnets into ${selKey}`, UNDO);
+  toast(`Joined ${fmt(n)} subnets into ${selKey}`, UNDO);
 };
 const keyStatus = () => {
   const r = selRow();
@@ -761,7 +761,7 @@ const renderMap = () => {
       const start = i, cellEnd = state.network + (cell + 1) * size(u);
       while (i < rows.length && rows[i].addr < cellEnd) i++;
       const inside = rows.slice(start, i);
-      const d = mk(r, start, 'mix', `${cidrStr(state.network + cell * size(u), u)}: ${inside.length} subnets\n` + inside.slice(0, 12).map(leafTitle).join('\n') + (inside.length > 12 ? `\n…and ${inside.length - 12} more` : ''));
+      const d = mk(r, start, 'mix', `${cidrStr(state.network + cell * size(u), u)}: ${fmt(inside.length)} subnets\n` + inside.slice(0, 12).map(leafTitle).join('\n') + (inside.length > 12 ? `\n…and ${inside.length - 12} more` : ''));
       d.style.gridColumn = `${col + 1}`;
       d.style.gridRow = `${row + 1}`;
       if (inside.some(clashes)) d.classList.add('clash');
@@ -952,7 +952,7 @@ $('addForm').addEventListener('submit', (e) => {
     const existingNode = findNode(b, p.addr, p.mask);
     if (existingNode && existingNode.c) {
       const n = leafCount(existingNode);
-      if (!confirm(`${p.cidr} is already divided into ${n} subnets. Join them into one?`)) return;
+      if (!confirm(`${p.cidr} is already divided into ${fmt(n)} subnets. Join them into one?`)) return;
     }
     checkpoint();
     state.active = bi;
@@ -1152,5 +1152,5 @@ const buildCsv = (onlyVisible) => {
 };
 $('csvBtn').addEventListener('click', async () => {
   const { text, ncols } = buildCsv(true);
-  toast((await copyText(text)) ? `Copied ${rows.length} rows (${ncols} columns) as CSV` : 'Couldn’t copy CSV');
+  toast((await copyText(text)) ? `Copied ${fmt(rows.length)} rows (${ncols} columns) as CSV` : 'Couldn’t copy CSV');
 });

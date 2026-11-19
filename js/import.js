@@ -144,13 +144,13 @@ const ipamPlan = (rows, source) => {
   const inside = (c) => { for (let m = c.mask - 1; m >= 0; m--) if (seen.has(cidrStr(netAddr(c.addr, m), m))) return true; return false; };
   const roots = all.filter((x) => !inside(x.c));
   const MAX_ROOTS = 256;
-  if (roots.length > MAX_ROOTS) throw new Error(`That ${source} data has ${roots.length} top-level prefixes, each of which would be a base network here (at most ${MAX_ROOTS}). Export one site, VRF or container at a time.`);
+  if (roots.length > MAX_ROOTS) throw new Error(`That ${source} data has ${fmt(roots.length)} top-level prefixes, each of which would be a base network here (at most ${MAX_ROOTS}). Export one site, VRF or container at a time.`);
   const defs = roots.map((x) => ({ c: { addr: x.c.addr, mask: x.c.mask }, tree: null, cloud: settings.cloud, label: x.name.slice(0, 40) }))
     .sort((a, b) => a.c.addr - b.c.addr);
   // A container only names its base network (or its group); every other prefix becomes a subnet with its details.
   const entries = all.filter((x) => !(x.status === 'container' && roots.includes(x)))
     .map((x) => ({ ...x.c, n: x.name, v: x.vid, o: x.notes, s: x.status === 'container' ? '' : x.status }));
-  const notes = [v6 ? `Skipped ${v6} IPv6 prefix${v6 === 1 ? '' : 'es'}` : '', dup ? `skipped ${dup} duplicate${dup === 1 ? '' : 's'} (the same prefix in another VRF)` : ''].filter(Boolean);
+  const notes = [v6 ? `Skipped ${fmt(v6)} IPv6 prefix${v6 === 1 ? '' : 'es'}` : '', dup ? `skipped ${fmt(dup)} duplicate${dup === 1 ? '' : 's'} (the same prefix in another VRF)` : ''].filter(Boolean);
   return { defs, entries, source, guessed: 0, ipam: true, notes };
 };
 // A NetBox or phpIPAM CSV, from its header: NetBox has a Prefix column and no Name; phpIPAM has Subnet and Mask.
@@ -303,12 +303,12 @@ const importHosts = (text) => {
     const h = cleanHost([ni >= 0 ? r[ni] : '', mi >= 0 ? r[mi] : '', oi >= 0 ? r[oi] : '']);
     if (h) adds.push([ntoa(ip), h]); else bad++;
   }
-  if (!adds.length) throw new Error(outside ? `None of the ${outside} addresses are inside this plan (${state.blocks.map(blockCidr).join(', ')}).` : 'No addresses with a name or MAC found.');
+  if (!adds.length) throw new Error(outside ? `None of the ${fmt(outside)} addresses are inside this plan (${state.blocks.map(blockCidr).join(', ')}).` : 'No addresses with a name or MAC found.');
   checkpoint();
   for (const [ip, h] of adds) { state.hosts[ip] = h; added++; }
   hostsChanged();
   update();
-  return `Assigned ${added} IP address${added === 1 ? '' : 'es'} in the current plan${outside ? `. Skipped ${outside} outside it` : ''}${bad ? `${outside ? ',' : '. Skipped'} ${bad} without a valid address or a name` : ''}.`;
+  return `Assigned ${fmt(added)} IP address${added === 1 ? '' : 'es'} in the current plan${outside ? `. Skipped ${fmt(outside)} outside it` : ''}${bad ? `${outside ? ',' : '. Skipped'} ${fmt(bad)} without a valid address or a name` : ''}.`;
 };
 const isHostCsv = (text) => {
   const t = String(text || '').replace(/^\uFEFF/, '').trim();
@@ -330,7 +330,7 @@ const doImport = (text) => {
     const guess = cloud && cloud.guessed ? ` ${cloud.guessed === 1 ? 'One network’s' : `${cloud.guessed} networks’`} address space wasn’t in the paste, so ${cloud.guessed === 1 ? 'it is' : 'they are'} the smallest block covering ${cloud.guessed === 1 ? 'its' : 'their'} subnets.${cloud.source === 'AWS' ? ' Paste the describe-vpcs output too for the real VPC ranges.' : ''}` : '';
     const from = cloud ? ` from ${cloud.source}${cloud.ipam ? '' : ', marked in use,'}` : '';
     const ipamNotes = cloud && cloud.ipam && cloud.notes.length ? ` ${cloud.notes.join(', ').replace(/^./, (ch) => ch.toUpperCase())}.` : '';
-    showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'}${from} into ${where}${skipped ? `. Skipped ${skipped} that didn’t fit a base network (overlapping networks keep the first)` : ''}.${guess}${ipamNotes}`, 'ok');
+    showMsg('imMsg', `Imported ${fmt(count)} subnet${count === 1 ? '' : 's'}${from} into ${where}${skipped ? `. Skipped ${fmt(skipped)} that didn’t fit a base network (overlapping networks keep the first)` : ''}.${guess}${ipamNotes}`, 'ok');
     renderExport();
   } catch (e) {
     showMsg('imMsg', e.message, 'error');

@@ -23,6 +23,8 @@ const lastAddr = (addr, mask) => addr + size(mask) - 1;
 // format, like the English text around them, so a file reads the same wherever it was made.
 const fmt = (n) => n.toLocaleString();
 const fmtDoc = (n) => n.toLocaleString('en-US');
+// A percentage on screen (v from 0 to 100), the visitor's way: 12.5% in the US, 12,5 % in Germany.
+const pctFmt = (v, digits = 1) => (v / 100).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: digits, maximumFractionDigits: digits });
 const cidrStr = (a, m) => `${ntoa(a)}/${m}`;
 const inBlock = (ip, a, m) => ip >= a && ip <= lastAddr(a, m);
 const overlaps = (a1, m1, a2, m2) => a1 <= lastAddr(a2, m2) && a2 <= lastAddr(a1, m1);

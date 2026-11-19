@@ -43,7 +43,7 @@ $('ovRun').addEventListener('click', () => {
         const n = getMeta(r.key).n;
         return `${rel ? esc(rel) + ' ' : ''}<b class="mono">${r.key}</b>${n ? ` (${esc(n)})` : ''}`;
       });
-      res = `<span class="tag danger">Overlaps ${hits.length}</span> ${shown.join(', ')}${hits.length > 6 ? `, +${hits.length - 6} more` : ''}`;
+      res = `<span class="tag danger">Overlaps ${fmt(hits.length)}</span> ${shown.join(', ')}${hits.length > 6 ? `, +${fmt(hits.length - 6)} more` : ''}`;
     }
     const fix = e.aligned ? '' : ` <span class="tag muted" title="Host bits were set in ${esc(e.raw)}">from ${esc(ntoa(e.ip))}</span>`;
     html += `<tr><td class="mono"><b>${e.cidr}</b>${fix}</td><td>${esc(e.label || '—')}</td><td style="white-space:normal">${res}</td></tr>`;
@@ -59,7 +59,7 @@ $('ovRun').addEventListener('click', () => {
   html += pairs.length
     ? `<div><span class="lbl">Overlaps among the existing networks</span><ul>${pairs.map((p) => `<li>${p}</li>`).join('')}</ul></div>`
     : '<div class="stat-line">No overlaps among the existing networks.</div>';
-  html = `<div class="msg show ${clashCount ? 'error' : 'ok'}">${clashCount ? `${clashCount} of ${list.length} existing networks clash with ${esc(planName)}.` : `None of the ${list.length} networks clash with ${esc(planName)}.`}</div>` + html;
+  html = `<div class="msg show ${clashCount ? 'error' : 'ok'}">${clashCount ? `${fmt(clashCount)} of ${fmt(list.length)} existing networks clash with ${esc(planName)}.` : `None of the ${fmt(list.length)} networks clash with ${esc(planName)}.`}</div>` + html;
   out.innerHTML = html + html6;
 });
 // IPv6 part of the overlap checker: against the IPv6 plan and among the pasted prefixes.
@@ -79,7 +79,7 @@ const ovHtml6 = (list6) => {
         const k = v6Key(lf.a, lf.m), rel = relation6(e.a, e.m, lf.a, lf.m), n = v6Get(k).n;
         return `${rel ? esc(rel) + ' ' : ''}<b class="mono">${esc(k)}</b>${n ? ` (${esc(n)})` : ''}`;
       });
-      res = `<span class="tag danger">Overlaps ${hits.length}</span> ${shown.join(', ')}${hits.length > 6 ? `, +${hits.length - 6} more` : ''}`;
+      res = `<span class="tag danger">Overlaps ${fmt(hits.length)}</span> ${shown.join(', ')}${hits.length > 6 ? `, +${fmt(hits.length - 6)} more` : ''}`;
     }
     const fix = e.aligned ? '' : ' <span class="tag muted" title="Host bits were set">adjusted</span>';
     html += `<tr><td class="mono"><b>${esc(e.cidr)}</b>${fix}</td><td>${esc(e.label || '—')}</td><td style="white-space:normal">${res}</td></tr>`;
@@ -93,7 +93,7 @@ const ovHtml6 = (list6) => {
   html += pairs.length
     ? `<div><span class="lbl">Overlaps among the existing IPv6 prefixes</span><ul>${pairs.map((x) => `<li>${x}</li>`).join('')}</ul></div>`
     : '<div class="stat-line">No overlaps among the existing IPv6 prefixes.</div>';
-  return `<div class="msg show ${clash ? 'error' : 'ok'}" style="margin-top:12px">${clash ? `${clash} of ${list6.length} IPv6 prefixes clash with your IPv6 plan (${esc(planName)}).` : `None of the ${list6.length} IPv6 prefixes clash with your IPv6 plan (${esc(planName)}).`}</div>` + html;
+  return `<div class="msg show ${clash ? 'error' : 'ok'}" style="margin-top:12px">${clash ? `${fmt(clash)} of ${fmt(list6.length)} IPv6 prefixes clash with your IPv6 plan (${esc(planName)}).` : `None of the ${fmt(list6.length)} IPv6 prefixes clash with your IPv6 plan (${esc(planName)}).`}</div>` + html;
 };
 $('ovClear').addEventListener('click', () => { existing = []; existing6 = []; $('ovIn').value = ''; $('ovOut').innerHTML = ''; update(); renderV6(); });
 
@@ -162,7 +162,7 @@ const runSummarize = () => {
   const extra = size(sup.mask) - covered;
   let html = '';
   if (bad.length) html += `<div class="msg show error">Skipped: ${bad.map(esc).join(', ')}</div>`;
-  html += `<div class="stat-line"><b>${list.length}</b> networks → <b>${exact.length}</b> route${exact.length > 1 ? 's' : ''} covering exactly the same ${fmt(covered)} addresses.</div>`;
+  html += `<div class="stat-line"><b>${fmt(list.length)}</b> networks → <b>${fmt(exact.length)}</b> route${exact.length > 1 ? 's' : ''} covering exactly the same ${fmt(covered)} addresses.</div>`;
   html += `<div><span class="lbl">Exact summary</span><div class="codebox" style="margin-top:6px">${exact.map((c) => `<code>${cidrStr(c.addr, c.mask)}</code>`).join('')}</div>
       <div style="margin-top:8px"><button type="button" class="small" id="sumCopy" data-routes="${esc(exact.map((c) => cidrStr(c.addr, c.mask)).join('\n'))}">Copy routes</button></div></div>`;
   html += `<div><span class="lbl">Single supernet</span><div class="codebox" style="margin-top:6px"><code>${cidrStr(sup.addr, sup.mask)}</code></div>
@@ -192,7 +192,7 @@ const summarize6Html = (list6) => {
   const covered = merged.reduce((t, [st, e]) => t + (e - st + 1n), 0n);
   const extra = size6(sup.m) - covered;
   const routes = exact.map((c) => v6Key(c.a, c.m));
-  return `<div class="stat-line" style="margin-top:8px"><b>${list6.length}</b> IPv6 prefix${list6.length > 1 ? 'es' : ''} → <b>${exact.length}</b> route${exact.length > 1 ? 's' : ''} covering exactly the same space.</div>` +
+  return `<div class="stat-line" style="margin-top:8px"><b>${fmt(list6.length)}</b> IPv6 prefix${list6.length > 1 ? 'es' : ''} → <b>${fmt(exact.length)}</b> route${exact.length > 1 ? 's' : ''} covering exactly the same space.</div>` +
     `<div><span class="lbl">Exact IPv6 summary</span><div class="codebox" style="margin-top:6px">${routes.map((r) => `<code>${esc(r)}</code>`).join('')}</div>` +
     `<div style="margin-top:8px"><button type="button" class="small" data-routes="${esc(routes.join('\n'))}">Copy IPv6 routes</button></div></div>` +
     `<div><span class="lbl">Single IPv6 supernet</span><div class="codebox" style="margin-top:6px"><code>${esc(v6Key(sup.a, sup.m))}</code></div>` +

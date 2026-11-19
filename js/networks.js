@@ -94,7 +94,7 @@ const azPreview = () => {
   if (res.errors.length || !res.vnets) sum.textContent = res.errors.length === 1 ? 'Can’t apply yet: see the problem above' : `Can’t apply yet: see the ${res.errors.length} problems above`;
   else {
     const n = res.vnets.reduce((t, v) => t + v.reqs.length, 0);
-    sum.textContent = `${res.vnets.length} ${tpl.net}${res.vnets.length === 1 ? '' : 's'} · ${n} subnet${n === 1 ? '' : 's'}`;
+    sum.textContent = `${res.vnets.length} ${tpl.net}${res.vnets.length === 1 ? '' : 's'} · ${fmt(n)} subnet${n === 1 ? '' : 's'}`;
   }
   const notes = res.notes.length ? `<div class="msg show info">${res.notes.map(esc).join('<br>')}</div>` : '';
   if (res.errors.length || !res.vnets) { $('azOut').innerHTML = `<div class="msg show error">${res.errors.map(esc).join('<br>')}</div>` + notes; return res; }
@@ -310,7 +310,7 @@ const siteCalc = () => {
   let smallest = space.mask;
   for (let m = space.mask + 1; m <= 30; m++) { const f = run(m); if (f.tooBig.length || f.failed.length) break; smallest = m; }
   const dupV = [...new Set(reqs.map((r) => r.vlan).filter((v, i, a) => v && a.indexOf(v) !== i))];
-  const parts = [`${fit.placed.length} subnets use ${fmt(fit.needTotal)} of ${fmt(size(space.mask))} addresses (${((fit.needTotal / size(space.mask)) * 100).toFixed(1)}%)`];
+  const parts = [`${fmt(fit.placed.length)} subnets use ${fmt(fit.needTotal)} of ${fmt(size(space.mask))} addresses (${pctFmt((fit.needTotal / size(space.mask)) * 100)})`];
   if (smallest > space.mask) parts.push(`they’d fit in a /${smallest}`);
   if (dupV.length) parts.push(`VLAN ${dupV.join(', ')} is used twice`);
   const same = space.addr === state.network && space.mask === state.mask;
@@ -367,7 +367,7 @@ $('siteApply').addEventListener('click', () => {
   $('siteDlg').close();
   syncControls(); update();
   showTab('plan');
-  toast(`Applied ${fit.placed.length} subnets`, UNDO);
+  toast(`Applied ${fmt(fit.placed.length)} subnets`, UNDO);
 });
 $('azCloud').addEventListener('change', () => openAz($('azCloud').value));
 $('azSpace').addEventListener('input', () => { tplState[tpl.cloud].space = $('azSpace').value; azPreview(); });
@@ -420,7 +420,7 @@ $('azApply').addEventListener('click', () => {
   syncControls();
   update();
   const sp = res.vnets.length - 1;
-  toast(single ? `Applied a ${tpl.net} with ${n} subnets.` : `Applied a hub and ${sp} spoke${sp === 1 ? '' : 's'} with ${n} subnets. Switch ${tpl.net}s with the buttons above.`, UNDO);
+  toast(single ? `Applied a ${tpl.net} with ${fmt(n)} subnets.` : `Applied a hub and ${sp} spoke${sp === 1 ? '' : 's'} with ${fmt(n)} subnets. Switch ${tpl.net}s with the buttons above.`, UNDO);
 });
 
 // =====================================================================

@@ -141,7 +141,7 @@ $('vlsmRun').addEventListener('click', () => {
   if (placed.length) {
     html += mode === 'fill'
       ? `<div class="stat-line">Places <b>${placed.length}</b> subnet${placed.length > 1 ? 's' : ''} using <b>${fmt(needTotal)}</b> addresses in free space. Existing subnets are kept.</div>`
-      : `<div class="stat-line">Uses <b>${fmt(needTotal)}</b> of ${fmt(size(state.mask))} addresses (<b>${((needTotal / size(state.mask)) * 100).toFixed(1)}%</b>)${headroom ? `, with ${headroom}% growth headroom` : ''}.</div>`;
+      : `<div class="stat-line">Uses <b>${fmt(needTotal)}</b> of ${fmt(size(state.mask))} addresses (<b>${pctFmt((needTotal / size(state.mask)) * 100)}</b>)${headroom ? `, with ${headroom}% growth headroom` : ''}.</div>`;
     html += `<div class="table-wrap"><table><thead><tr><th>Name</th><th>VLAN</th>${zones.length ? '<th>Zone</th>' : ''}<th class="num">Needs</th>`;
     html += '<th>Subnet</th><th class="num">Usable</th><th class="num">Spare</th><th>Usable range</th></tr></thead><tbody>';
     for (const r of placed) {
@@ -182,5 +182,5 @@ $('vlsmApply').addEventListener('click', () => {
   if (plan.placed.some((r) => r.zone) && !visible.zone) showColumn('zone');
   update();
   showTab('plan');
-  toast(`Applied ${plan.placed.length} subnets`, UNDO);
+  toast(`Applied ${fmt(plan.placed.length)} subnets`, UNDO);
 });

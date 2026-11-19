@@ -44,7 +44,7 @@ const renderBackup = (list) => {
   box.classList.toggle('done', !stale);
   txt.textContent = !stale ? `All saved plans backed up ${when(at)}.`
     : !at ? `Your saved plans aren’t backed up yet: they live only in this browser.${risk} Back them up to a file.`
-      : `${stale} saved plan${stale === 1 ? '' : 's'} changed since your last backup on ${when(at)}.${risk}`;
+      : `${fmt(stale)} saved plan${stale === 1 ? '' : 's'} changed since your last backup on ${when(at)}.${risk}`;
 };
 const setCurrentPlan = (id) => {
   currentPlanId = id;
@@ -184,7 +184,7 @@ const exportPlans = () => {
   const stamp = new Date();
   download(`ip-plan-o-matic-plans-${stamp.toISOString().slice(0, 10)}.json`, JSON.stringify({ format: 'ip-plan-o-matic-plans', version: 1, exported: stamp.toISOString(), plans: list }, null, 2), 'application/json');
   try { localStorage.setItem(BACKUP_KEY, String(stamp.getTime())); } catch (e) { /* ignore */ }
-  showMsg('plansMsg', `Backed up ${list.length} plan${list.length === 1 ? '' : 's'}. Import… brings them back, here or on another device.`, 'ok');
+  showMsg('plansMsg', `Backed up ${fmt(list.length)} plan${list.length === 1 ? '' : 's'}. Import… brings them back, here or on another device.`, 'ok');
   renderBackup(list);
 };
 $('plansExport').addEventListener('click', exportPlans);
@@ -205,7 +205,7 @@ $('plansImport').addEventListener('change', () => {
       all.push({ id: all.some((y) => y.id === x.id) || !x.id ? newId() : String(x.id), name: x.name.slice(0, 80), hash: x.hash, updated: Number(x.updated) || Date.now() });
       added++;
     }
-    if (writePlans(all)) { showMsg('plansMsg', `Imported ${added} plan${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} (duplicates or unreadable)` : ''}.`, 'ok'); renderPlans(); }
+    if (writePlans(all)) { showMsg('plansMsg', `Imported ${fmt(added)} plan${added === 1 ? '' : 's'}${skipped ? `, skipped ${fmt(skipped)} (duplicates or unreadable)` : ''}.`, 'ok'); renderPlans(); }
   });
 });
 
