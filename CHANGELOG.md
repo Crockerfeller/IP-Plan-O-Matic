@@ -5,6 +5,8 @@ date. The build number in the app's footer is the commit it was built from.
 
 ## 2026-11-18
 
+- **Content Security Policy:** the app and guides can only run their own script files, so a malicious plan link
+  couldn't run code even if a bug let its text through.
 - **Accessibility:** checked against WCAG 2.2 AA in light and dark themes on every release. Text colors have more
   contrast, every field has a label, and screen readers can now reach the rename button on group bars.
 - **Fonts are self-hosted:** the page makes no requests to Google or anyone else.

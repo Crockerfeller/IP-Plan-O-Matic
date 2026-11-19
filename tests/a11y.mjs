@@ -29,6 +29,8 @@ const cleanup = () => { server.kill(); rmSync(site, { recursive: true, force: tr
 await new Promise((r) => setTimeout(r, 800));
 const BASE = `http://127.0.0.1:${port}/`;
 
+// Anything the Content Security Policy blocks on these pages is a failure too.
+const cspBlocks = new Set();
 const problems = new Map();   // rule id -> { impact, help, url, where: Set, nodes: [] }
 let scans = 0;
 async function scan(page, where, include) {
@@ -51,6 +53,7 @@ try {
   for (const theme of ['light', 'dark']) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1400, height: 1000 } });
     const page = await context.newPage();
+    page.on('console', (m) => { if (/Content.Security.Policy/i.test(m.text())) cspBlocks.add(`${theme}: ${m.text()}`); });
     // The app: a /22 split a few times, named, with a VLAN, so the table, map and bars all render.
     await page.goto(BASE + 'index.html#10.0.0.0/22');
     for (let i = 0; i < 3; i++) await page.locator('#body tr .col-divide button').first().click();
@@ -85,6 +88,7 @@ try {
     // A sample of the guides.
     const gctx = await browser.newContext({ colorScheme: theme });
     const gp = await gctx.newPage();
+    gp.on('console', (m) => { if (/Content.Security.Policy/i.test(m.text())) cspBlocks.add(`${theme} guide: ${m.text()}`); });
     for (const g of GUIDES) { await gp.goto(BASE + g); await settle(gp); await scan(gp, `${theme}: ${g}`); }
     await gctx.close();
   }
@@ -106,4 +110,5 @@ for (const [id, p] of [...problems].sort((a, b) => order[a[1].impact] - order[b[
   if (p.nodes.size > max) console.log(`    …and ${p.nodes.size - max} more (A11Y_ALL=1 lists them all)`);
 }
 console.log(problems.size ? `  ${problems.size} rules failed` : '  no violations');
-process.exit(problems.size ? 1 : 0);
+for (const c of cspBlocks) console.log('  FAIL CSP ' + c.slice(0, 400));
+process.exit(problems.size || cspBlocks.size ? 1 : 0);

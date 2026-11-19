@@ -53,6 +53,9 @@ try {
       // A fresh context per suite, like run.sh's fresh Chrome profile: no storage carried over.
       const context = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
       const page = await context.newPage();
+      // Anything the Content Security Policy blocks is a failure, except the tests' own probe (T.csp), whose URL says cspProbe.
+      const csp = [];
+      page.on('console', (m) => { if (/Content.Security.Policy/i.test(m.text()) && !/cspProbe/.test(m.text())) csp.push(m.text()); });
       console.log(`== ${name} ${suite}`);
       let d;
       try {
@@ -67,9 +70,10 @@ try {
       }
       for (const r of d.results) if (!r.startsWith('PASS')) console.log('  ' + r.slice(0, 600));
       for (const e of d.errors) console.log('  ERROR ' + e.slice(0, 600));
+      for (const e of csp) console.log('  CSP ' + e.slice(0, 600));
       const passed = d.results.filter((r) => r.startsWith('PASS')).length;
       console.log(`  ${passed} passed, ${d.failures} failed${d.errors.length ? `, ${d.errors.length} page errors` : ''}`);
-      if (d.failures || d.errors.length) failed = true;
+      if (d.failures || d.errors.length || csp.length) failed = true;
       await context.close();
     }
     await browser.close();

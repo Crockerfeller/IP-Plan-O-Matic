@@ -927,7 +927,7 @@ T.comparePlans = async () => {
   divideRow(0); await sleep(20);
   await setRow('10.0.0.0/25', 'Users', '10', 'used');
   await setRow('10.0.0.128/25', 'Servers', '20', 'used');
-  await W.eval('Promise.resolve()'); await sleep(400);
+  await W.Promise.resolve(); await sleep(400);
   const before = W.location.href;
   // After: Users renamed and moved to VLAN 11, Servers split into two /26s (one named), and a second network.
   await setRow('10.0.0.0/25', 'Staff', '11', null);
@@ -951,7 +951,7 @@ T.comparePlans = async () => {
   check('compare: copy as Markdown', copied.startsWith('Changes from the pasted link to the current plan:') && copied.includes('| Changed | 10.0.0.0/25 | name: Users; VLAN: 10 | name: Staff; VLAN: 11 |'), copied);
   // The other way round: joined, removed.
   click('#tb-plan');
-  await W.eval('Promise.resolve()'); await sleep(400);
+  await W.Promise.resolve(); await sleep(400);
   const after = W.location.href;
   await load(before);
   [, rows] = await cmp(after);
@@ -1017,7 +1017,7 @@ T.ipAssign = async () => {
   click('#undoBtn'); await sleep(30);
   click('#redoBtn'); await sleep(30);
   // Links keep them; joining the subnets keeps them too, because they're kept by address.
-  await W.eval('Promise.resolve()'); await sleep(400);
+  await W.Promise.resolve(); await sleep(400);
   const link = W.location.href;
   await load(link);
   check('hosts: link round trip', hostsBtn(0).textContent === '3 / 126', hostsBtn(0).textContent);
@@ -1086,7 +1086,7 @@ T.azureHubSpoke = async () => {
   const rowsHub = snap().rows;
   check('hub rows named', rowsHub.length === 7 && rowsHub.some((r) => r.startsWith('10.0.0.64/26') && r.includes('[AzureBastionSubnet]') && r.includes('[used]')), rowsHub);
   check('no azure warnings on defaults', !/must be|exact name/.test($('warnings').textContent), $('warnings').textContent);
-  await W.eval('Promise.resolve()'); await sleep(400);
+  await W.Promise.resolve(); await sleep(400);
   const link = W.location.hash;
   click('#tb-export'); select('#exFmt', 'tf-azure');
   const tf = $('exOut').value;
@@ -1336,7 +1336,7 @@ T.peering = async () => {
   t = tf('tf-azure');
   check('tf-azure gateway transit', /"hub_to_spoke_workload" \{[^}]*allow_gateway_transit     = true/.test(t) && /"spoke_workload_to_hub" \{[^}]*use_remote_gateways       = true/.test(t), t.slice(-2500));
   check('tf-azure hub and spoke only', !t.includes('spoke_workload_to_spoke_2'));
-  await W.eval('Promise.resolve()'); await sleep(400);
+  await W.Promise.resolve(); await sleep(400);
   const link = W.location.hash;
   click('#tb-export'); select('#exFmt', 'json');
   const js = JSON.parse($('exOut').value);
@@ -1696,6 +1696,40 @@ T.assets = async () => {
   check('assets: service worker caches the same URLs', sw.includes(`'./app.css?v=${tag}'`) && sw.includes(`'./app.js?v=${tag}'`));
   const ok = await Promise.all([`../app.css?v=${tag}`, `../app.js?v=${tag}`].map((u) => fetch(u, { cache: 'no-store' }).then((r) => r.ok)));
   check('assets: both files are served', ok.every(Boolean), ok);
+};
+// The Content Security Policy: only the site's own script files run. A policy that's present but too loose, or one that
+// blocks the app's own needs, would both fail here; tests/lib.js reports anything it blocks as a page error.
+T.csp = async () => {
+  await load('../index.html#10.0.0.0/24');
+  const policy = (D.querySelector('meta[http-equiv="Content-Security-Policy"]') || {}).content || '';
+  const dir = Object.fromEntries(policy.split(';').map((d) => d.trim().split(/\s+/)).filter((d) => d[0]).map(([k, ...v]) => [k, v]));
+  check('csp: the app has a policy, and only its own files may run', (dir['script-src'] || []).join(' ') === "'self'" && (dir['object-src'] || []).join() === "'none'" && (dir['base-uri'] || []).join() === "'none'", policy);
+  W.__cspProbe = true;
+  // An off-site script is refused (its URL says cspProbe, so the Playwright runs know this block is expected).
+  const ext = D.createElement('script');
+  ext.src = 'https://cspprobe.invalid/cspProbe.js';
+  const blocked = new Promise((res) => { ext.onerror = () => res(true); setTimeout(() => res(false), 2000); });
+  D.body.append(ext);
+  check('csp: a script from another site is refused', await blocked);
+  // Injected markup can't run script. (Only where no browser automation is listening: those messages can't be told apart.)
+  if (!navigator.webdriver) {
+    W.__pwned = 0;
+    D.body.insertAdjacentHTML('beforeend', '<img src="data:," onerror="window.__pwned=1"><div id="cspProbe"></div>');
+    const sc = D.createElement('script'); sc.textContent = 'window.__pwned = 2'; D.body.append(sc);
+    await sleep(200);
+    check('csp: injected inline handlers and scripts don’t run', W.__pwned === 0, W.__pwned);
+  }
+  await sleep(100);
+  W.__cspProbe = false;
+  // The app still does everything it needs: styles, the address map, a PNG export (blob and data URLs).
+  click('#tb-export'); select('#exFmt', 'svg'); await sleep(100);
+  check('csp: the SVG preview loads', $('exImg').complete && $('exImg').naturalWidth > 0, $('exImg').naturalWidth);
+  check('csp: inline style attributes still apply', W.getComputedStyle(D.querySelector('#usageBar span')).width !== 'auto');
+  // The guides allow only their theme script, by hash: it still runs.
+  W.localStorage.setItem('subnetPlanner.theme', 'dark');
+  await load('../learn/cidr-cheat-sheet.html');
+  check('csp: the guides’ theme script runs under their policy', D.documentElement.dataset.theme === 'dark' && /script-src 'self' 'sha256-/.test((D.querySelector('meta[http-equiv="Content-Security-Policy"]') || {}).content), D.documentElement.dataset.theme);
+  W.localStorage.removeItem('subnetPlanner.theme');
 };
 T.feedback = async () => {
   await load('../index.html#10.0.0.0/24');

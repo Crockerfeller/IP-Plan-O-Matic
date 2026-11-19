@@ -10,6 +10,9 @@ async function load(url) {
   W = F.contentWindow; D = W.document;
   W.confirm = (m) => { dialogs.push(m); return confirmAnswer; }; W.alert = (m) => dialogs.push(m); W.prompt = (m, d) => { dialogs.push(m); return promptAnswers.length ? promptAnswers.shift() : d; };
   W.addEventListener('error', (e) => errors.push(String(e.message)));
+  // Anything the Content Security Policy blocks from here on is a page error. (tests/browsers.mjs and tests/a11y.mjs
+  // also catch what it blocks while the page loads.)
+  D.addEventListener('securitypolicyviolation', (e) => { if (!W.__cspProbe) errors.push(`CSP blocked ${e.blockedURI || 'inline'} (${e.violatedDirective})`); });
   // capture console errors
   const ce = W.console.error.bind(W.console);
   W.console.error = (...a) => { errors.push(a.map(String).join(' ')); ce(...a); };

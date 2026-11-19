@@ -19,6 +19,8 @@ writes nothing and exits 1 if any generated file differs from what is committed
 (CI runs this, so the guides can't drift from the generator).
 """
 import base64
+import hashlib
+import base64
 import datetime
 import html
 import ipaddress
@@ -186,6 +188,13 @@ LOGO = '''<svg viewBox="3 3 42 42" aria-hidden="true"><rect x="3" y="3" width="1
 PAGES = []  # (slug, title, description) for the hub and sitemap
 
 
+# The theme is set before the page draws, so it can't flash. The Content Security Policy allows exactly this script by
+# its hash and nothing else inline; any other script must be a file on this site.
+THEME_JS = "try { const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}"
+CSP = ("default-src 'self'; script-src 'self' 'sha256-" + base64.b64encode(hashlib.sha256(THEME_JS.encode()).digest()).decode() + "'; "
+       "style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'")
+
+
 def page(slug, title, description, body, h1=None, faq=None, listed=True):
     url = SITE + 'learn/' + ('' if slug == 'index' else slug + '.html')
     crumbs = [('IP Plan-O-Matic', SITE), ('Guides', SITE + 'learn/')]
@@ -210,6 +219,7 @@ def page(slug, title, description, body, h1=None, faq=None, listed=True):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{CSP}">
 <title>{esc(title)} | IP Plan-O-Matic</title>
 <meta name="description" content="{esc(description)}">
 <link rel="canonical" href="{url}">
@@ -227,7 +237,7 @@ def page(slug, title, description, body, h1=None, faq=None, listed=True):
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link href="../fonts/fonts.css" rel="stylesheet">
 <link rel="stylesheet" href="learn.css">
-<script>try {{ const t = localStorage.getItem('subnetPlanner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; }} catch (e) {{}}</script>
+<script>{THEME_JS}</script>
 <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body>

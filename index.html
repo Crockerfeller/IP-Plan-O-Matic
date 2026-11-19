@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Content Security Policy: only this site's own app.js can run, so even an escaping bug can't run injected script.
+     Styles allow inline (the app sets style="" in its markup). connect-src lets a downloaded copy check the live site for updates. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://crockerfeller.github.io; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>IP Plan-O-Matic — Free Visual Subnet Calculator, IPv4/IPv6 Planner &amp; VLSM Tool</title>
 <meta name="description" content="Free browser-based subnet calculator and IP address planner. Divide and join IPv4 subnets visually on a color-coded map, plan several base networks at once, auto-plan with VLSM by host count, track names, VLANs and status, check overlaps, summarize routes, plan IPv6 prefixes, and export Cisco, Junos, MikroTik or Terraform config. Handles AWS, Azure, Google Cloud and Oracle Cloud reserved addresses. Works offline.">
 <meta name="robots" content="index, follow, max-image-preview:large">
