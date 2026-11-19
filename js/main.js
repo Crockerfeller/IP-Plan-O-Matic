@@ -8,6 +8,7 @@
 // =====================================================================
 const PLANS_KEY = 'subnetPlanner.plans';
 const DEFAULT_HASH = '192.168.0.0/24/1.0';
+/** @type {string | null} */
 let currentPlanId = null;
 try { currentPlanId = sessionStorage.getItem('subnetPlanner.planId'); } catch (e) { /* ignore */ }
 const readPlans = () => {
@@ -259,6 +260,7 @@ const ZIP_URL = SITE + 'IP-Plan-O-Matic.zip';
 const OFFICIAL = location.hostname === 'crockerfeller.github.io';
 const short = (sha) => sha.slice(0, 7);
 const RELOAD_TITLE = $('reloadBtn').title;
+/** A newer build on the server, once one is seen. @type {{ sha: string, date: string } | null} */
 let newBuild = null;
 
 // The build number above Reload and in the footer; Reload turns green when a newer build is on the server.
@@ -392,7 +394,7 @@ window.addEventListener('hashchange', async () => {
   const qs = new URLSearchParams(location.search);
   const wiz = qs.get('wizard'), tabQ = qs.get('tab');
   if (wiz || tabQ) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ } }
-  if (TABS.includes(tabQ)) showTab(tabQ);
+  if (tabQ && TABS.includes(tabQ)) showTab(tabQ);
   if (wiz === 'azure' || wiz === 'aws') {
     showTab('plan');
     openAz(wiz);

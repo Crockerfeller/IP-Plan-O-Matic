@@ -53,7 +53,7 @@ npm install                                  # once: ESLint, TypeScript, Playwri
 npx playwright install webkit firefox        # once
 
 npm run lint                                 # ESLint, plus a check for unused names across js/
-npm run typecheck                            # TypeScript over js/ (nothing is compiled)
+npm run typecheck                            # TypeScript over js/, with strict null checks (nothing is compiled)
 tests/run.sh                                 # every browser suite in headless Chrome
 npm run test:browsers                        # the same suites in WebKit (Safari) and Firefox
 npm run test:a11y                            # accessibility, WCAG 2.2 AA, light and dark

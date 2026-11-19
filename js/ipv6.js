@@ -155,6 +155,7 @@ $('v6Csv').addEventListener('click', async () => {
 });
 
 // ---------- IPv6 auto-plan by count ----------
+/** The last auto-plan, until it's applied. @type {{ root: TreeNode, placed: any[], mode: string, before: string } | null} */
 let v6Plan = null;
 const v6Clone = (n) => (n.c ? { c: n.c.map(v6Clone) } : { c: null });
 // Split a free leaf down to addr/len (16-way on nibble boundaries when 4+ bits remain, else halves).

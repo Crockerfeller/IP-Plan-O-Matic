@@ -1,7 +1,8 @@
 {
   // Type-checks the app's scripts in js/ (plain JavaScript, with JSDoc hints where inference needs help). Nothing is compiled:
   // `npm run typecheck` only reports errors, and CI runs it on every push.
-  // strictNullChecks and noImplicitAny are off: turning them on means annotating most of the file.
+  // strictNullChecks is on: a value that may be null or missing has to be checked before it's used.
+  // noImplicitAny is off: requiring a type on every parameter would mean annotating most of the code.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
@@ -10,6 +11,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "skipLibCheck": true,
     "strict": false,
+    "strictNullChecks": true,
     "noImplicitThis": true,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,

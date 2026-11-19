@@ -91,13 +91,13 @@ const azPreview = () => {
   $('azApply').disabled = !!res.errors.length;
   const sum = $('azSum');
   sum.classList.toggle('err', !!res.errors.length);
-  if (res.errors.length) sum.textContent = res.errors.length === 1 ? 'Can’t apply yet: see the problem above' : `Can’t apply yet: see the ${res.errors.length} problems above`;
+  if (res.errors.length || !res.vnets) sum.textContent = res.errors.length === 1 ? 'Can’t apply yet: see the problem above' : `Can’t apply yet: see the ${res.errors.length} problems above`;
   else {
     const n = res.vnets.reduce((t, v) => t + v.reqs.length, 0);
     sum.textContent = `${res.vnets.length} ${tpl.net}${res.vnets.length === 1 ? '' : 's'} · ${n} subnet${n === 1 ? '' : 's'}`;
   }
   const notes = res.notes.length ? `<div class="msg show info">${res.notes.map(esc).join('<br>')}</div>` : '';
-  if (res.errors.length) { $('azOut').innerHTML = `<div class="msg show error">${res.errors.map(esc).join('<br>')}</div>` + notes; return res; }
+  if (res.errors.length || !res.vnets) { $('azOut').innerHTML = `<div class="msg show error">${res.errors.map(esc).join('<br>')}</div>` + notes; return res; }
   let html = notes;
   for (const v of res.vnets) {
     html += `<h4>${esc(v.label)} <span class="mono">${cidrStr(v.addr, v.mask)}</span></h4>`;
@@ -259,12 +259,16 @@ const SITE_PRESETS = [
   ['Lab / test', 50, 140, false],
   ['WAN / ISP link', 2, '', false, 'Point-to-point link to the ISP or another site'],
 ];
-let siteRows = null;   // [{ on, name, hosts, vlan, tip }]: kept while the page is open
+/** The on-prem wizard's rows, kept while the page is open. @type {{ on: any, name: any, hosts: any, vlan: any, tip: any }[] | null} */
+let siteRows = null;
+// The rows, starting from the presets the first time the wizard opens.
+const siteRowsNow = () => siteRows || (siteRows = SITE_PRESETS.map(([name, hosts, vlan, on, tip]) => ({ name, hosts, vlan, on, tip: tip || '' })));
+/** @type {{ fit: any, space: { addr: number, mask: number }, headroom: number } | null} */
 let siteFit = null;
-const siteReqs = () => siteRows.map((r, idx) => ({ ...r, idx })).filter((r) => r.on)
+const siteReqs = () => siteRowsNow().map((r, idx) => ({ ...r, idx })).filter((r) => r.on)
   .map((r) => ({ name: r.name.trim() || `Network ${r.idx + 1}`, hosts: Number(r.hosts), vlan: String(r.vlan).trim() ? String(+r.vlan) : '', idx: r.idx, exact: Number(r.hosts) <= 2 }));
 const siteRender = () => {
-  $('siteBody').innerHTML = siteRows.map((r, i) => `<tr data-i="${i}"${r.on ? '' : ' class="off"'}>` +
+  $('siteBody').innerHTML = siteRowsNow().map((r, i) => `<tr data-i="${i}"${r.on ? '' : ' class="off"'}>` +
     `<td><input type="checkbox" class="site-on" aria-label="Use ${esc(r.name)}"${r.on ? ' checked' : ''}></td>` +
     `<td><input type="text" class="site-name" value="${esc(r.name)}" aria-label="Network name"${r.tip ? ` title="${esc(r.tip)}"` : ''}></td>` +
     `<td class="num"><input type="number" class="site-hosts" min="1" value="${esc(r.hosts)}" aria-label="Devices on ${esc(r.name)}"></td>` +
@@ -298,6 +302,7 @@ const siteCalc = () => {
   for (const r of fit.placed) cells[r.idx].textContent = `${cidrStr(r.addr, r.mask)}  (${fmt(hostInfo(r.addr, r.mask).hosts)} usable)`;
   if (fit.tooBig.length || fit.failed.length) {
     // Say how big the space would need to be.
+    /** @type {number | null} */
     let need = null;
     for (let m = space.mask - 1; m >= 8 && need === null; m--) { const f = vlsmFit(reqs.map((r) => ({ ...r })), { headroom, minM: 30, mode: 'replace', network: 0, mask: m }); if (!f.tooBig.length && !f.failed.length) need = m; }
     return bad(`These don’t fit in ${cidrStr(space.addr, space.mask)}${need !== null ? `: it needs a /${need} or larger` : ''}. Use a bigger space, fewer devices or less headroom.`);
@@ -315,7 +320,7 @@ const siteCalc = () => {
   siteFit = { fit, space, headroom };
 };
 const openSite = () => {
-  if (!siteRows) siteRows = SITE_PRESETS.map(([name, hosts, vlan, on, tip]) => ({ name, hosts, vlan, on, tip: tip || '' }));
+  siteRowsNow();
   // Start from the current base network when it's big enough to hold a site; otherwise suggest a /16.
   $('siteSpace').value = state.mask <= 20 ? blockCidr(blk()) : '10.10.0.0/16';
   $('siteReplace').hidden = !(state.root.c || blockMetaKeys().length);
@@ -323,7 +328,7 @@ const openSite = () => {
   $('siteDlg').showModal();
 };
 $('siteBody').addEventListener('input', (e) => {
-  const tr = e.target.closest('tr'), r = siteRows[+tr.dataset.i];
+  const tr = e.target.closest('tr'), r = siteRowsNow()[+tr.dataset.i];
   if (e.target.classList.contains('site-on')) { r.on = e.target.checked; tr.classList.toggle('off', !r.on); }
   else if (e.target.classList.contains('site-name')) r.name = e.target.value;
   else if (e.target.classList.contains('site-hosts')) r.hosts = e.target.value;
@@ -332,9 +337,9 @@ $('siteBody').addEventListener('input', (e) => {
 });
 for (const id of ['siteSpace', 'siteHead']) $(id).addEventListener('input', siteCalc);
 $('siteAdd').addEventListener('click', () => {
-  const used = new Set(siteRows.map((r) => +r.vlan).filter(Boolean));
+  const used = new Set(siteRowsNow().map((r) => +r.vlan).filter(Boolean));
   let v = 150; while (used.has(v)) v += 10;
-  siteRows.push({ name: '', hosts: 20, vlan: v, on: true, tip: '' });
+  siteRowsNow().push({ name: '', hosts: 20, vlan: v, on: true, tip: '' });
   siteRender();
   $('siteBody').lastElementChild.querySelector('.site-name').focus();
 });
@@ -381,7 +386,7 @@ $('azClose').addEventListener('click', () => $('azDlg').close());
 $('azDlg').addEventListener('click', (e) => { if (e.target === $('azDlg')) $('azDlg').close(); });
 $('azApply').addEventListener('click', () => {
   const res = azPreview();
-  if (res.errors.length) return;
+  if (res.errors.length || !res.vnets) return;   // vnets is there whenever there are no errors
   const single = tplLayout === 'single';
   if (planInUse() && !confirm(`Replace the current IPv4 plan with this ${single ? tpl.net : 'hub and spokes'}?`)) return;
   checkpoint();
@@ -392,7 +397,7 @@ $('azApply').addEventListener('click', () => {
   hostsChanged();
   // Hub and spoke peering to match; the Peering button changes it.
   const hubC = single ? '' : cidrStr(res.vnets[0].addr, res.vnets[0].mask);
-  state.peers = single ? null : res.vnets.slice(1).map((v) => [hubC, cidrStr(v.addr, v.mask)]);
+  state.peers = single ? null : res.vnets.slice(1).map((v) => /** @type {[string, string]} */ ([hubC, cidrStr(v.addr, v.mask)]));
   state.po = { ...PEER_DEFAULTS, h: hubC };
   let n = 0;
   for (const v of res.vnets) for (const r of v.reqs) {
@@ -433,7 +438,8 @@ const peerPreset = () => {
 const peerSync = () => {
   const mode = $('peerMode').value;
   $('peerHubF').hidden = mode !== 'hub';
-  const chosen = peerBoxes().filter((cb) => cb.checked).map((cb) => [blockByCidr(cb.dataset.a), blockByCidr(cb.dataset.b)]);
+  // Each box was drawn for two base networks of the plan, so both are found.
+  const chosen = peerBoxes().filter((cb) => cb.checked).map((cb) => /** @type {[Block, Block]} */ ([blockByCidr(cb.dataset.a || ''), blockByCidr(cb.dataset.b || '')]));
   const az = chosen.filter(([x]) => x.cloud === 'azure'), aws = chosen.filter(([x]) => x.cloud === 'aws');
   const hub = blockByCidr($('peerHub').value);
   const notes = [];
@@ -482,7 +488,8 @@ const openPeer = () => {
   hubSel.innerHTML = '';
   for (const b of bs) hubSel.add(new Option(blockName(b), blockCidr(b)));
   const labeled = bs.find((b) => /^hub$/i.test(b.label || ''));
-  const hub = blockByCidr(po.h) && PEER_CLOUDS.includes(blockByCidr(po.h).cloud) ? po.h : labeled ? blockCidr(labeled) : bs[0] ? blockCidr(bs[0]) : '';
+  const ph = blockByCidr(po.h);
+  const hub = ph && PEER_CLOUDS.includes(ph.cloud) ? po.h : labeled ? blockCidr(labeled) : bs[0] ? blockCidr(bs[0]) : '';
   if (hub) hubSel.value = hub;
   $('peerMode').value = state.peers ? po.m : 'hub';
   $('peerFwd').checked = !!po.f;
@@ -503,7 +510,7 @@ $('peerDlg').addEventListener('click', (e) => { if (e.target === $('peerDlg')) $
 $('peerSave').addEventListener('click', () => {
   const hub = $('peerHub').value, mode = $('peerMode').value;
   // Hub first in each pair, so gateway transit and routes know which side is the hub.
-  const pairs = peerBoxes().filter((cb) => cb.checked).map((cb) => (cb.dataset.b === hub ? [cb.dataset.b, cb.dataset.a] : [cb.dataset.a, cb.dataset.b]));
+  const pairs = peerBoxes().filter((cb) => cb.checked).map((cb) => /** @type {[string, string]} */ (cb.dataset.b === hub ? [cb.dataset.b, cb.dataset.a] : [cb.dataset.a, cb.dataset.b]));
   checkpoint();
   state.peers = pairs;
   state.po = cleanPo({ m: mode, h: hub, f: $('peerFwd').checked ? 1 : 0, g: $('peerGw').checked ? 1 : 0, t: $('peerType').value, r: $('peerRoutes').checked ? 1 : 0 });

@@ -6,6 +6,7 @@
 // =====================================================================
 // VLSM tab
 // =====================================================================
+/** The last plan, until it's applied. @type {{ placed: any[], root: TreeNode, mode: string, active: number, base: string, before: string } | null} */
 let vlsmPlan = null;
 // Leaves of a tree no bigger than maxMask that aren't occupied.
 const freeLeavesOf = (root, baseA, baseM, maxMask, occupied) => {
@@ -22,6 +23,7 @@ const freeLeavesOf = (root, baseA, baseM, maxMask, occupied) => {
 const bestFit = (root, baseA, baseM, reqs, occupied, taken) => {
   const busy = (k) => taken.has(k) || occupied(k);
   for (const r of reqs) {
+    /** @type {{ addr: number, mask: number } | null} */
     let best = null;
     for (const f of freeLeavesOf(root, baseA, baseM, r.mask, busy)) if (!best || f.mask > best.mask || (f.mask === best.mask && f.addr < best.addr)) best = f;
     r.addr = best ? best.addr : null;
@@ -47,7 +49,7 @@ $('vlsmCloudEx').addEventListener('click', () => {
       checkpoint();
       clearBlockMeta();
       const oldC = blockCidr(blk());
-      state.network = aton('10.20.0.0'); state.mask = 16; state.root = { c: null };
+      state.network = builtIn(aton, '10.20.0.0'); state.mask = 16; state.root = { c: null };
       renamePeers(oldC, blockCidr(blk()));
       settings.cloud = 'aws';
       syncControls(); update(); updateVlsmBase();
@@ -61,7 +63,7 @@ $('vlsmExample').addEventListener('click', () => {
     checkpoint();
     clearBlockMeta();
     const oldC = blockCidr(blk());
-    state.network = aton('10.10.0.0'); state.mask = 22; state.root = { c: null };
+    state.network = builtIn(aton, '10.10.0.0'); state.mask = 22; state.root = { c: null };
     renamePeers(oldC, blockCidr(blk()));
     syncControls(); update(); updateVlsmBase();
     toast('Base network set to 10.10.0.0/22 for the example');
@@ -128,7 +130,7 @@ $('vlsmRun').addEventListener('click', () => {
     return;
   }
   const { root, placed, failed, free, needTotal } = fit;
-  vlsmPlan = placed.length ? { placed, root, mode, active: state.active, base: cidrStr(state.network, state.mask), before: stateHash() } : null;
+  vlsmPlan = placed.length && root ? { placed, root, mode, active: state.active, base: cidrStr(state.network, state.mask), before: stateHash() } : null;
 
   let html = '';
   if (errors.length) html += `<div class="msg show error">${errors.map(esc).join('<br>')}</div>`;

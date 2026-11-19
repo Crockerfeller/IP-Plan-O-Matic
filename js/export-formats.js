@@ -204,7 +204,8 @@ const genMikrotik = (list, dhcp) => {
 // Which base networks become cloud networks (VPC / VNet / VCN), their names, and the peerings between them.
 // Shared by every cloud export. `c` is the format's comment marker.
 /** One network in a cloud export; each exporter adds the fields it needs (tgw, byZone, cf, subs).
-    @typedef {{ b: any, base: string, id: string, slug: string, dns: string, name: string, items: any[], tgw?: any[], byZone?: any, cf?: string, subs?: any[] }} CloudNet */
+    @typedef {{ b: Block, base: string, id: string, slug: string, dns: string, name: string, items: any[], tgw: any[], byZone: any, cf: string, subs: any[], att: any }} CloudNet
+      (tgw, byZone, cf, subs and att are filled in by the exporter that uses them, before it reads them.) */
 const cloudNets = (list, want, out, c = '#') => {
   // With several base networks, each one becomes its own VPC / VNet / VCN. If some base networks are set to
   // this cloud, only those are exported; otherwise all of them are.
@@ -222,10 +223,12 @@ const cloudNets = (list, want, out, c = '#') => {
   // Peerings between the exported networks: from the Peering button, or (plans from before it) the network
   // labeled Hub with every other one. Hub first in each pair.
   const byBlock = new Map(nets.map((v) => [v.b, v]));
+  /** @type {() => [CloudNet, CloudNet][]} */
   const netPairs = () => {
-    if (state.peers) return peerPairs().filter(([x, y]) => byBlock.has(x) && byBlock.has(y)).map(([x, y]) => [byBlock.get(x), byBlock.get(y)]);
+    // Both sides are in byBlock (checked first), so get() finds them.
+    if (state.peers) return peerPairs().filter(([x, y]) => byBlock.has(x) && byBlock.has(y)).map(([x, y]) => /** @type {[CloudNet, CloudNet]} */ ([byBlock.get(x), byBlock.get(y)]));
     const hub = nets.length > 1 && nets.find((v) => /^hub$/i.test(v.b.label || ''));
-    return hub ? nets.filter((v) => v !== hub).map((v) => [hub, v]) : [];
+    return hub ? nets.filter((v) => v !== hub).map((v) => /** @type {[CloudNet, CloudNet]} */ ([hub, v])) : [];
   };
   return { nets, netPairs };
 };
@@ -256,18 +259,22 @@ const AZ_NO_UDR = { gw: 'Azure doesn’t allow a default route here', fw: 'the f
   dbwhost: 'Databricks needs routes for its control plane', dbwcont: 'Databricks needs routes for its control plane', dnsin: 'DNS Private Resolver: route only if your firewall should see its traffic', dnsout: 'DNS Private Resolver: route only if your firewall should see its traffic' };
 const AZ_NO_NSG = { gw: 'Azure doesn’t support NSGs on GatewaySubnet', fw: 'Azure doesn’t allow NSGs here', fwmgmt: 'Azure doesn’t allow NSGs here', rs: 'Azure doesn’t allow NSGs here',
   bastion: 'Bastion needs a specific set of NSG rules (see Azure Bastion NSG docs)', appgw: 'Application Gateway v2 needs inbound 65200-65535 from GatewayManager', apim: 'API Management needs inbound 3443 from ApiManagement' };
+/** @typedef {{ net: CloudNet, name: string, id: string, routes: { name: string, prefix: string }[], noBgp: boolean, subs: any[] }} AzRouteTable */
+/** @type {(nets: CloudNet[], pairs: [CloudNet, CloudNet][], subName: (x: any) => string) => { fwIp: string, tables: AzRouteTable[], nsgs: { net: CloudNet, x: any, name: string }[], notes: string[] }} */
 const azSecurity = (nets, pairs, subName) => {
+  /** @type {ReturnType<typeof azSecurity>} */
   const res = { fwIp: '', tables: [], nsgs: [], notes: [] };
   const wantRt = !$('exAzRtL').hidden && $('exAzRt').checked, wantNsg = !$('exAzNsgL').hidden && $('exAzNsg').checked;
   const svcId = (x) => { const v = svcOf(x.meta); return v ? v.id : ''; };
   if (wantRt) {
     const fwNet = nets.find((v) => v.items.some((x) => svcId(x) === 'fw'));
     if (fwNet) {
-      const fwSub = fwNet.items.find((x) => svcId(x) === 'fw');
+      const fwSub = fwNet.items.find((x) => svcId(x) === 'fw');   // there is one: that's how fwNet was found
       res.fwIp = ntoa(fwSub.addr + 4);
       const peered = pairs.filter(([a, b]) => a === fwNet || b === fwNet).map(([a, b]) => (a === fwNet ? b : a));
       if (peered.length && state.peers && !state.po.f) res.notes.push('Turn on “Allow forwarded traffic” in Peering: the spokes’ traffic reaches them through the firewall.');
       for (const v of [fwNet, ...peered]) {
+        /** @type {AzRouteTable} */
         const t = { net: v, name: `rt-${v.slug}`, id: `rt_${v.id}`, routes: [{ name: 'default-via-firewall', prefix: '0.0.0.0/0' }], noBgp: true, subs: [] };
         for (const x of v.items) {
           const why = AZ_NO_UDR[svcId(x)];
@@ -1115,13 +1122,16 @@ const genPlanSvg = (list) => {
 };
 // PNG at twice the size for sharp text, smaller if that would make a canvas taller than browsers allow.
 const svgToPng = (svg) => new Promise((res, rej) => {
-  const [, wS, hS] = /width="(\d+)" height="(\d+)"/.exec(svg);
-  const w = Number(wS), h = Number(hS), scale = Math.min(2, 16000 / h);
+  const dims = /width="(\d+)" height="(\d+)"/.exec(svg);
+  if (!dims) { rej(new Error('svg size')); return; }
+  const w = Number(dims[1]), h = Number(dims[2]), scale = Math.min(2, 16000 / h);
   const img = new Image(), url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   img.onload = () => {
     const c = document.createElement('canvas');
     c.width = Math.round(w * scale); c.height = Math.round(h * scale);
     const g = c.getContext('2d');
+    // No 2-D context (a canvas too big for this device's memory): fail the export instead of leaving it hanging.
+    if (!g) { URL.revokeObjectURL(url); rej(new Error('png')); return; }
     g.scale(scale, scale); g.drawImage(img, 0, 0);
     URL.revokeObjectURL(url);
     c.toBlob((b) => (b ? res(b) : rej(new Error('png'))), 'image/png');

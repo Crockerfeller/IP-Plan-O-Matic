@@ -124,7 +124,7 @@ const fmtItem = (v, label) => {
   const b = document.createElement('button');
   b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.dataset.fmt = v;
   b.innerHTML = `<span class="fm-tick" aria-hidden="true">✓</span>${fmtIcon(v)}<span class="fm-lab"></span>`;
-  b.querySelector('.fm-lab').textContent = label || fmtText(v);
+  /** @type {HTMLElement} */ (b.querySelector('.fm-lab')).textContent = label || fmtText(v);   // set in the markup just above
   return b;
 };
 // Submenus live beside the scrolling list (in .fmenu), not inside it, so nothing can clip them;
@@ -143,7 +143,7 @@ for (const [head, items] of FMT_MENU) {
     wrap.className = 'fm-group';
     b.type = 'button'; b.className = 'fm-parent'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', id);
     b.innerHTML = `<span class="fm-tick" aria-hidden="true">✓</span>${fmtIcon(it[0])}<span class="fm-lab"></span><span aria-hidden="true">▸</span>`;
-    b.querySelector('.fm-lab').textContent = it[0];
+    /** @type {HTMLElement} */ (b.querySelector('.fm-lab')).textContent = it[0];
     sub.id = id; sub.className = 'fmenu-sub'; sub.setAttribute('role', 'menu'); sub.setAttribute('aria-label', it[0]); sub.hidden = true;
     for (const [v, label] of it[1]) sub.append(fmtItem(v, label));
     subOf.set(b, sub); parentOf.set(sub, b);
@@ -230,7 +230,7 @@ fmtWrap.addEventListener('pointerover', (e) => {
 });
 fmtWrap.addEventListener('keydown', (e) => {
   const a = document.activeElement;
-  if (!inMenu(a)) return;
+  if (!a || !inMenu(a)) return;
   e.stopPropagation();
   const sub = a.closest('.fmenu-sub');
   // Arrows move within the current level: the submenu, or the top level.

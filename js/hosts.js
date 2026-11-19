@@ -4,14 +4,16 @@
 'use strict';
 
 // ---------- IP assignments dialog ----------
+/** The subnet whose dialog is open. @type {string | null} */
 let hostsKey = null;
 const hostsCtx = () => {
-  const c = parseCidr(hostsKey), bi = blockOf(c.addr), cloud = bi >= 0 ? state.blocks[bi].cloud : settings.cloud;
+  // Only called while the dialog is open, for a subnet of the plan, so the key parses.
+  const c = /** @type {{ addr: number, mask: number }} */ (parseCidr(hostsKey)), bi = blockOf(c.addr), cloud = bi >= 0 ? state.blocks[bi].cloud : settings.cloud;
   return { c, info: hostInfo(c.addr, c.mask, cloud), cloud };
 };
 const nextFree = () => {
   const { info } = hostsCtx();
-  if (info.uF === null) return null;
+  if (info.uF === null || info.uL === null) return null;
   const taken = new Set(hostsIn(info.addr, info.mask));
   for (let ip = info.uF; ip <= info.uL; ip++) if (!taken.has(ip) && ip !== info.gw) return ip;
   return null;
@@ -23,7 +25,7 @@ const hostProblem = (ip) => {
   if (!inBlock(ip, c.addr, c.mask)) return `${ntoa(ip)} isn’t in ${hostsKey}.`;
   const res = info.reserved.find(([a]) => a === ip);
   if (res) return `${ntoa(ip)} is ${res[1]}.`;
-  if (info.uF === null || ip < info.uF || ip > info.uL) return `${ntoa(ip)} isn’t usable on this platform.`;
+  if (info.uF === null || info.uL === null || ip < info.uF || ip > info.uL) return `${ntoa(ip)} isn’t usable on this platform.`;
   const h = state.hosts[ntoa(ip)];
   if (h) return `${ntoa(ip)} is already assigned${h.n ? ` to ${h.n}` : ''}.`;
   return '';
@@ -31,7 +33,7 @@ const hostProblem = (ip) => {
 const renderHosts = () => {
   const { c, info } = hostsCtx(), meta = getMeta(hostsKey);
   $('hostsTtl').textContent = `IP addresses in ${hostsKey}${meta.n ? ` (${meta.n})` : ''}`;
-  const mine = hostsIn(c.addr, c.mask), used = mine.filter((ip) => info.uF !== null && ip >= info.uF && ip <= info.uL).length;
+  const mine = hostsIn(c.addr, c.mask), used = mine.filter((ip) => info.uF !== null && info.uL !== null && ip >= info.uF && ip <= info.uL).length;
   const nf = nextFree(), pct = info.hosts ? Math.round((100 * used) / info.hosts) : 0;
   $('hostsSum').textContent = `${fmt(used)} of ${fmt(info.hosts)} usable address${info.hosts === 1 ? '' : 'es'} assigned (${pct}%)${nf === null ? '. None left.' : ` · next free ${ntoa(nf)}`}`;
   $('hostsBar').style.setProperty('--p', Math.min(100, (100 * used) / Math.max(1, info.hosts)) + '%');

@@ -61,7 +61,8 @@ const cloudJson = (docs) => {
     }
     for (const s of items(doc).filter((x) => x && !x.addressSpace && (x.addressPrefix || x.addressPrefixes) && /\/virtualNetworks\//i.test(x.id || ''))) {
       source = 'Azure';
-      const vn = /\/virtualNetworks\/([^/]+)/i.exec(s.id)[1], id = s.id.replace(/\/subnets\/.*$/i, '');
+      // The filter above matched /virtualNetworks/, so exec finds it.
+      const vn = /** @type {RegExpExecArray} */ (/\/virtualNetworks\/([^/]+)/i.exec(s.id))[1], id = s.id.replace(/\/subnets\/.*$/i, '');
       net(id, 'azure', vn);
       for (const c of s.addressPrefixes || [s.addressPrefix]) sub(c, { n: s.name, o: vn, net: id });
     }
@@ -107,7 +108,17 @@ const cloudJson = (docs) => {
 const importText = (text) => {
   text = String(text || '').replace(/^\uFEFF/, '').trim();   // a byte-order mark from Excel or Notepad
   if (!text) throw new Error('Nothing to import.');
-  let base = null, tree = null, set = null, v6data = null, defs = null, peering = null, cloud = null, hosts = {};
+  // What the text holds. Plans and CLI output are JSON from outside, so their parts stay loosely typed (any).
+  /** @type {{ addr: number, mask: number } | null} */
+  let base = null;
+  /** @type {{ cloud: string, gw: string } | null} */
+  let set = null;
+  /** @type {any} */ let tree = null;
+  /** @type {any} */ let v6data = null;
+  /** @type {any} */ let defs = null;
+  /** @type {any} */ let peering = null;
+  /** @type {any} */ let cloud = null;
+  let hosts = {};
   const entries = [];
   if (text[0] === '{' || text[0] === '[') {
     let docs;

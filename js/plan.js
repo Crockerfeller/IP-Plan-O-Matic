@@ -156,6 +156,7 @@ const drawPeerArcs = () => {
   row.style.setProperty('--arc', under ? `${14 + Math.min(pairs.length, 6) * 7}px` : '0px');
   svg.innerHTML = paths;
 };
+/** @type {ResizeObserver | null} */
 let arcObserver = null;
 const NUDGE_KEY = 'subnetPlanner.cloudNudgeOff';
 let nudgeHidden = false;
@@ -225,7 +226,7 @@ const renderBlocks = () => {
     h.className = 'hint nudge';
     h.id = 'cloudNudge';
     h.innerHTML = '<span>Planning cloud networks? Set each card’s Platform, or start from the <button type="button" class="linkish">subnet wizard</button>.</span>';
-    h.querySelector('.linkish').addEventListener('click', () => openAz('azure'));
+    /** @type {HTMLElement} */ (h.querySelector('.linkish')).addEventListener('click', () => openAz('azure'));   // in the markup just above
     const x = document.createElement('button');
     x.type = 'button';
     x.className = 'chip-x';
@@ -282,7 +283,7 @@ const renderBlocks = () => {
       x.title = `Remove ${blockCidr(b)} from this plan`;
       x.setAttribute('aria-label', x.title);
       x.addEventListener('click', (e) => { e.stopPropagation(); removeBlock(i); });
-      card.querySelector('.nc-top').appendChild(x);
+      /** @type {HTMLElement} */ (card.querySelector('.nc-top')).appendChild(x);
     }
     // Only on address-space-sized networks (regions or spokes drawn as subnets), not on small hubs.
     if (i === state.active && b.root.c && b.mask <= 20) {
@@ -338,7 +339,7 @@ const fillSplitAll = () => {
   for (let n = state.mask + 1; n <= lim; n++) {
     const cnt = leavesAfterSplit(state.root, state.mask, n);
     if (cnt > MAX_SPLIT) break;
-    sel.add(new Option(`/${n}  (${fmt(cnt)} subnets)`, n));
+    sel.add(new Option(`/${n}  (${fmt(cnt)} subnets)`, String(n)));
   }
   if (!sel.options.length) sel.add(new Option('—', ''));
   // Keep the user's pick on the same block; otherwise suggest the smallest subnet size already in use.
@@ -348,6 +349,7 @@ const fillSplitAll = () => {
   sel.dataset.blk = blockCidr(blk());
   sel.disabled = $('splitAllBtn').disabled = !sel.options[0].value;
 };
+/** Draw the Plan tab; returns the row the Find IP box matched, if any. @type {() => HTMLTableRowElement | null} */
 const render = () => {
   renderBlocks();
   fillSplitAll();
@@ -371,6 +373,7 @@ const render = () => {
 
   const body = $('body');
   body.innerHTML = '';
+  /** @type {HTMLTableRowElement | null} */
   let foundRow = null;
   rows.forEach((leaf, idx) => {
     const key = leaf.key;
@@ -609,6 +612,7 @@ const editGroup = (td, key, old) => {
 };
 
 // ---------- Keyboard: select a row, then D divide, J join, S status, Enter rename ----------
+/** @type {string | null} */
 let selKey = null;
 const selectRow = (key, scroll = true) => {
   selKey = key;
@@ -891,7 +895,7 @@ const applyBase = () => {
       // Same size, new address: carry names and VLANs across to the matching subnets.
       const shift = aligned - state.network, moved = {};
       for (const k of blockMetaKeys()) {
-        const c = parseCidr(k);
+        const c = /** @type {{ addr: number, mask: number }} */ (parseCidr(k));   // blockMetaKeys only returns keys that parse
         moved[cidrStr(c.addr + shift, c.mask)] = state.meta[k];
         delete state.meta[k];
       }
@@ -928,7 +932,7 @@ $('addForm').addEventListener('submit', (e) => {
   const raw = $('addIn').value.trim();
   if (!raw) return;
   const p = parseLine(raw);
-  if (!p || p.error || !/^\d{1,3}(?:\.\d{1,3}){3}\s*(?:\/|255\.)/.test(raw)) {
+  if (!parsedOk(p) || !/^\d{1,3}(?:\.\d{1,3}){3}\s*(?:\/|255\.)/.test(raw)) {
     showMsg('msg', 'Enter a network with its prefix length, like 10.0.5.0/24, optionally followed by a name.', 'error');
     return;
   }
@@ -1010,7 +1014,7 @@ const runFind = (scroll) => {
   let role;
   if (res) role = res[1];
   else if (ip === info.gw) role = 'the gateway';
-  else if (info.uF !== null && ip >= info.uF && ip <= info.uL) role = `usable host #${fmt(ip - info.uF + 1)} of ${fmt(info.hosts)}`;
+  else if (info.uF !== null && info.uL !== null && ip >= info.uF && ip <= info.uL) role = `usable host #${fmt(ip - info.uF + 1)} of ${fmt(info.hosts)}`;
   else role = 'not usable on this platform';
   const name = getMeta(leaf.key).n;
   const hst = state.hosts[ntoa(ip)];

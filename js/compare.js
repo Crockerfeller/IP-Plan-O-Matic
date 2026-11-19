@@ -71,6 +71,7 @@ const diffPlans = (a, b, all) => {
   for (const r of onlyB) if (!paired.has(r.key) && counts(r.meta)) out.push({ kind: 'Added', key: r.key, addr: r.addr, mask: r.mask, before: '', after: cmpDesc(r) });
   return out.sort((x, y) => x.addr - y.addr || x.mask - y.mask || x.kind.localeCompare(y.kind));
 };
+/** The last comparison, for Copy. @type {{ changes: any[], name: string } | null} */
 let cmpLast = null;
 const fillCmpSaved = () => {
   const sel = $('cmpSaved'), plans = readPlans() || [];
@@ -98,6 +99,7 @@ const runCompare = async (text, name) => {
   out.innerHTML = html;
 };
 const cmpMarkdown = () => {
+  if (!cmpLast) return '';
   const cell = (v) => String(v || '').replace(/\|/g, '\\|');
   return [`Changes from ${cmpLast.name} to the current plan:`, '', '| Change | Subnet | Before | After |', '|---|---|---|---|',
     ...cmpLast.changes.map((c) => `| ${cell(c.kind)} | ${cell(c.key)} | ${cell(c.before)} | ${cell(c.after)} |`)].join('\n');

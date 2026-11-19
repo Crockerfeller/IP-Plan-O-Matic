@@ -46,7 +46,10 @@ const parseCidr = (s) => {
   const addr = netAddr(ip, mask);
   return { addr, mask, ip, aligned: addr === ip, cidr: cidrStr(addr, mask) };
 };
-/** @typedef {{ raw: string, error?: boolean, addr?: number, mask?: number, ip?: number, aligned?: boolean, cidr?: string, label?: string }} ParsedLine */
+/** A line's network. @typedef {{ raw: string, error?: undefined, addr: number, mask: number, ip: number, aligned: boolean, cidr: string, label: string }} ParsedOk */
+/** A line that didn't parse, or its network. @typedef {{ raw: string, error: true } | ParsedOk} ParsedLine */
+/** @param {ParsedLine | null} p @returns {p is ParsedOk} */
+const parsedOk = (p) => !!p && !p.error;
 // Pull "CIDR [label]" out of one line.
 /** @type {(line: string) => ParsedLine | null} */
 const parseLine = (line) => {
@@ -90,6 +93,9 @@ const binHtml = (addr, mask) => {
 };
 const binText = (addr) => [24, 16, 8, 0].map((sh) => ((Math.floor(addr / 2 ** sh)) & 255).toString(2).padStart(8, '0')).join('.');
 
+/** A network in one of the app's own tables, which must parse: a typo there fails at start-up, where the tests see it.
+    @template T @param {(s: string) => T | null} parse @param {string} c @returns {T} */
+const builtIn = (parse, c) => { const p = parse(c); if (!p) throw new Error(`Built-in network ${c} doesn't parse`); return p; };
 const SPECIAL4 = [
   ['0.0.0.0/8', '“This network” (RFC 791)', 'warn'],
   ['10.0.0.0/8', 'Private (RFC 1918)', 'ok'],
@@ -107,7 +113,7 @@ const SPECIAL4 = [
   ['224.0.0.0/4', 'Multicast (RFC 5771)', 'danger'],
   ['240.0.0.0/4', 'Reserved for future use', 'danger'],
   ['255.255.255.255/32', 'Limited broadcast', 'danger'],
-].map(([c, label, kind]) => ({ ...parseCidr(c), label, kind }));
+].map(([c, label, kind]) => ({ ...builtIn(parseCidr, c), label, kind }));
 const classify4 = (addr, mask) => {
   const hits = [];
   for (const r of SPECIAL4) {
@@ -251,6 +257,7 @@ const azNear = (n) => { if (!n) return null; const l = n.toLowerCase(); const hi
 // Everything about one subnet under the current platform rules.
 const hostInfo = (addr, mask, c = settings.cloud) => {
   const sz = size(mask), last = addr + sz - 1;
+  /** @type {{ addr: number, mask: number, last: number, reserved: [number, string][], uF: number | null, uL: number | null, hosts: number, gw: number | null, note: string, warn: string }} */
   const r = { addr, mask, last, reserved: [], uF: null, uL: null, hosts: 0, gw: null, note: '', warn: '' };
   if (c === 'std') {
     if (mask === 32) Object.assign(r, { uF: addr, uL: addr, hosts: 1, note: 'Single host (loopback or host route)' });
@@ -285,11 +292,18 @@ const hostInfo = (addr, mask, c = settings.cloud) => {
 // A node is { c: null } (leaf) or { c: [left, right] } (split into halves).
 // A plan holds one or more non-overlapping base networks ("blocks"), each with its own tree and platform.
 // state.network / mask / root and settings.cloud always refer to the active block.
+/** A tree node: a leaf, or split into halves (IPv6 also splits 16 ways on nibble boundaries).
+    @typedef {{ c: TreeNode[] | null }} TreeNode */
+/** One base network of the plan. @typedef {{ network: number, mask: number, root: TreeNode, cloud: string, label: string }} Block */
+/** The plan. network, mask and root are the active block's (getters below).
+    @typedef {{ blocks: Block[], active: number, meta: Record<string, any>, hosts: Record<string, any>, peers: [string, string][] | null,
+      po: typeof PEER_DEFAULTS, network: number, mask: number, root: TreeNode }} PlanState */
+/** @type {(network: number, mask: number, cloud?: string, label?: string) => Block} */
 const mkBlock = (network, mask, cloud = 'std', label = '') => ({ network, mask, root: { c: null }, cloud, label });
 // Peering options: m layout (hub / mesh / custom / none), h hub base network, f Azure forwarded traffic,
 // g Azure gateway transit, t AWS connection (tgw = Transit Gateway, pcx = VPC peering), r AWS routes in main route tables.
 const PEER_DEFAULTS = { m: 'hub', h: '', f: 1, g: 0, t: 'tgw', r: 1 };
-const state = { blocks: [mkBlock(aton('192.168.0.0'), 24)], active: 0, meta: {}, hosts: {}, peers: null, po: { ...PEER_DEFAULTS } };
+const state = /** @type {PlanState} */ ({ blocks: [mkBlock(/** @type {number} */ (aton('192.168.0.0')), 24)], active: 0, meta: {}, hosts: {}, peers: null, po: { ...PEER_DEFAULTS } });
 // meta: { 'a.b.c.d/m': { n: name, v: vlan, o: note, s: 'used' | 'reserved' } }, shared by all blocks
 const blk = () => state.blocks[state.active];
 for (const f of ['network', 'mask', 'root']) Object.defineProperty(state, f, { get: () => blk()[f], set: (v) => { blk()[f] = v; } });
@@ -302,19 +316,22 @@ const blockOf = (ip) => state.blocks.findIndex((b) => inBlock(ip, b.network, b.m
 const blockClash = (addr, mask, skip = -1) => state.blocks.find((b, i) => i !== skip && overlaps(addr, mask, b.network, b.mask));
 // Peering: state.peers is null (never set up) or a list of [cidr, cidr] pairs of base networks, hub first.
 const PEER_CLOUDS = ['azure', 'aws', 'gcp', 'oci'];
+/** @type {(c: string) => Block | undefined} */
 const blockByCidr = (c) => state.blocks.find((b) => blockCidr(b) === c);
 const cleanPo = (po) => {
   const p = po && typeof po === 'object' ? po : {};
   return { m: ['hub', 'mesh', 'custom', 'none'].includes(p.m) ? p.m : 'hub', h: typeof p.h === 'string' ? p.h : '', f: p.f === 0 ? 0 : 1, g: p.g === 1 ? 1 : 0, t: p.t === 'pcx' ? 'pcx' : 'tgw', r: p.r === 0 ? 0 : 1 };
 };
-const cleanPeers = (p) => (Array.isArray(p) ? p.filter((x) => Array.isArray(x) && x.length === 2 && typeof x[0] === 'string' && typeof x[1] === 'string' && x[0] !== x[1]).slice(0, 1000).map((x) => [x[0], x[1]]) : null);
+/** @type {(p: any) => [string, string][] | null} */
+const cleanPeers = (p) => (Array.isArray(p) ? p.filter((x) => Array.isArray(x) && x.length === 2 && typeof x[0] === 'string' && typeof x[1] === 'string' && x[0] !== x[1]).slice(0, 1000).map((x) => /** @type {[string, string]} */ ([x[0], x[1]])) : null);
 // Pairs that can be exported: both base networks still exist and are on the same cloud (Azure or AWS).
+/** @type {() => [Block, Block][]} */
 const peerPairs = () => (state.peers || []).map(([a, b]) => [blockByCidr(a), blockByCidr(b)])
-  .filter(([x, y]) => x && y && x !== y && x.cloud === y.cloud && PEER_CLOUDS.includes(x.cloud));
+  .filter(/** @returns {p is [Block, Block]} */ (p) => !!(p[0] && p[1] && p[0] !== p[1] && p[0].cloud === p[1].cloud && PEER_CLOUDS.includes(p[0].cloud)));
 // A base network got a new address or size: keep its peerings.
 const renamePeers = (from, to) => {
   if (from === to) return;
-  if (state.peers) state.peers = state.peers.map((pr) => pr.map((c) => (c === from ? to : c)));
+  if (state.peers) state.peers = state.peers.map(([a, b]) => [a === from ? to : a, b === from ? to : b]);
   if (state.po.h === from) state.po.h = to;
 };
 const getMeta = (key) => state.meta[key] || {};
@@ -324,6 +341,7 @@ const setMeta = (key, field, val) => {
   if (Object.keys(m).length) state.meta[key] = m; else delete state.meta[key];
 };
 let existing = [];  // networks pasted into the overlap checker
+/** @type {number | null} */
 let foundIp = null; // address from the Find IP box
 
 const COLS = [
@@ -474,7 +492,7 @@ const SPECIAL6 = [
   ['2001::/32', 'Teredo', 'warn'], ['2001:db8::/32', 'Documentation (RFC 3849)', 'warn'], ['2002::/16', '6to4 (deprecated)', 'warn'],
   ['fc00::/7', 'Unique local, ULA (RFC 4193)', 'ok'], ['fe80::/10', 'Link-local', 'warn'], ['ff00::/8', 'Multicast', 'danger'],
   ['2000::/3', 'Global unicast', ''],
-].map(([c, label, kind]) => { const p = parse6Cidr(c); return { n: p.net, mask: p.mask, label, kind, cidr: c }; });
+].map(([c, label, kind]) => { const p = builtIn(parse6Cidr, c); return { n: p.net, mask: p.mask, label, kind, cidr: c }; });
 const classTags6 = (n, m) => {
   const end = n + size6(m) - 1n;
   const hits = SPECIAL6.filter((r) => n <= r.n + size6(r.mask) - 1n && r.n <= end);
@@ -488,7 +506,8 @@ const pow2Text = (k) => (k <= 40 ? String(2 ** k) : `2^${k}`);
 
 const V6_DEFAULT = '2001:db8::/48';
 const MAX6 = 4096;
-const v6 = { net: parse6('2001:db8::'), mask: 48, root: { c: null }, meta: {} };
+/** The IPv6 plan. @type {{ net: bigint, mask: number, root: TreeNode, meta: Record<string, any> }} */
+const v6 = { net: builtIn(parse6, '2001:db8::'), mask: 48, root: { c: null }, meta: {} };
 const v6Key = (a, m) => `${fmt6(a)}/${m}`;
 // v6.meta: { 'prefix/len': { n: name, v: vlan, o: note, s: 'used' | 'reserved' } }
 const v6Get = (k) => v6.meta[k] || {};
@@ -540,12 +559,14 @@ const showMsg = (id, text, kind = 'info') => { const m = $(id); m.textContent = 
 const clearMsg = (id) => { const m = $(id); m.className = 'msg'; m.textContent = ''; };
 
 let toastTimer;
-// toast(text) or toast(text, { label, fn }) for a clickable action such as Undo.
+// toast(text) or toast(text, { label, fn }) for a clickable action such as Undo (or a list of them).
+/** @typedef {{ label: string, fn: () => void }} ToastAction */
+/** @type {(text: string, action?: ToastAction | ToastAction[]) => void} */
 const toast = (text, action) => {
   const t = $('toast');
   t.textContent = text;
   t.classList.toggle('act', !!action);
-  for (const a of action ? [].concat(action) : []) {
+  for (const a of /** @type {ToastAction[]} */ (action ? [action].flat() : [])) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = a.label;
@@ -675,7 +696,7 @@ const normMac = (s) => {
   const t = String(s ?? '').trim();
   if (!t || !/^[0-9a-f:.-]+$/i.test(t)) return '';
   const hex = t.replace(/[^0-9a-f]/gi, '').toLowerCase();
-  return hex.length === 12 ? hex.match(/../g).join(':') : '';
+  return hex.length === 12 ? (hex.match(/../g) || []).join(':') : '';
 };
 const cleanHost = (v) => {
   const a = Array.isArray(v) ? v : v && typeof v === 'object' ? [v.n ?? v.name, v.m ?? v.mac, v.o ?? v.note] : [v];
@@ -692,8 +713,10 @@ const cleanHosts = (o) => {
   return out;
 };
 // Assigned addresses as sorted numbers, rebuilt when the assignments change.
+/** @type {number[] | null} */
 let hostIpsCache = null;
-const hostIps = () => hostIpsCache || (hostIpsCache = Object.keys(state.hosts).map(aton).sort((a, b) => a - b));
+// The keys were checked when they were added (cleanHosts), so each one parses.
+const hostIps = () => hostIpsCache || (hostIpsCache = Object.keys(state.hosts).map((k) => /** @type {number} */ (aton(k))).sort((a, b) => a - b));
 const hostsChanged = () => { hostIpsCache = null; };
 const hostsIn = (addr, mask) => {
   const ips = hostIps(), last = lastAddr(addr, mask);
