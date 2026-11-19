@@ -693,7 +693,7 @@
 
     <div class="card pad">
       <h2>Import</h2>
-      <p class="sub">Load a JSON file exported from here, a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes), or the networks you already have in the cloud. Importing replaces the current IPv4 plan. A CSV with an <span class="mono">IP address</span> column instead (and Name, MAC, Notes) adds assigned addresses to the current plan.</p>
+      <p class="sub">Load a JSON file exported from here, a CSV with a <span class="mono">Subnet</span> column (and optionally Name, VLAN, Status, Notes), a NetBox or phpIPAM export, or the networks you already have in the cloud. Importing replaces the current IPv4 plan. A CSV with an <span class="mono">IP address</span> column instead (and Name, MAC, Notes) adds assigned addresses to the current plan.</p>
       <details class="im-cloud">
         <summary>Import from AWS, Azure, Google Cloud or Oracle Cloud</summary>
         <p>Run one of these and paste the output below (or save it to a file and load that). Nothing is sent anywhere: the import happens in this page.</p>
@@ -702,6 +702,14 @@
           <dt>Azure</dt><dd><code>az network vnet list</code> <span class="muted">(add <span class="mono">-g &lt;group&gt;</span> for one resource group)</span></dd>
           <dt>Google Cloud</dt><dd><code>gcloud compute networks subnets list --format=json</code></dd>
           <dt>Oracle Cloud</dt><dd><code>oci network vcn list -c &lt;compartment&gt;; oci network subnet list -c &lt;compartment&gt;</code></dd>
+        </dl>
+      </details>
+      <details class="im-cloud">
+        <summary>Import from NetBox or phpIPAM</summary>
+        <p>Export your prefixes and load the file here, or paste what the API returns. Each prefix that isn’t inside another one becomes a base network (a container names it), containers inside it become named groups, and the rest become subnets with their description as the name, VLAN, status and comments. IPv6 prefixes are skipped.</p>
+        <dl>
+          <dt>NetBox</dt><dd><b>IPAM → Prefixes → Export</b> (CSV), or <code>curl -H "Authorization: Token &lt;token&gt;" https://&lt;netbox&gt;/api/ipam/prefixes/?limit=1000</code></dd>
+          <dt>phpIPAM</dt><dd>Export the subnets as CSV (with <span class="mono">Subnet</span> and <span class="mono">Mask</span> columns), or <code>curl -H "token: &lt;token&gt;" https://&lt;phpipam&gt;/api/&lt;app&gt;/subnets/</code> <span class="muted">(the API gives VLANs as internal ids, so they aren’t carried over)</span></dd>
         </dl>
       </details>
       <div class="row">

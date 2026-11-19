@@ -105,6 +105,80 @@ const cloudJson = (docs) => {
   defs.sort((a, b) => a.c.addr - b.c.addr || a.c.mask - b.c.mask);
   return { defs, entries, source, guessed };
 };
+// ---------- Import from NetBox and phpIPAM: their CSV exports and their REST API's JSON ----------
+// The hierarchy becomes the plan: a prefix that isn't inside another one in the file is a base network (a container
+// names it), a container inside one is a named group, and the rest are subnets. Both tools keep a prefix's name in
+// its description.
+const IPAM_STATUS = { active: 'used', reserved: 'reserved', deprecated: 'reserved', container: 'container' };
+// "10", "Servers (10)", "VLAN 10" or a VLAN object from the API → "10". A name with no number stays a name.
+const ipamVlan = (v) => {
+  if (v && typeof v === 'object') return v.vid != null ? { vid: String(v.vid), name: '' } : { vid: '', name: String(v.name || '') };
+  const t = String(v ?? '').trim();
+  const m = /^(\d{1,4})$/.exec(t) || /\((\d{1,4})\)\s*$/.exec(t) || /^vlan\s*(\d{1,4})\b/i.exec(t);
+  return { vid: m ? m[1] : '', name: m ? '' : t };
+};
+// Rows as { prefix, mask?, desc, comments, status, vlan } → { defs, entries, source, notes }, the shape cloudJson returns.
+const ipamPlan = (rows, source) => {
+  let v6 = 0, dup = 0;
+  const seen = new Map();
+  for (const r of rows) {
+    const raw = String(r.prefix ?? '').trim();
+    if (raw.includes(':')) { v6++; continue; }
+    const hasMask = r.mask != null && String(r.mask).trim() !== '';
+    if (!raw.includes('/') && !hasMask) continue;   // a bare address isn't a prefix
+    const mk = String(r.mask ?? '').trim();   // 24, or 255.255.255.0
+    const c = parseCidr(raw.includes('/') ? raw : mk.includes('.') ? `${raw} ${mk}` : `${raw}/${mk}`);
+    if (!c || !c.aligned) continue;
+    if (seen.has(c.cidr)) { dup++; continue; }   // the same prefix in another VRF: keep the first
+    const st = String((r.status && typeof r.status === 'object' ? r.status.value : r.status) || '').trim().toLowerCase();
+    const vl = ipamVlan(r.vlan);
+    // phpIPAM falls back to the subnet itself when it has no description: that's not a name.
+    const desc = String(r.desc ?? '').trim(), name = desc === c.cidr || desc === raw ? '' : desc;
+    const notes = [String(r.comments ?? '').trim(), vl.name ? `VLAN ${vl.name}` : '', st === 'deprecated' ? `Deprecated in ${source}` : ''].filter(Boolean).join('. ');
+    seen.set(c.cidr, { c, name, vid: vl.vid, notes, status: IPAM_STATUS[st] || '' });
+  }
+  const all = [...seen.values()];
+  if (!all.length) throw new Error(`No IPv4 prefixes found in the ${source} ${v6 ? 'data (IPv6 prefixes are skipped)' : 'data'}.`);
+  // A prefix is inside another when one of its supernets is in the file. Checking the 32 possible supernets keeps
+  // this fast for big exports.
+  const inside = (c) => { for (let m = c.mask - 1; m >= 0; m--) if (seen.has(cidrStr(netAddr(c.addr, m), m))) return true; return false; };
+  const roots = all.filter((x) => !inside(x.c));
+  const MAX_ROOTS = 256;
+  if (roots.length > MAX_ROOTS) throw new Error(`That ${source} data has ${roots.length} top-level prefixes, each of which would be a base network here (at most ${MAX_ROOTS}). Export one site, VRF or container at a time.`);
+  const defs = roots.map((x) => ({ c: { addr: x.c.addr, mask: x.c.mask }, tree: null, cloud: settings.cloud, label: x.name.slice(0, 40) }))
+    .sort((a, b) => a.c.addr - b.c.addr);
+  // A container only names its base network (or its group); every other prefix becomes a subnet with its details.
+  const entries = all.filter((x) => !(x.status === 'container' && roots.includes(x)))
+    .map((x) => ({ ...x.c, n: x.name, v: x.vid, o: x.notes, s: x.status === 'container' ? '' : x.status }));
+  const notes = [v6 ? `Skipped ${v6} IPv6 prefix${v6 === 1 ? '' : 'es'}` : '', dup ? `skipped ${dup} duplicate${dup === 1 ? '' : 's'} (the same prefix in another VRF)` : ''].filter(Boolean);
+  return { defs, entries, source, guessed: 0, ipam: true, notes };
+};
+// A NetBox or phpIPAM CSV, from its header: NetBox has a Prefix column and no Name; phpIPAM has Subnet and Mask.
+const ipamCsv = (recs) => {
+  if (!recs.length) return null;
+  const hdr = recs[0].map((h) => String(h).trim().toLowerCase());
+  const col = (...names) => hdr.findIndex((h) => names.includes(h));
+  const pick = (r, i) => (i >= 0 ? r[i] : '');
+  const pi = col('prefix'), si = col('subnet'), mi = col('mask', 'netmask', 'subnet mask', 'bitmask'), ni = col('name');
+  const source = pi >= 0 && ni < 0 ? 'NetBox' : si >= 0 && mi >= 0 && ni < 0 ? 'phpIPAM' : '';
+  if (!source) return null;
+  const di = col('description'), oi = col('comments', 'comment', 'notes'), sti = col('status'), vi = col('vlan', 'vlan_vid', 'vid', 'vlan id', 'vlan number');
+  const rows = recs.slice(1).filter((r) => r.some((v) => String(v).trim())).map((r) => ({
+    prefix: pick(r, source === 'NetBox' ? pi : si), mask: source === 'phpIPAM' ? pick(r, mi) : '',
+    desc: pick(r, di), comments: pick(r, oi), status: pick(r, sti), vlan: pick(r, vi),
+  }));
+  return ipamPlan(rows, source);
+};
+// The REST APIs: NetBox's /api/ipam/prefixes/ ({ results: [...] }) and phpIPAM's /api/<app>/subnets/ ({ data: [...] }).
+// phpIPAM's API gives VLANs as its own internal ids, not VLAN numbers, so those aren't carried over.
+const ipamJson = (docs) => {
+  const items = docs.flatMap((d) => (Array.isArray(d) ? d : d && Array.isArray(d.results) ? d.results : d && Array.isArray(d.data) ? d.data : []));
+  const nb = items.filter((x) => x && typeof x.prefix === 'string');
+  if (nb.length) return ipamPlan(nb.map((x) => ({ prefix: x.prefix, desc: x.description, comments: x.comments, status: x.status, vlan: x.vlan })), 'NetBox');
+  const pi = items.filter((x) => x && typeof x.subnet === 'string' && x.mask != null && String(x.isFolder ?? '0') !== '1');   // the API sends "0" / "1"
+  if (pi.length) return ipamPlan(pi.map((x) => ({ prefix: x.subnet, mask: x.mask, desc: x.description })), 'phpIPAM');
+  return null;
+};
 const importText = (text) => {
   text = String(text || '').replace(/^\uFEFF/, '').trim();   // a byte-order mark from Excel or Notepad
   if (!text) throw new Error('Nothing to import.');
@@ -117,15 +191,15 @@ const importText = (text) => {
   /** @type {any} */ let v6data = null;
   /** @type {any} */ let defs = null;
   /** @type {any} */ let peering = null;
-  /** @type {any} */ let cloud = null;
+  /** @type {any} */ let cloud;   // set below: cloud CLI output, or NetBox / phpIPAM data
   let hosts = {};
   const entries = [];
   if (text[0] === '{' || text[0] === '[') {
     let docs;
     try { docs = jsonDocs(text); } catch (e) { throw new Error('That JSON couldn’t be read.', { cause: e }); }
-    cloud = cloudJson(docs);
-    if (!cloud && (docs.length !== 1 || Array.isArray(docs[0]))) throw new Error('That JSON isn’t a plan from here or a network list from AWS, Azure, Google Cloud or Oracle Cloud.');
-  }
+    cloud = cloudJson(docs) || ipamJson(docs);
+    if (!cloud && (docs.length !== 1 || Array.isArray(docs[0]))) throw new Error('That JSON isn’t a plan from here, a network list from AWS, Azure, Google Cloud or Oracle Cloud, or prefixes from NetBox or phpIPAM.');
+  } else cloud = ipamCsv(parseCsv(text));
   if (cloud) {
     entries.push(...cloud.entries);
     defs = cloud.defs;
@@ -253,7 +327,9 @@ const doImport = (text) => {
     const { count, skipped, cloud } = importText(text);
     const where = state.blocks.map(blockName).join(', ');
     const guess = cloud && cloud.guessed ? ` ${cloud.guessed === 1 ? 'One network’s' : `${cloud.guessed} networks’`} address space wasn’t in the paste, so ${cloud.guessed === 1 ? 'it is' : 'they are'} the smallest block covering ${cloud.guessed === 1 ? 'its' : 'their'} subnets.${cloud.source === 'AWS' ? ' Paste the describe-vpcs output too for the real VPC ranges.' : ''}` : '';
-    showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'}${cloud ? ` from ${cloud.source}, marked in use,` : ''} into ${where}${skipped ? `. Skipped ${skipped} that didn’t fit a base network (overlapping networks keep the first)` : ''}.${guess}`, 'ok');
+    const from = cloud ? ` from ${cloud.source}${cloud.ipam ? '' : ', marked in use,'}` : '';
+    const ipamNotes = cloud && cloud.ipam && cloud.notes.length ? ` ${cloud.notes.join(', ').replace(/^./, (ch) => ch.toUpperCase())}.` : '';
+    showMsg('imMsg', `Imported ${count} subnet${count === 1 ? '' : 's'}${from} into ${where}${skipped ? `. Skipped ${skipped} that didn’t fit a base network (overlapping networks keep the first)` : ''}.${guess}${ipamNotes}`, 'ok');
     renderExport();
   } catch (e) {
     showMsg('imMsg', e.message, 'error');

@@ -346,6 +346,74 @@ T.v6 = async () => {
 };
 
 // Backups: the Plans dialog nudges an export while saved plans have changed since the last one, and goes quiet after.
+// Import from NetBox and phpIPAM: their CSV exports (and ours, round trip) and their REST APIs' JSON.
+T.ipamImport = async () => {
+  await load('../index.html#192.168.0.0/24');
+  const imp = (text) => { click('#tb-export'); $('imText').value = text; click('#imRun'); return $('imMsg').textContent; };
+  const asJson = () => { select('#exFmt', 'json'); return JSON.parse($('exOut').value); };
+  // The CSV export quotes every field: "Subnet","Group",...
+  const groups = () => { select('#exFmt', 'csv'); const lines = $('exOut').value.split('\n').map((l) => l.slice(1, -1).split('","')); const g = lines[0].indexOf('Group'); return lines.slice(1).map((l) => l[g]).filter(Boolean); };
+  const sub = (j, cidr) => j.subnets.find((x) => x.cidr === cidr) || {};
+  // A NetBox prefix list as its web UI exports it: display names, a campus container with a building inside,
+  // VLANs shown as "name (VID)", an IPv6 prefix and the same prefix in a second VRF.
+  let msg = imp([
+    'Prefix,Status,Children,VRF,Utilization,Tenant,Site,VLAN,Role,Description',
+    '10.0.0.0/16,Container,3,,12%,,HQ,,,Campus',
+    '10.0.0.0/20,Container,2,,40%,,HQ,,,Building A',
+    '10.0.1.0/24,Active,0,,50%,,HQ,Servers (10),,Servers',
+    '10.0.2.0/24,Reserved,0,,0%,,HQ,20,,Printers',
+    '10.0.3.0/24,Deprecated,0,,0%,,HQ,Old-Voice,,Old phones',
+    '10.0.1.0/24,Active,0,Lab,50%,,HQ,,,Lab copy',
+    '2001:db8::/48,Container,0,,0%,,HQ,,,v6',
+  ].join('\n'));
+  let j = asJson();
+  check('ipam: NetBox CSV: the container is the base network, with its name', j.blocks.length === 1 && j.blocks[0].base === '10.0.0.0/16' && j.blocks[0].label === 'Campus', j.blocks);
+  check('ipam: NetBox CSV: names from Description, VLAN from "Servers (10)", Active → in use', sub(j, '10.0.1.0/24').name === 'Servers' && sub(j, '10.0.1.0/24').vlan === 10 && sub(j, '10.0.1.0/24').status === 'used', sub(j, '10.0.1.0/24'));
+  check('ipam: NetBox CSV: Reserved, a bare VID, and Deprecated kept as reserved with a note', sub(j, '10.0.2.0/24').status === 'reserved' && sub(j, '10.0.2.0/24').vlan === 20
+    && sub(j, '10.0.3.0/24').status === 'reserved' && /VLAN Old-Voice/.test(sub(j, '10.0.3.0/24').note) && /Deprecated in NetBox/.test(sub(j, '10.0.3.0/24').note), [sub(j, '10.0.2.0/24'), sub(j, '10.0.3.0/24')]);
+  check('ipam: NetBox CSV: a nested container becomes a named group', groups().includes('Building A'), groups());
+  check('ipam: NetBox CSV: says it came from NetBox and what was skipped', /from NetBox into/.test(msg) && /Skipped 1 IPv6 prefix/.test(msg) && /1 duplicate/.test(msg) && !/marked in use/.test(msg), msg);
+  // Round trips: our own NetBox and phpIPAM exports come back as the same plan.
+  await load('../index.html#10.50.0.0/22');
+  divideRow(0); divideRow(0);
+  type(qa('#body tr')[0].querySelector('input'), 'Users');
+  type(qa('#body tr')[1].querySelector('input'), 'Voice');
+  const before = asJson();
+  for (const f of ['netbox', 'phpipam']) {
+    select('#exFmt', f);
+    const text = $('exOut').value;
+    msg = imp(text);
+    j = asJson();
+    const same = j.blocks.map((b) => b.base).join() === before.blocks.map((b) => b.base).join()
+      && before.subnets.every((x) => sub(j, x.cidr).name === x.name);
+    check(`ipam: our ${f} export imports back as the same plan`, same && new RegExp(`from ${f === 'netbox' ? 'NetBox' : 'phpIPAM'}`).test(msg), [msg, j.subnets.map((x) => x.cidr + ' ' + x.name)]);
+  }
+  // phpIPAM CSV with a dotted mask, and its API JSON (folders skipped, VLAN ids not carried over).
+  imp('Section,Subnet,Mask,Description,VLAN,Master subnet\nSite,172.16.0.0,255.255.0.0,Site,,\nSite,172.16.8.0,21,Cameras,30,172.16.0.0/16');
+  j = asJson();
+  check('ipam: phpIPAM CSV: dotted or bit masks, the top subnet is the base network', j.blocks[0].base === '172.16.0.0/16' && sub(j, '172.16.8.0/21').name === 'Cameras' && sub(j, '172.16.8.0/21').vlan === 30, j.blocks.concat(j.subnets.slice(0, 3)));
+  imp(JSON.stringify({ code: 200, success: true, data: [
+    { id: '1', subnet: '10.9.0.0', mask: '16', description: 'Branch', isFolder: '0', vlanId: null },
+    { id: '2', subnet: '10.9.4.0', mask: '24', description: 'Staff', isFolder: '0', vlanId: '7' },
+    { id: '3', subnet: '', mask: '', description: 'A folder', isFolder: '1' },
+  ] }));
+  j = asJson();
+  check('ipam: phpIPAM API JSON', j.blocks[0].base === '10.9.0.0/16' && j.blocks[0].label === 'Branch' && sub(j, '10.9.4.0/24').name === 'Staff' && sub(j, '10.9.4.0/24').vlan === null, [j.blocks, sub(j, '10.9.4.0/24')]);
+  // NetBox API JSON: status and VLAN as objects.
+  imp(JSON.stringify({ count: 2, results: [
+    { prefix: '10.70.0.0/22', status: { value: 'container', label: 'Container' }, vlan: null, description: 'DC', comments: '' },
+    { prefix: '10.70.1.0/24', status: { value: 'active', label: 'Active' }, vlan: { id: 99, vid: 110, name: 'Storage' }, description: 'SAN', comments: 'iSCSI' },
+  ] }));
+  j = asJson();
+  check('ipam: NetBox API JSON', j.blocks[0].base === '10.70.0.0/22' && j.blocks[0].label === 'DC' && sub(j, '10.70.1.0/24').name === 'SAN' && sub(j, '10.70.1.0/24').vlan === 110 && sub(j, '10.70.1.0/24').status === 'used' && sub(j, '10.70.1.0/24').note === 'iSCSI', sub(j, '10.70.1.0/24'));
+  // A flat list of hundreds of unrelated prefixes would be hundreds of base networks: refuse, and say why.
+  const many = ['Prefix,Status,Description', ...Array.from({ length: 300 }, (_, i) => `10.${i >> 8}.${i & 255}.0/24,Active,n${i}`)].join('\n');
+  msg = imp(many);
+  check('ipam: too many top-level prefixes is refused with a reason', /300 top-level prefixes/.test(msg) && $('imMsg').classList.contains('error'), msg);
+  // A CSV with its own Name column is still a plain plan CSV, not NetBox.
+  imp('Prefix,Name,Status\n10.80.0.0/24,Plain,used');
+  check('ipam: a Prefix CSV with a Name column is a plain plan CSV', sub(asJson(), '10.80.0.0/24').name === 'Plain' && !/NetBox/.test($('imMsg').textContent), $('imMsg').textContent);
+};
 T.backup = async () => {
   await load('../index.html#10.2.0.0/16');
   W.localStorage.removeItem('subnetPlanner.plans'); W.localStorage.removeItem('subnetPlanner.backedUp');
@@ -930,7 +998,7 @@ T.cloudImport = async () => {
   check('oci: vcn and subnet', $('platform').value === 'oci' && $('network').value === '172.16.0.0' && $('mask').value === '16' && snap().rows.some((r) => r.startsWith('172.16.1.0/24') && r.includes('[public]')) && !m.includes('wasn’t in the paste'), [m, snap().rows]);
   // Not a cloud list, and broken JSON: clear errors, plan untouched.
   m = await imp('[{"foo": 1}]');
-  check('unknown JSON list: clear error', m.includes('isn’t a plan from here or a network list') && $('network').value === '172.16.0.0', m);
+  check('unknown JSON list: clear error', m.includes('isn’t a plan from here, a network list') && $('network').value === '172.16.0.0', m);
   m = await imp('{"Subnets": [');
   check('broken JSON: clear error', m.includes('couldn’t be read'), m);
   // The plan's own JSON still imports.
