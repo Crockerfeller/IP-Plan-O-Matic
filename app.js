@@ -5456,6 +5456,30 @@
     catch (e) { showMsg('plansMsg', 'Couldn’t save: this browser is blocking storage (private mode?) or it is full. Use Copy link or Export instead.', 'error'); return false; }
   };
   const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  // Backups. Saved plans live only in this browser's storage, which the browser may clear (Safari does for a site not
+  // visited in 7 days, unless it's installed). So: ask the browser to keep it, and nudge an export when plans have
+  // changed since the last one.
+  const BACKUP_KEY = 'subnetPlanner.backedUp';
+  const lastBackup = () => { try { return Number(localStorage.getItem(BACKUP_KEY)) || 0; } catch (e) { return 0; } };
+  let kept = false;   // the browser agreed to keep this site's storage (navigator.storage.persist)
+  const askToKeep = async () => {
+    try {
+      if (!navigator.storage || !navigator.storage.persist) return;
+      kept = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+    } catch (e) { /* not offered here */ }
+  };
+  try { if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then((v) => { kept = v; }, () => {}); } catch (e) { /* ignore */ }
+  const renderBackup = (list) => {
+    const box = $('plansBackup'), txt = $('plansBackupTxt');
+    if (!list || !list.length) { box.hidden = true; return; }
+    const at = lastBackup(), stale = list.filter((x) => (x.updated || 0) > at).length;
+    const risk = kept ? '' : ' This browser can clear them, for example Safari after 7 days without a visit.';
+    box.hidden = false;
+    box.classList.toggle('done', !stale);
+    txt.textContent = !stale ? `All saved plans backed up ${when(at)}.`
+      : !at ? `Your saved plans aren’t backed up yet: they live only in this browser.${risk} Back them up to a file.`
+        : `${stale} saved plan${stale === 1 ? '' : 's'} changed since your last backup on ${when(at)}.${risk}`;
+  };
   const setCurrentPlan = (id) => {
     currentPlanId = id;
     try { if (id) sessionStorage.setItem('subnetPlanner.planId', id); else sessionStorage.removeItem('subnetPlanner.planId'); } catch (e) { /* ignore */ }
@@ -5484,6 +5508,7 @@
     const list = readPlans();
     const body = $('plansBody');
     body.innerHTML = '';
+    renderBackup(list);
     if (list === null) { showMsg('plansMsg', 'Saved plans aren’t available because this browser is blocking storage. Use Copy link or Export instead.', 'error'); return; }
     if (!list.length) { body.innerHTML = '<tr><td colspan="3" class="empty">No saved plans yet. Name this one above and click Save.</td></tr>'; return; }
     const cur = stateHash();
@@ -5578,7 +5603,7 @@
     let id;
     if (same) { same.hash = h; same.updated = Date.now(); same.name = name; id = same.id; }
     else { id = newId(); all.push({ id, name, hash: h, updated: Date.now() }); }
-    if (writePlans(all)) { setCurrentPlan(id); showMsg('plansMsg', `Saved “${name}”.`, 'ok'); renderPlans(); }
+    if (writePlans(all)) { setCurrentPlan(id); showMsg('plansMsg', `Saved “${name}”.`, 'ok'); askToKeep().then(renderPlans); renderPlans(); }
   });
   $('planNew').addEventListener('click', () => {
     openPlanHash(DEFAULT_HASH);
@@ -5587,11 +5612,17 @@
     $('plansDlg').close();
     toast('Started a new plan', UNDO);
   });
-  $('plansExport').addEventListener('click', () => {
+  const exportPlans = () => {
     const list = readPlans() || [];
     if (!list.length) { showMsg('plansMsg', 'There are no saved plans to export yet.', 'info'); return; }
-    download('ip-plan-o-matic-plans.json', JSON.stringify({ format: 'ip-plan-o-matic-plans', version: 1, exported: new Date().toISOString(), plans: list }, null, 2), 'application/json');
-  });
+    const stamp = new Date();
+    download(`ip-plan-o-matic-plans-${stamp.toISOString().slice(0, 10)}.json`, JSON.stringify({ format: 'ip-plan-o-matic-plans', version: 1, exported: stamp.toISOString(), plans: list }, null, 2), 'application/json');
+    try { localStorage.setItem(BACKUP_KEY, String(stamp.getTime())); } catch (e) { /* ignore */ }
+    showMsg('plansMsg', `Backed up ${list.length} plan${list.length === 1 ? '' : 's'}. Import… brings them back, here or on another device.`, 'ok');
+    renderBackup(list);
+  };
+  $('plansExport').addEventListener('click', exportPlans);
+  $('plansBackupBtn').addEventListener('click', exportPlans);
   $('plansImport').addEventListener('change', () => {
     const f = $('plansImport').files[0];
     if (!f) return;

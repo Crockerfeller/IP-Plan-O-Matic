@@ -186,8 +186,12 @@
         <tbody id="plansBody"></tbody>
       </table>
     </div>
+    <div class="backup" id="plansBackup" role="status" hidden>
+      <span id="plansBackupTxt"></span>
+      <button type="button" class="small" id="plansBackupBtn">Back up now</button>
+    </div>
     <div class="row dlg-foot">
-      <button type="button" id="plansExport">Export all</button>
+      <button type="button" id="plansExport" title="Download every saved plan as one file: your backup, or to move them to another device">Export all</button>
       <label class="filebtn"><input type="file" id="plansImport" accept=".json,application/json"> Import…</label>
     </div>
   </dialog>

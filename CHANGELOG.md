@@ -5,6 +5,8 @@ date. The build number in the app's footer is the commit it was built from.
 
 ## 2026-11-18
 
+- **Backups:** the Plans dialog reminds you to back up saved plans when they've changed since your last backup,
+  and asks the browser to keep them (so Safari doesn't clear them after a week away). Backups are dated files.
 - **Content Security Policy:** the app and guides can only run their own script files, so a malicious plan link
   couldn't run code even if a bug let its text through.
 - **Accessibility:** checked against WCAG 2.2 AA in light and dark themes on every release. Text colors have more

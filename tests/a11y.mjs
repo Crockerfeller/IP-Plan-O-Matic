@@ -78,7 +78,8 @@ try {
       await page.evaluate(() => document.querySelectorAll('dialog[open]').forEach((d) => d.close()));
     };
     await dialog('keyboard shortcuts', () => page.click('#keysBtn'));
-    await dialog('saved plans', () => page.click('#plansBtn'));
+    // With a saved plan, so the list and the backup note are scanned too.
+    await dialog('saved plans', async () => { await page.click('#plansBtn'); await page.fill('#planName', 'Campus'); await page.click('#planSaveForm button[type=submit]'); });
     await dialog('IP addresses', () => page.locator('#body tr .hosts-btn').first().click());
     await dialog('on-prem wizard', () => page.click('#tplBtn'));
     await page.selectOption('#platform', 'azure');

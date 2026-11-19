@@ -234,6 +234,12 @@ dialog#plansDlg::backdrop, dialog#hostsDlg::backdrop { background: rgba(10, 14, 
 .plans-list .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
 .plans-list td:nth-child(2) { white-space: nowrap; font-size: 13px; }
 .plans-list .when { color: var(--muted); font-size: 12px; margin-top: 2px; }
+/* Backup status under the saved plans: a nudge when plans have changed since the last export, quiet once backed up. */
+.backup { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 12px; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--warn-weak); color: var(--text); }
+.backup[hidden] { display: none; }
+.backup span { flex: 1 1 260px; }
+.backup.done { background: none; padding: 0; color: var(--muted); }
+.backup.done button { display: none; }
 .plans-list td:first-child { min-width: 160px; }
 .plans-list .empty { color: var(--muted); text-align: center; padding: 18px; }
 .dlg-foot { margin-top: 12px; }

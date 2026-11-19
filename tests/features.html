@@ -345,6 +345,31 @@ T.v6 = async () => {
   check('too-big line rejected', $('v6PlanOut').textContent.includes('bigger than'), $('v6PlanOut').textContent);
 };
 
+// Backups: the Plans dialog nudges an export while saved plans have changed since the last one, and goes quiet after.
+T.backup = async () => {
+  await load('../index.html#10.2.0.0/16');
+  W.localStorage.removeItem('subnetPlanner.plans'); W.localStorage.removeItem('subnetPlanner.backedUp');
+  click('#plansBtn');
+  check('backup: no note while there are no saved plans', $('plansBackup').hidden);
+  $('planName').value = 'Branch'; $('planSaveForm').requestSubmit();
+  await sleep(100);
+  const box = $('plansBackup'), txt = () => $('plansBackupTxt').textContent;
+  check('backup: after saving, a nudge to back up', !box.hidden && !box.classList.contains('done') && /aren’t backed up yet/.test(txt()) && !$('plansBackupBtn').hidden, txt());
+  const got = [], orig = W.URL.createObjectURL, origClick = W.HTMLAnchorElement.prototype.click;
+  let blob = null;
+  W.URL.createObjectURL = (b) => { blob = b; return 'blob:x'; };
+  W.HTMLAnchorElement.prototype.click = function () { got.push(this.download); };
+  click('#plansBackupBtn');
+  W.URL.createObjectURL = orig; W.HTMLAnchorElement.prototype.click = origClick;
+  const file = blob ? JSON.parse(await blob.text()) : {};
+  check('backup: Back up now downloads every plan in a dated file', /^ip-plan-o-matic-plans-\d{4}-\d\d-\d\d\.json$/.test(got[0] || '') && file.format === 'ip-plan-o-matic-plans' && file.plans.length === 1, [got, file.plans && file.plans.length]);
+  check('backup: then it goes quiet', box.classList.contains('done') && /^All saved plans backed up/.test(txt()) && W.getComputedStyle($('plansBackupBtn')).display === 'none', txt());
+  await sleep(5);
+  [...qa('#plansBody button')].find((b) => b.textContent === 'Save here').click();
+  check('backup: a change after the backup brings the nudge back', !box.classList.contains('done') && /^1 saved plan changed since your last backup/.test(txt()), txt());
+  $('plansDlg').close();
+  W.localStorage.removeItem('subnetPlanner.plans'); W.localStorage.removeItem('subnetPlanner.backedUp');
+};
 T.plans = async () => {
   await load('../index.html#10.1.0.0/16');
   W.localStorage.removeItem('subnetPlanner.plans');
@@ -602,14 +627,16 @@ T.guidesTab = async () => {
   await load('../index.html#10.0.0.0/24');
   click('#tb-learn');
   check('guides tab shows cards', !$('tab-learn').hidden && qa('#tab-learn .guide-grid a').length === 11 && qa('#tab-learn .guide-grid a').some((a) => a.href.endsWith('learn/subnet-sizes.html')), qa('#tab-learn .guide-grid a').length);
-  const res = await Promise.all(qa('#tab-learn .guide-grid a').map((a) => fetch(a.href).then((r) => r.status)));
+  // ~40 requests at once can make the little test server drop one: try each failed one again before calling it missing.
+  const status = (u) => fetch(u).then((r) => r.status, () => fetch(u).then((r) => r.status));
+  const res = await Promise.all(qa('#tab-learn .guide-grid a').map((a) => status(a.href)));
   check('every guide link resolves', res.every((s) => s === 200), res);
   click('#tb-plan');
   // Size pages: every link on the index resolves, and each page links back and forth.
   const idx = await (await fetch('../learn/subnet-sizes.html')).text();
   const pages = [...idx.matchAll(/<li><a href="([^"]+)"/g)].map((m) => m[1]);
   check('size index lists /8 to /32 and IPv6 /48, /56, /64', pages.length === 28 && pages[0] === 'slash-8-subnet.html' && pages[24] === 'slash-32-subnet.html' && pages[27] === 'ipv6-slash-64.html', pages);
-  const st = await Promise.all(pages.map((pg) => fetch('../learn/' + pg).then((r) => r.status)));
+  const st = await Promise.all(pages.map((pg) => status('../learn/' + pg)));
   check('every size page resolves', st.every((s) => s === 200), st);
   const p26 = await (await fetch('../learn/slash-26-subnet.html')).text();
   check('/26 page: mask, hosts, ranges, neighbours', p26.includes('255.255.255.192') && p26.includes('<td>Usable hosts</td><td>62 ') && p26.includes('192.168.1.193 – 192.168.1.254') && p26.includes('href="slash-25-subnet.html"') && p26.includes('href="slash-27-subnet.html"'));
